@@ -14,57 +14,59 @@ datasource db {
 model Enquiry {
   id          Int      @id @default(autoincrement())
   
-  // Basic Customer Information
+  // Basic Information (exactly matching your form)
   status      String   @default("New") // New, Sold, Finalised
+  institutionName String?
   firstName   String
-  lastName    String?
-  surname     String?  // For backwards compatibility
+  lastName    String
+  
+  // Contact Information
   email       String
   phone       String?
-  nationality String?  @default("English")
+  nationality String?  // English, Chinese, Korean, Japanese, Indian, Other
   
   // Location Information
-  state       String
+  state       String   // Australian states and territories
   suburb      String?
   
-  // Business Information
-  institutionName String?
-  
-  // Product Interest (stored as JSON array)
-  productInterest Json?   // ["Steinway", "Boston", etc.]
+  // Product Interest (stored as JSON array of IDs)
+  productInterest Json?   // ["steinway", "boston", "essex", "kawai", "yamaha", "usedpiano", "roland", "ritmuller", "ronisch", "kurzweil", "other"]
   
   // Source Information
-  source         String?  // Where did you hear about us
-  eventSource    String?  // Where did enquiry come from
-  enquirySource  String?  // Alternative field name
+  source         String?  // Teacher, Google, Facebook, Instagram, LinkedIn, WeChat, YouTube, Steinway Website, Radio, Magazine/Newspaper, Recommended by a friend, Event Follow Up, Other
+  eventSource    String?  // Events - Steinway Gallery St Leonards, Events - Steinway Gallery Melbourne, Phone Enquiry, In-store enquiry, etc.
   
-  // Comments and Notes
-  comments       String?
-  followUpNotes  String?
+  // Comments and Additional Information
+  comments       String?  // Other Comments from form
   
-  // Follow-up Information
-  bestTimeToFollowUp DateTime?
-  customerRating     String?   @default("N/A")
-  stepProgram        String?   @default("N/A")
-  
-  // Staff Management
-  submittedBy        String?
-  callTakenBy        String?
-  enquiryUpdatedBy   String?
-  
-  // Sales Manager Involvement
-  salesManagerInvolved    String?  @default("No") // Yes/No
-  salesManagerExplanation String?
-  notInvolvingReason     String?
+  // Staff and Rating Information (from form)
+  submittedBy    String?  // Enquiry Submitted By
+  customerRating String?  @default("N/A") // N/A, Ready to buy, High Priority, After Sale Follow Up, Very interested but not ready to buy, Looking for information, Just browsing for now, Cold, Events
   
   // Email Preferences
-  doNotEmail    Boolean  @default(false)
-  newsletter    String?  @default("Yes") // Yes/No
+  doNotEmail     Boolean  @default(false) // Do Not Email This Customer checkbox
+  
+  // Follow-up System (additional fields used in follow-up form)
+  followUpInfo   String?
+  bestTimeToFollowUp DateTime?
+  stepProgram    String?  @default("N/A") // N/A, Interested, Not interested
+  enquiryUpdatedBy String? // Staff member who updated in follow-up
+  salesManagerInvolved String? @default("No") // Yes/No
+  salesManagerExplanation String?
+  followUpNotes  String?
+  
+  // Backward compatibility fields
+  surname        String?  // For data migration
+  callTakenBy    String?  // Legacy field
+  enquirySource  String?  // Legacy field
+  newsletter     String?  // Legacy field
+  inputDate      DateTime? // Legacy field
   
   // System Fields
-  inputDate     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  importSource   String?  // Track if imported from old system
+  originalId     String?  // Original ID from old system
   
   @@map("enquiries")
 }

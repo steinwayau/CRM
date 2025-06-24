@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Enquiry {
+  id                  Int      @id @default(autoincrement())
+  status              String   @default("New")
+  institutionName     String?  @map("institution_name")
+  firstName           String   @map("first_name")
+  surname             String?
+  email               String
+  phone               String?
+  nationality         String   @default("English")
+  state               String
+  suburb              String?
+  source              String?
+  enquirySource       String?  @map("enquiry_source")
+  products            String[] // Array of selected products
+  otherProducts       String?  @map("other_products")
+  comment             String?
+  followUpInfo        String?  @map("follow_up_info")
+  followUpDate        DateTime? @map("follow_up_date")
+  classification      String   @default("N/A")
+  stepProgram         String?  @map("step_program") @default("N/A")
+  involving           String?  @default("No")
+  notInvolvingReason  String?  @map("not_involving_reason")
+  newsletter          String   @default("Yes")
+  callTakenBy         String   @map("call_taken_by")
+  originalFollowUpDate DateTime? @map("original_follow_up_date")
+  inputDate           DateTime @default(now()) @map("input_date")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("enquiries")
+}
+
+model Staff {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  email     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("staff")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("staff") // admin, staff
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+} 

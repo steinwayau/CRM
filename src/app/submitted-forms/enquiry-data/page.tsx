@@ -84,6 +84,13 @@ export default function EnquiryData() {
     leadsWithoutSales: '- Select -'
   })
 
+  // Modal states
+  const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
+
   useEffect(() => {
     fetchEnquiries()
   }, [])
@@ -209,7 +216,45 @@ export default function EnquiryData() {
       case 'in progress': return '🟡' 
       case 'completed': return '✅'
       case 'follow up': return '🔄'
+      case 'sold': return '💰'
+      case 'finalised': return '✅'
       default: return '⚪'
+    }
+  }
+
+  // Modal handlers
+  const handleViewEnquiry = (enquiry: Enquiry) => {
+    setSelectedEnquiry(enquiry)
+    setIsViewModalOpen(true)
+  }
+
+  const handleEditEnquiry = (enquiry: Enquiry) => {
+    setSelectedEnquiry(enquiry)
+    setIsEditModalOpen(true)
+  }
+
+  const handleDeleteEnquiry = (enquiry: Enquiry) => {
+    setEnquiryToDelete(enquiry)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!enquiryToDelete) return
+    
+    try {
+      const response = await fetch(`/api/enquiries/${enquiryToDelete.id}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        setEnquiries(prev => prev.filter(e => e.id !== enquiryToDelete.id))
+        setShowDeleteConfirm(false)
+        setEnquiryToDelete(null)
+      } else {
+        alert('Error deleting enquiry. Please try again.')
+      }
+    } catch (error) {
+      alert('Error deleting enquiry. Please try again.')
     }
   }
 
@@ -408,7 +453,7 @@ export default function EnquiryData() {
 
         {/* Status Summary */}
         <div className="mb-4 text-sm text-gray-600">
-          Status Icons: 🟢 = New | ✓ = Finalised | $ = Sold
+          Status Icons: 🟢 = New | ✅ = Finalised | 💰 = Sold
         </div>
 
         {/* Results Controls */}
@@ -480,9 +525,10 @@ export default function EnquiryData() {
                     <tr key={enquiry.id || index} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <div className="flex space-x-1">
-                          <button className="text-orange-500 hover:text-orange-700" title="View">👁️</button>
-                          <button className="text-blue-500 hover:text-blue-700" title="Edit">📝</button>
-                          <button className="text-green-500 hover:text-green-700" title="Email">📧</button>
+                          <button className="text-orange-500 hover:text-orange-700" title="View" onClick={() => handleViewEnquiry(enquiry)}>👁️</button>
+                          <button className="text-blue-500 hover:text-blue-700" title="Edit" onClick={() => handleEditEnquiry(enquiry)}>📝</button>
+                          <button className="text-red-500 hover:text-red-700" title="Delete" onClick={() => handleDeleteEnquiry(enquiry)}>🗑️</button>
+                          <button className="text-green-500 hover:text-green-700" title="Email" onClick={() => window.location.href = `mailto:${enquiry.email}`}>📧</button>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center text-lg">
@@ -577,6 +623,64 @@ export default function EnquiryData() {
           </div>
         </div>
       </div>
+
+      {/* View Modal */}
+      {isViewModalOpen && selectedEnquiry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">View Enquiry Details</h3>
+              <button 
+                onClick={() => setIsViewModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><strong>Name:</strong> {selectedEnquiry.firstName} {selectedEnquiry.surname || selectedEnquiry.lastName}</div>
+              <div><strong>Email:</strong> {selectedEnquiry.email}</div>
+              <div><strong>Phone:</strong> {selectedEnquiry.phone}</div>
+              <div><strong>State:</strong> {selectedEnquiry.state}</div>
+              <div><strong>Suburb:</strong> {selectedEnquiry.suburb}</div>
+              <div><strong>Status:</strong> {selectedEnquiry.status}</div>
+              <div><strong>Nationality:</strong> {selectedEnquiry.nationality}</div>
+              <div><strong>Institution:</strong> {selectedEnquiry.institutionName || selectedEnquiry.institution_name}</div>
+              <div className="col-span-2"><strong>Product Interest:</strong> {formatProductInterest(selectedEnquiry.productInterest || selectedEnquiry.products)}</div>
+              <div className="col-span-2"><strong>Comments:</strong> {selectedEnquiry.comments}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && enquiryToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4">
+              <div className="text-red-500 text-2xl mr-3">⚠️</div>
+              <h3 className="text-lg font-semibold">Confirm Delete</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the enquiry from <strong>{enquiryToDelete.firstName} {enquiryToDelete.surname || enquiryToDelete.lastName}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

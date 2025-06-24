@@ -52,14 +52,25 @@ const EVENT_SOURCES = [
 ]
 
 const STAFF_MEMBERS = [
+  // Current Staff (Active)
   "Abbey Landgren", "Alexa Curtis", "Angela Liu", "Chris", "Daryl", 
-  "Jeremy", "Jessica Herz", "Lucy", "Mark", "Sargoon", "Teresa"
+  "Jeremy", "Jessica Herz", "Lucy", "Mark", "Sargoon", "Teresa",
+  // Historical Staff (for data integrity)
+  "Alison West", "Andrea Idato", "Anthea Wong", "Day Peng", "Davina", "Dolly",
+  "Georgie Jennings", "Irina", "Jennie Lu", "Johannes MacDonald", "Josephine Macken",
+  "Jude", "Juliana Zhuang", "June", "Kelly Tsai", "Kevin Wang", "Layla Li",
+  "Lisha Feng", "Meng Dai", "Mike", "Olivia Huang", "Pat", "Robert",
+  "Yoong Whei Lee"
 ]
 
 const CUSTOMER_RATINGS = [
-  "Ready to buy", "High Priority", "After Sale Follow Up", 
+  "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
   "Very interested but not ready to buy", "Looking for information", 
   "Just browsing for now", "Cold", "Events"
+]
+
+const STEP_PROGRAM_OPTIONS = [
+  "N/A", "Interested", "Not interested"
 ]
 
 export default function EnquiryForm() {

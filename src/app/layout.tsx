@@ -86,7 +86,7 @@ export default function RootLayout({
         </nav>
 
         {/* Main content */}
-        <main>
+        <main className="py-8 px-4">
           {children}
         </main>
       </body>

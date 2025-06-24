@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Temporary in-memory storage for demo purposes  
-let enquiries: any[] = []
+let enquiries: any[] = [
+  {
+    id: 1,
+    status: 'New',
+    firstName: 'Demo',
+    lastName: 'Entry',
+    surname: 'Entry',
+    email: 'demo@example.com',
+    phone: '+61 2 9999 9999',
+    nationality: 'English',
+    state: 'Victoria',
+    suburb: 'Melbourne',
+    institutionName: 'Test School',
+    productInterest: ['Steinway'],
+    source: 'Google',
+    eventSource: '',
+    comments: 'Initial demo entry',
+    submittedBy: 'System',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+]
 
 export async function GET(request: NextRequest) {
   try {

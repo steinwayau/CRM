@@ -2,6 +2,7 @@
 'use client'
 
 import { useState } from 'react'
+import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
 
 // Simple constants defined inline
 const STATES = [
@@ -323,13 +324,12 @@ export default function EnquiryForm() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Suburb
                   </label>
-                  <input
-                    type="text"
-                    name="suburb"
+                  <SuburbAutocomplete
                     value={formData.suburb}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    placeholder="Enter suburb"
+                    onChange={(value) => setFormData(prev => ({ ...prev, suburb: value }))}
+                    state={formData.state}
+                    placeholder="Type suburb name..."
+                    className="px-4 py-3 rounded-xl"
                   />
                 </div>
               </div>

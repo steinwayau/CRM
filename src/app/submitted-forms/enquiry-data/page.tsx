@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
 
 // Constants matching the current system
 const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Other"]
@@ -72,6 +73,7 @@ export default function EnquiryData() {
     customerRating: 'All',
     status: 'All',
     state: 'All',
+    suburb: '',
     mailList: 'All',
     nationality: 'All',
     callTakenBy: 'All',
@@ -136,6 +138,11 @@ export default function EnquiryData() {
     }
     if (filters.state !== 'All') {
       filtered = filtered.filter(enquiry => enquiry.state === filters.state)
+    }
+    if (filters.suburb) {
+      filtered = filtered.filter(enquiry => 
+        enquiry.suburb && enquiry.suburb.toLowerCase().includes(filters.suburb.toLowerCase())
+      )
     }
     if (filters.nationality !== 'All') {
       filtered = filtered.filter(enquiry => enquiry.nationality === filters.nationality)
@@ -285,6 +292,16 @@ export default function EnquiryData() {
                   <option key={state} value={state}>{state}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Suburb</label>
+              <SuburbAutocomplete
+                value={filters.suburb}
+                onChange={(value) => handleFilterChange('suburb', value)}
+                state={filters.state === 'All' ? '' : filters.state}
+                placeholder="Type suburb name..."
+                className="text-sm"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Mail List</label>

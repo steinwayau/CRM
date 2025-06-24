@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
+import { getActiveStaff } from '@/lib/staff-management'
 
 // Simple constants defined inline
 const STATES = [
@@ -51,17 +52,8 @@ const EVENT_SOURCES = [
   "Other"
 ]
 
-const STAFF_MEMBERS = [
-  // Current Staff (Active)
-  "Abbey Landgren", "Alexa Curtis", "Angela Liu", "Chris", "Daryl", 
-  "Jeremy", "Jessica Herz", "Lucy", "Mark", "Sargoon", "Teresa",
-  // Historical Staff (for data integrity)
-  "Alison West", "Andrea Idato", "Anthea Wong", "Day Peng", "Davina", "Dolly",
-  "Georgie Jennings", "Irina", "Jennie Lu", "Johannes MacDonald", "Josephine Macken",
-  "Jude", "Juliana Zhuang", "June", "Kelly Tsai", "Kevin Wang", "Layla Li",
-  "Lisha Feng", "Meng Dai", "Mike", "Olivia Huang", "Pat", "Robert",
-  "Yoong Whei Lee"
-]
+// Only show active staff in customer inquiry form
+const STAFF_MEMBERS = getActiveStaff()
 
 const CUSTOMER_RATINGS = [
   "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 

@@ -2,13 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
+import { getAllStaffWithLabels, getAllStaffForFiltering } from '@/lib/staff-management'
 
 // Constants matching the current system
-const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Other"]
+const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Roland", "Ritmuller", "Ronisch", "Kurzweil", "Other"]
 const CUSTOMER_RATINGS = [
-  "All", "Ready to buy", "High Priority", "After Sale Follow Up", 
+  "All", "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
   "Very interested but not ready to buy", "Looking for information", 
   "Just browsing for now", "Cold", "Events"
+]
+const STEP_PROGRAM_OPTIONS = [
+  "N/A", "Interested", "Not interested"
 ]
 const STATUSES = ["All", "New", "In Progress", "Completed", "Follow Up", "Closed"]
 const STATES = [
@@ -17,10 +21,9 @@ const STATES = [
 ]
 const MAIL_LISTS = ["All", "Yes", "No"]
 const NATIONALITIES = ["All", "English", "Chinese", "Korean", "Japanese", "Indian", "Other"]
-const STAFF_MEMBERS = [
-  "All", "Abbey Landgren", "Alexa Curtis", "Angela Liu", "Chris", "Daryl", 
-  "Jeremy", "Jessica Herz", "Lucy", "Mark", "Sargoon", "Teresa", "June", "Mike", "Olivia Huang"
-]
+// Use dynamic staff management with active/inactive labeling
+const STAFF_MEMBERS_FOR_FILTERING = getAllStaffForFiltering()
+const STAFF_MEMBERS_WITH_LABELS = getAllStaffWithLabels()
 const HEAR_ABOUT_US = [
   "All", "Teacher", "Google", "Facebook", "Instagram", "LinkedIn", "WeChat", 
   "YouTube", "Steinway Website", "Radio", "Magazine/Newspaper", 
@@ -90,6 +93,18 @@ export default function EnquiryData() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
+  
+  // Follow-up system states
+  const [followUpData, setFollowUpData] = useState({
+    bestTimeToFollowUp: '',
+    customerRating: 'N/A',
+    stepProgram: 'N/A',
+    enquiryUpdatedBy: '',
+    salesManagerInvolved: 'No',
+    salesManagerExplanation: '',
+    followUpNotes: '',
+    doNotEmail: false
+  })
 
   useEffect(() => {
     fetchEnquiries()
@@ -379,7 +394,7 @@ export default function EnquiryData() {
                 onChange={(e) => handleFilterChange('callTakenBy', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
-                {STAFF_MEMBERS.map(staff => (
+                {STAFF_MEMBERS_FOR_FILTERING.map(staff => (
                   <option key={staff} value={staff}>{staff}</option>
                 ))}
               </select>
@@ -624,30 +639,201 @@ export default function EnquiryData() {
         </div>
       </div>
 
-      {/* View Modal */}
+      {/* Enhanced View Modal with Follow-up System */}
       {isViewModalOpen && selectedEnquiry && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-96 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">View Enquiry Details</h3>
-              <button 
-                onClick={() => setIsViewModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><strong>Name:</strong> {selectedEnquiry.firstName} {selectedEnquiry.surname || selectedEnquiry.lastName}</div>
-              <div><strong>Email:</strong> {selectedEnquiry.email}</div>
-              <div><strong>Phone:</strong> {selectedEnquiry.phone}</div>
-              <div><strong>State:</strong> {selectedEnquiry.state}</div>
-              <div><strong>Suburb:</strong> {selectedEnquiry.suburb}</div>
-              <div><strong>Status:</strong> {selectedEnquiry.status}</div>
-              <div><strong>Nationality:</strong> {selectedEnquiry.nationality}</div>
-              <div><strong>Institution:</strong> {selectedEnquiry.institutionName || selectedEnquiry.institution_name}</div>
-              <div className="col-span-2"><strong>Product Interest:</strong> {formatProductInterest(selectedEnquiry.productInterest || selectedEnquiry.products)}</div>
-              <div className="col-span-2"><strong>Comments:</strong> {selectedEnquiry.comments}</div>
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Enquiry Details & Follow-up</h3>
+                <button 
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Customer Information Section */}
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Customer Information</h4>
+                <div className="grid grid-cols-2 gap-6">
+                  <div><strong>Name:</strong> {selectedEnquiry.firstName} {selectedEnquiry.surname || selectedEnquiry.lastName}</div>
+                  <div><strong>Email:</strong> {selectedEnquiry.email}</div>
+                  <div><strong>Phone:</strong> {selectedEnquiry.phone}</div>
+                  <div><strong>State:</strong> {selectedEnquiry.state}</div>
+                  <div><strong>Suburb:</strong> {selectedEnquiry.suburb}</div>
+                  <div><strong>Status:</strong> {selectedEnquiry.status}</div>
+                  <div><strong>Nationality:</strong> {selectedEnquiry.nationality}</div>
+                  <div><strong>Institution:</strong> {selectedEnquiry.institutionName || selectedEnquiry.institution_name}</div>
+                  <div className="col-span-2"><strong>Product Interest:</strong> {formatProductInterest(selectedEnquiry.productInterest || selectedEnquiry.products)}</div>
+                  <div className="col-span-2"><strong>Comments:</strong> {selectedEnquiry.comments}</div>
+                </div>
+              </div>
+
+              {/* Follow-up System Section */}
+              <div className="border-t pt-6">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4">Follow-up Information</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Best Time to Follow Up */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Best Time to Follow Up
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={followUpData.bestTimeToFollowUp}
+                      onChange={(e) => setFollowUpData(prev => ({ ...prev, bestTimeToFollowUp: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Customer Rating */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Customer Rating
+                    </label>
+                    <select
+                      value={followUpData.customerRating}
+                      onChange={(e) => setFollowUpData(prev => ({ ...prev, customerRating: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {CUSTOMER_RATINGS.filter(rating => rating !== "All").map(rating => (
+                        <option key={rating} value={rating}>{rating}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* STEP Program */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      STEP Program
+                    </label>
+                    <select
+                      value={followUpData.stepProgram}
+                      onChange={(e) => setFollowUpData(prev => ({ ...prev, stepProgram: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {STEP_PROGRAM_OPTIONS.map(option => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Enquiry Updated By */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Enquiry Updated By *
+                    </label>
+                    <select
+                      value={followUpData.enquiryUpdatedBy}
+                      onChange={(e) => setFollowUpData(prev => ({ ...prev, enquiryUpdatedBy: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">- select -</option>
+                      {STAFF_MEMBERS_WITH_LABELS.map(staff => (
+                        <option key={staff.value} value={staff.value}>
+                          {staff.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Sales Manager Involvement */}
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Did you involve a Sales Manager or the CEO for this enquiry?
+                  </label>
+                  <div className="flex space-x-6">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="Yes"
+                        checked={followUpData.salesManagerInvolved === 'Yes'}
+                        onChange={(e) => setFollowUpData(prev => ({ ...prev, salesManagerInvolved: e.target.value, salesManagerExplanation: '' }))}
+                        className="mr-2"
+                      />
+                      Yes
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="No"
+                        checked={followUpData.salesManagerInvolved === 'No'}
+                        onChange={(e) => setFollowUpData(prev => ({ ...prev, salesManagerInvolved: e.target.value }))}
+                        className="mr-2"
+                      />
+                      No
+                    </label>
+                  </div>
+                  
+                  {/* Conditional explanation field when "No" is selected */}
+                  {followUpData.salesManagerInvolved === 'No' && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Please explain why not:
+                      </label>
+                      <textarea
+                        value={followUpData.salesManagerExplanation}
+                        onChange={(e) => setFollowUpData(prev => ({ ...prev, salesManagerExplanation: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        rows={3}
+                        placeholder="Enter explanation..."
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Follow-up Notes */}
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Follow-up Notes
+                  </label>
+                  <textarea
+                    value={followUpData.followUpNotes}
+                    onChange={(e) => setFollowUpData(prev => ({ ...prev, followUpNotes: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={4}
+                    placeholder="Enter detailed follow-up notes..."
+                  />
+                </div>
+
+                {/* Mailing List */}
+                <div className="mt-6">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={followUpData.doNotEmail}
+                      onChange={(e) => setFollowUpData(prev => ({ ...prev, doNotEmail: e.target.checked }))}
+                      className="mr-2"
+                    />
+                    Do Not Email This Customer
+                  </label>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 mt-8 pt-6 border-t">
+                  <button 
+                    onClick={() => setIsViewModalOpen(false)}
+                    className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                  <button 
+                    className="px-6 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600"
+                    onClick={() => {
+                      // TODO: Save follow-up data
+                      console.log('Saving follow-up data:', followUpData)
+                      alert('Follow-up information saved successfully!')
+                    }}
+                  >
+                    Save Follow-up
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

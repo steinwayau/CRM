@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getAllStaffWithLabels } from '@/lib/staff-management'
+import DateTimePicker from '@/components/ui/date-time-picker'
 
 const CUSTOMER_RATINGS = [
   "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
@@ -218,15 +219,11 @@ export default function FollowUpPage() {
             {/* Best Time to Follow Up & Customer Rating */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Best Time to Follow Up
-                </label>
-                <input
-                  type="datetime-local"
-                  name="bestTimeToFollowUp"
+                <DateTimePicker
                   value={followUpData.bestTimeToFollowUp}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(value) => setFollowUpData(prev => ({ ...prev, bestTimeToFollowUp: value }))}
+                  label="Best Time to Follow Up"
+                  placeholder="Select date and time for follow-up"
                 />
               </div>
 

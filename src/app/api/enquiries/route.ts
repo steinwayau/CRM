@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Temporary in-memory storage for demo purposes
-let enquiries: any[] = [
-  {
-    id: 1,
-    status: 'New',
-    firstName: 'John',
-    surname: 'Smith',
-    email: 'john@example.com',
-    phone: '+61 2 1234 5678',
-    state: 'NSW',
-    suburb: 'Sydney',
-    institutionName: 'ABC Music School',
-    productInterest: ['Steinway', 'Boston'],
-    createdAt: new Date().toISOString()
-  }
-]
+// Temporary in-memory storage for demo purposes  
+let enquiries: any[] = []
 
 export async function GET(request: NextRequest) {
   try {

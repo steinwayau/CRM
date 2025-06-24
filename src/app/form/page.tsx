@@ -22,9 +22,15 @@ const NATIONALITIES = [
 
 const PRODUCTS = [
   { id: "steinway", name: "Steinway" },
+  { id: "boston", name: "Boston" },
   { id: "essex", name: "Essex" },
+  { id: "kawai", name: "Kawai" },
   { id: "yamaha", name: "Yamaha" },
   { id: "usedpiano", name: "Used Piano" },
+  { id: "roland", name: "Roland" },
+  { id: "ritmuller", name: "Ritmuller" },
+  { id: "ronisch", name: "Ronisch" },
+  { id: "kurzweil", name: "Kurzweil" },
   { id: "other", name: "Other" }
 ]
 
@@ -193,9 +199,8 @@ export default function EnquiryForm() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   >
                     <option value="New">New</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Follow Up">Follow Up</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Finalised">Finalised</option>
                   </select>
                 </div>
 

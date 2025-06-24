@@ -87,24 +87,9 @@ export default function EnquiryData() {
     leadsWithoutSales: '- Select -'
   })
 
-  // Modal states
-  const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null)
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
-  
-  // Follow-up system states
-  const [followUpData, setFollowUpData] = useState({
-    bestTimeToFollowUp: '',
-    customerRating: 'N/A',
-    stepProgram: 'N/A',
-    enquiryUpdatedBy: '',
-    salesManagerInvolved: 'No',
-    salesManagerExplanation: '',
-    followUpNotes: '',
-    doNotEmail: false
-  })
 
   useEffect(() => {
     fetchEnquiries()
@@ -239,13 +224,13 @@ export default function EnquiryData() {
 
   // Modal handlers
   const handleViewEnquiry = (enquiry: Enquiry) => {
-    setSelectedEnquiry(enquiry)
-    setIsViewModalOpen(true)
+    // Redirect to full-page follow-up system
+    window.location.href = `/submitted-forms/enquiry-data/follow-up/${enquiry.id}`
   }
 
   const handleEditEnquiry = (enquiry: Enquiry) => {
-    setSelectedEnquiry(enquiry)
-    setIsEditModalOpen(true)
+    // Redirect to full-page follow-up system  
+    window.location.href = `/submitted-forms/enquiry-data/follow-up/${enquiry.id}`
   }
 
   const handleDeleteEnquiry = (enquiry: Enquiry) => {
@@ -639,242 +624,9 @@ export default function EnquiryData() {
         </div>
       </div>
 
-      {/* Enhanced View Modal with Follow-up System */}
-      {isViewModalOpen && selectedEnquiry && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Enquiry Details & Follow-up</h3>
-                <button 
-                  onClick={() => setIsViewModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700 text-xl"
-                >
-                  ✕
-                </button>
-              </div>
 
-              {/* Customer Information Section */}
-              <div className="mb-8">
-                <h4 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Customer Information</h4>
-                <div className="grid grid-cols-2 gap-6">
-                  <div><strong>Name:</strong> {selectedEnquiry.firstName} {selectedEnquiry.surname || selectedEnquiry.lastName}</div>
-                  <div><strong>Email:</strong> {selectedEnquiry.email}</div>
-                  <div><strong>Phone:</strong> {selectedEnquiry.phone}</div>
-                  <div><strong>State:</strong> {selectedEnquiry.state}</div>
-                  <div><strong>Suburb:</strong> {selectedEnquiry.suburb}</div>
-                  <div><strong>Status:</strong> {selectedEnquiry.status}</div>
-                  <div><strong>Nationality:</strong> {selectedEnquiry.nationality}</div>
-                  <div><strong>Institution:</strong> {selectedEnquiry.institutionName || selectedEnquiry.institution_name}</div>
-                  <div className="col-span-2"><strong>Product Interest:</strong> {formatProductInterest(selectedEnquiry.productInterest || selectedEnquiry.products)}</div>
-                  <div className="col-span-2"><strong>Comments:</strong> {selectedEnquiry.comments}</div>
-                </div>
-              </div>
 
-              {/* Follow-up System Section */}
-              <div className="border-t pt-6">
-                <h4 className="text-lg font-semibold text-gray-800 mb-4">Follow-up Information</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Best Time to Follow Up */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Best Time to Follow Up
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={followUpData.bestTimeToFollowUp}
-                      onChange={(e) => setFollowUpData(prev => ({ ...prev, bestTimeToFollowUp: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
 
-                  {/* Customer Rating */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Customer Rating
-                    </label>
-                    <select
-                      value={followUpData.customerRating}
-                      onChange={(e) => setFollowUpData(prev => ({ ...prev, customerRating: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      {CUSTOMER_RATINGS.filter(rating => rating !== "All").map(rating => (
-                        <option key={rating} value={rating}>{rating}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* STEP Program */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      STEP Program
-                    </label>
-                    <select
-                      value={followUpData.stepProgram}
-                      onChange={(e) => setFollowUpData(prev => ({ ...prev, stepProgram: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      {STEP_PROGRAM_OPTIONS.map(option => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Enquiry Updated By */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Enquiry Updated By *
-                    </label>
-                    <select
-                      value={followUpData.enquiryUpdatedBy}
-                      onChange={(e) => setFollowUpData(prev => ({ ...prev, enquiryUpdatedBy: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">- select -</option>
-                      {STAFF_MEMBERS_WITH_LABELS.map(staff => (
-                        <option key={staff.value} value={staff.value}>
-                          {staff.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Sales Manager Involvement */}
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Did you involve a Sales Manager or the CEO for this enquiry?
-                  </label>
-                  <div className="flex space-x-6">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        value="Yes"
-                        checked={followUpData.salesManagerInvolved === 'Yes'}
-                        onChange={(e) => setFollowUpData(prev => ({ ...prev, salesManagerInvolved: e.target.value, salesManagerExplanation: '' }))}
-                        className="mr-2"
-                      />
-                      Yes
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        value="No"
-                        checked={followUpData.salesManagerInvolved === 'No'}
-                        onChange={(e) => setFollowUpData(prev => ({ ...prev, salesManagerInvolved: e.target.value }))}
-                        className="mr-2"
-                      />
-                      No
-                    </label>
-                  </div>
-                  
-                  {/* Conditional explanation field when "No" is selected */}
-                  {followUpData.salesManagerInvolved === 'No' && (
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Please explain why not:
-                      </label>
-                      <textarea
-                        value={followUpData.salesManagerExplanation}
-                        onChange={(e) => setFollowUpData(prev => ({ ...prev, salesManagerExplanation: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        rows={3}
-                        placeholder="Enter explanation..."
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Follow-up Notes */}
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Follow-up Notes
-                  </label>
-                  <textarea
-                    value={followUpData.followUpNotes}
-                    onChange={(e) => setFollowUpData(prev => ({ ...prev, followUpNotes: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows={4}
-                    placeholder="Enter detailed follow-up notes..."
-                  />
-                </div>
-
-                {/* Mailing List */}
-                <div className="mt-6">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={followUpData.doNotEmail}
-                      onChange={(e) => setFollowUpData(prev => ({ ...prev, doNotEmail: e.target.checked }))}
-                      className="mr-2"
-                    />
-                    Do Not Email This Customer
-                  </label>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-3 mt-8 pt-6 border-t">
-                  <button 
-                    onClick={() => setIsViewModalOpen(false)}
-                    className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-                  >
-                    Close
-                  </button>
-                  <button 
-                    className="px-6 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600"
-                    onClick={() => {
-                      // TODO: Save follow-up data
-                      console.log('Saving follow-up data:', followUpData)
-                      alert('Follow-up information saved successfully!')
-                    }}
-                  >
-                    Save Follow-up
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {isEditModalOpen && selectedEnquiry && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto m-4">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Edit Enquiry</h3>
-                <button 
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700 text-xl"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="text-center py-8">
-                <div className="text-4xl mb-4">🚧</div>
-                <h4 className="text-lg font-semibold text-gray-700 mb-2">Edit Functionality Coming Soon</h4>
-                <p className="text-gray-500 mb-6">
-                  The edit functionality is currently under development. <br/>
-                  For now, you can view enquiry details and add follow-up information.
-                </p>
-                <button 
-                  onClick={() => {
-                    setIsEditModalOpen(false)
-                    setIsViewModalOpen(true)
-                  }}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                >
-                  View & Add Follow-up Instead
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && enquiryToDelete && (

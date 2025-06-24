@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
           ${data.status || 'New'},
           ${data.institutionName || ''},
           ${data.firstName},
-          ${data.lastName || ''},
+          ${data.surname || data.lastName || ''},
           ${data.email},
           ${data.phone || ''},
           ${data.nationality || 'English'},

@@ -839,6 +839,43 @@ export default function EnquiryData() {
         </div>
       )}
 
+      {/* Edit Modal */}
+      {isEditModalOpen && selectedEnquiry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto m-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Edit Enquiry</h3>
+                <button 
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">🚧</div>
+                <h4 className="text-lg font-semibold text-gray-700 mb-2">Edit Functionality Coming Soon</h4>
+                <p className="text-gray-500 mb-6">
+                  The edit functionality is currently under development. <br/>
+                  For now, you can view enquiry details and add follow-up information.
+                </p>
+                <button 
+                  onClick={() => {
+                    setIsEditModalOpen(false)
+                    setIsViewModalOpen(true)
+                  }}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  View & Add Follow-up Instead
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && enquiryToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

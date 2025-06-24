@@ -7,50 +7,114 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
 }
 
 model Enquiry {
-  id                  Int      @id @default(autoincrement())
-  status              String   @default("New")
-  institutionName     String?  @map("institution_name")
-  firstName           String   @map("first_name")
-  surname             String?
-  email               String
-  phone               String?
-  nationality         String   @default("English")
-  state               String
-  suburb              String?
-  source              String?
-  enquirySource       String?  @map("enquiry_source")
-  products            String[] // Array of selected products
-  otherProducts       String?  @map("other_products")
-  comment             String?
-  followUpInfo        String?  @map("follow_up_info")
-  followUpDate        DateTime? @map("follow_up_date")
-  classification      String   @default("N/A")
-  stepProgram         String?  @map("step_program") @default("N/A")
-  involving           String?  @default("No")
-  notInvolvingReason  String?  @map("not_involving_reason")
-  newsletter          String   @default("Yes")
-  callTakenBy         String   @map("call_taken_by")
-  originalFollowUpDate DateTime? @map("original_follow_up_date")
-  inputDate           DateTime @default(now()) @map("input_date")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
+  id          Int      @id @default(autoincrement())
+  
+  // Basic Customer Information
+  status      String   @default("New") // New, Sold, Finalised
+  firstName   String
+  lastName    String?
+  surname     String?  // For backwards compatibility
+  email       String
+  phone       String?
+  nationality String?  @default("English")
+  
+  // Location Information
+  state       String
+  suburb      String?
+  
+  // Business Information
+  institutionName String?
+  
+  // Product Interest (stored as JSON array)
+  productInterest Json?   // ["Steinway", "Boston", etc.]
+  
+  // Source Information
+  source         String?  // Where did you hear about us
+  eventSource    String?  // Where did enquiry come from
+  enquirySource  String?  // Alternative field name
+  
+  // Comments and Notes
+  comments       String?
+  followUpNotes  String?
+  
+  // Follow-up Information
+  bestTimeToFollowUp DateTime?
+  customerRating     String?   @default("N/A")
+  stepProgram        String?   @default("N/A")
+  
+  // Staff Management
+  submittedBy        String?
+  callTakenBy        String?
+  enquiryUpdatedBy   String?
+  
+  // Sales Manager Involvement
+  salesManagerInvolved    String?  @default("No") // Yes/No
+  salesManagerExplanation String?
+  notInvolvingReason     String?
+  
+  // Email Preferences
+  doNotEmail    Boolean  @default(false)
+  newsletter    String?  @default("Yes") // Yes/No
+  
+  // System Fields
+  inputDate     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
   @@map("enquiries")
 }
 
 model Staff {
   id        Int      @id @default(autoincrement())
   name      String   @unique
-  email     String   @unique
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
+  email     String?  @unique
+  role      String?
+  isActive  Boolean  @default(true)
+  
+  // Additional staff fields
+  phone     String?
+  position  String?
+  department String?
+  startDate DateTime?
+  endDate   DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   @@map("staff")
+}
+
+model SystemSetting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+  type  String @default("string") // string, number, boolean, json
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_settings")
+}
+
+// For tracking data imports
+model ImportLog {
+  id          Int      @id @default(autoincrement())
+  fileName    String
+  recordsImported Int
+  recordsSkipped  Int
+  recordsErrored  Int
+  status      String   // pending, completed, failed
+  errorLog    String?
+  importedBy  String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("import_logs")
 }
 
 model User {

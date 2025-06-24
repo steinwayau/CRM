@@ -1,39 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
 
-// Temporary in-memory storage for demo purposes  
-let enquiries: any[] = [
-  {
-    id: 1,
-    status: 'New',
-    firstName: 'Demo',
-    lastName: 'Entry',
-    surname: 'Entry',
-    email: 'demo@example.com',
-    phone: '+61 2 9999 9999',
-    nationality: 'English',
-    state: 'Victoria',
-    suburb: 'Melbourne',
-    institutionName: 'Test School',
-    productInterest: ['Steinway'],
-    source: 'Google',
-    eventSource: '',
-    comments: 'Initial demo entry',
-    submittedBy: 'System',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-]
+const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    // For now, use temporary storage (database setup comes later)
-    const sortedEnquiries = enquiries.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-    return NextResponse.json(sortedEnquiries)
+    const enquiries = await prisma.enquiry.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+    return NextResponse.json(enquiries)
   } catch (error) {
     console.error('Error fetching enquiries:', error)
-    return NextResponse.json(enquiries)
+    return NextResponse.json(
+      { error: 'Failed to fetch enquiries' },
+      { status: 500 }
+    )
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
@@ -51,35 +36,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For now, use temporary storage (database setup comes later)
-    const newEnquiry = {
-      id: enquiries.length + 1,
-      status: data.status || 'New',
-      institutionName: data.institutionName || '',
-      firstName: data.firstName,
-      lastName: data.lastName || '',
-      surname: data.lastName || '',
-      email: data.email,
-      phone: data.phone || '',
-      nationality: data.nationality || 'English',
-      state: data.state,
-      suburb: data.suburb || '',
-      productInterest: data.productInterest || [],
-      source: data.source || '',
-      eventSource: data.eventSource || '',
-      comments: data.comments || '',
-      followUpInfo: data.followUpInfo || '',
-      bestTimeToFollowUp: data.bestTimeToFollowUp || '',
-      customerRating: data.customerRating || 'N/A',
-      stepProgram: data.stepProgram || 'N/A',
-      submittedBy: data.submittedBy || 'Online Form',
-      salesManagerInvolved: data.salesManagerInvolved || 'No',
-      doNotEmail: data.doNotEmail || false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
+    // Create enquiry in database
+    const newEnquiry = await prisma.enquiry.create({
+      data: {
+        status: data.status || 'New',
+        firstName: data.firstName,
+        surname: data.lastName || data.surname || '',
+        email: data.email,
+        phone: data.phone || null,
+        nationality: data.nationality || 'English',
+        state: data.state,
+        suburb: data.suburb || null,
+        institutionName: data.institutionName || null,
+        productInterest: data.productInterest || [],
+        source: data.source || null,
+        eventSource: data.eventSource || null,
+        comments: data.comments || null,
+        followUpNotes: data.followUpNotes || null,
+        bestTimeToFollowUp: data.bestTimeToFollowUp ? new Date(data.bestTimeToFollowUp) : null,
+        customerRating: data.customerRating || 'N/A',
+        stepProgram: data.stepProgram || 'N/A',
+        submittedBy: data.submittedBy || 'Online Form',
+        callTakenBy: data.callTakenBy || null,
+        enquiryUpdatedBy: data.enquiryUpdatedBy || null,
+        salesManagerInvolved: data.salesManagerInvolved || 'No',
+        salesManagerExplanation: data.salesManagerExplanation || null,
+        doNotEmail: data.doNotEmail || false,
+        newsletter: data.doNotEmail ? 'No' : 'Yes',
+        inputDate: new Date()
+      }
+    })
     
-    enquiries.push(newEnquiry)
     console.log('Successfully created enquiry:', newEnquiry)
     return NextResponse.json(newEnquiry, { status: 201 })
   } catch (error) {
@@ -88,5 +75,7 @@ export async function POST(request: NextRequest) {
       { error: `Failed to create enquiry: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 } 

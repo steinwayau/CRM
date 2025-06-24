@@ -148,10 +148,13 @@ export default function EnquiryForm() {
           doNotEmail: false
         })
       } else {
-        setSubmitMessage('Error submitting enquiry. Please try again.')
+        const errorData = await response.json()
+        console.error('API Error:', errorData)
+        setSubmitMessage(`Error submitting enquiry: ${errorData.error || 'Please try again.'} (Status: ${response.status})`)
       }
     } catch (error) {
-      setSubmitMessage('Error submitting enquiry. Please try again.')
+      console.error('Form submission error:', error)
+      setSubmitMessage(`Network error: ${error.message || 'Please check your connection and try again.'}`)
     } finally {
       setIsSubmitting(false)
     }

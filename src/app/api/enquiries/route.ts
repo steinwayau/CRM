@@ -19,19 +19,13 @@ let enquiries: any[] = [
 
 export async function GET(request: NextRequest) {
   try {
-    // Check if we have a database connection
-    if (process.env.POSTGRES_URL) {
-      // Use database if available
-      const { sql } = await import('@vercel/postgres')
-      const { rows } = await sql`SELECT * FROM enquiries ORDER BY created_at DESC`
-      return NextResponse.json(rows)
-    } else {
-      // Use temporary storage for demo
-      return NextResponse.json(enquiries)
-    }
+    // For now, use temporary storage (database setup comes later)
+    const sortedEnquiries = enquiries.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    return NextResponse.json(sortedEnquiries)
   } catch (error) {
     console.error('Error fetching enquiries:', error)
-    // Fallback to temporary storage
     return NextResponse.json(enquiries)
   }
 }
@@ -39,68 +33,52 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
+    console.log('Received enquiry data:', data)
     
     // Validate required fields
     if (!data.firstName || !data.email || !data.state) {
+      console.log('Validation failed:', { firstName: data.firstName, email: data.email, state: data.state })
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: `Missing required fields. Received: firstName="${data.firstName}", email="${data.email}", state="${data.state}"` },
         { status: 400 }
       )
     }
 
-    // Check if we have a database connection
-    if (process.env.POSTGRES_URL) {
-      // Use database if available
-      const { sql } = await import('@vercel/postgres')
-      const { rows } = await sql`
-        INSERT INTO enquiries (
-          status, institution_name, first_name, surname, email, phone, 
-          nationality, state, suburb, products, source, enquiry_source,
-          comments, follow_up_info, follow_up_date, classification, 
-          step_program, involving, not_involving_reason, newsletter, 
-          call_taken_by, input_date, created_at, updated_at
-        ) VALUES (
-          ${data.status || 'New'},
-          ${data.institutionName || ''},
-          ${data.firstName},
-          ${data.surname || data.lastName || ''},
-          ${data.email},
-          ${data.phone || ''},
-          ${data.nationality || 'English'},
-          ${data.state},
-          ${data.suburb || ''},
-          ${JSON.stringify(data.productInterest || [])},
-          ${data.source || ''},
-          ${data.eventSource || ''},
-          ${data.comments || ''},
-          ${data.followUpInfo || ''},
-          ${data.bestTimeToFollowUp || null},
-          ${data.customerRating || 'N/A'},
-          ${data.stepProgram || 'N/A'},
-          ${data.salesManagerInvolved || 'No'},
-          ${data.notInvolvingReason || ''},
-          ${data.doNotEmail ? 'No' : 'Yes'},
-          ${data.submittedBy || 'Online Form'},
-          NOW(),
-          NOW(),
-          NOW()
-        ) RETURNING *
-      `
-      return NextResponse.json(rows[0], { status: 201 })
-    } else {
-      // Use temporary storage for demo
-      const newEnquiry = {
-        id: enquiries.length + 1,
-        ...data,
-        createdAt: new Date().toISOString()
-      }
-      enquiries.push(newEnquiry)
-      return NextResponse.json(newEnquiry, { status: 201 })
+    // For now, use temporary storage (database setup comes later)
+    const newEnquiry = {
+      id: enquiries.length + 1,
+      status: data.status || 'New',
+      institutionName: data.institutionName || '',
+      firstName: data.firstName,
+      lastName: data.lastName || '',
+      surname: data.lastName || '',
+      email: data.email,
+      phone: data.phone || '',
+      nationality: data.nationality || 'English',
+      state: data.state,
+      suburb: data.suburb || '',
+      productInterest: data.productInterest || [],
+      source: data.source || '',
+      eventSource: data.eventSource || '',
+      comments: data.comments || '',
+      followUpInfo: data.followUpInfo || '',
+      bestTimeToFollowUp: data.bestTimeToFollowUp || '',
+      customerRating: data.customerRating || 'N/A',
+      stepProgram: data.stepProgram || 'N/A',
+      submittedBy: data.submittedBy || 'Online Form',
+      salesManagerInvolved: data.salesManagerInvolved || 'No',
+      doNotEmail: data.doNotEmail || false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
+    
+    enquiries.push(newEnquiry)
+    console.log('Successfully created enquiry:', newEnquiry)
+    return NextResponse.json(newEnquiry, { status: 201 })
   } catch (error) {
     console.error('Error creating enquiry:', error)
     return NextResponse.json(
-      { error: 'Failed to create enquiry' },
+      { error: `Failed to create enquiry: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     )
   }

@@ -1,228 +1,563 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+
+// Constants matching the current system
+const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Other"]
+const CUSTOMER_RATINGS = [
+  "All", "Ready to buy", "High Priority", "After Sale Follow Up", 
+  "Very interested but not ready to buy", "Looking for information", 
+  "Just browsing for now", "Cold", "Events"
+]
+const STATUSES = ["All", "New", "In Progress", "Completed", "Follow Up", "Closed"]
+const STATES = [
+  "All", "Australian Capital Territory", "New South Wales", "Northern Territory",
+  "Queensland", "South Australia", "Tasmania", "Victoria", "Western Australia"
+]
+const MAIL_LISTS = ["All", "Yes", "No"]
+const NATIONALITIES = ["All", "English", "Chinese", "Korean", "Japanese", "Indian", "Other"]
+const STAFF_MEMBERS = [
+  "All", "Abbey Landgren", "Alexa Curtis", "Angela Liu", "Chris", "Daryl", 
+  "Jeremy", "Jessica Herz", "Lucy", "Mark", "Sargoon", "Teresa", "June", "Mike", "Olivia Huang"
+]
+const HEAR_ABOUT_US = [
+  "All", "Teacher", "Google", "Facebook", "Instagram", "LinkedIn", "WeChat", 
+  "YouTube", "Steinway Website", "Radio", "Magazine/Newspaper", 
+  "Recommended by a friend", "Event Follow Up", "Other"
+]
+const ENQUIRY_SOURCES = [
+  "All", "Events - Steinway Gallery St Leonards", "Events - Steinway Gallery Melbourne", 
+  "Phone Enquiry - Steinway National Information Line", "Phone Enquiry - Steinway Gallery St Leonards",
+  "In-store enquiry - Steinway Gallery St Leonards", "Lunar New Year", "Piano Teacher Calls", "Other"
+]
+
+type Enquiry = {
+  id?: number
+  status?: string
+  firstName?: string
+  first_name?: string
+  surname?: string
+  lastName?: string
+  email?: string
+  phone?: string
+  state?: string
+  suburb?: string
+  nationality?: string
+  productInterest?: string[]
+  products?: string
+  source?: string
+  eventSource?: string
+  enquiry_source?: string
+  callTakenBy?: string
+  call_taken_by?: string
+  submittedBy?: string
+  createdAt?: string
+  created_at?: string
+  [key: string]: any
+}
+
 export default function Dashboard() {
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([])
+  const [filteredEnquiries, setFilteredEnquiries] = useState<Enquiry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    pianoModel: 'All',
+    customerRating: 'All',
+    status: 'All',
+    state: 'All',
+    mailList: 'All',
+    nationality: 'All',
+    callTakenBy: 'All',
+    hearAboutUs: 'All',
+    enquirySource: 'All',
+    leadsNotContacted: '- Select -',
+    leadsInvolvingSales: '- Select -',
+    leadsWithoutSales: '- Select -'
+  })
+
+  useEffect(() => {
+    fetchEnquiries()
+  }, [])
+
+  useEffect(() => {
+    applyFilters()
+  }, [enquiries, filters, searchTerm])
+
+  const fetchEnquiries = async () => {
+    try {
+      const response = await fetch('/api/enquiries')
+      if (response.ok) {
+        const data = await response.json()
+        setEnquiries(data)
+      }
+    } catch (error) {
+      console.error('Error fetching enquiries:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const applyFilters = () => {
+    let filtered = [...enquiries]
+
+    // Apply search term
+    if (searchTerm) {
+      filtered = filtered.filter(enquiry => 
+        Object.values(enquiry).some(value => 
+          value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      )
+    }
+
+    // Apply date filters
+    if (filters.startDate) {
+      filtered = filtered.filter(enquiry => {
+        const enquiryDate = enquiry.createdAt || enquiry.created_at
+        return enquiryDate && new Date(enquiryDate) >= new Date(filters.startDate)
+      })
+    }
+    if (filters.endDate) {
+      filtered = filtered.filter(enquiry => {
+        const enquiryDate = enquiry.createdAt || enquiry.created_at
+        return enquiryDate && new Date(enquiryDate) <= new Date(filters.endDate)
+      })
+    }
+
+    // Apply dropdown filters
+    if (filters.status !== 'All') {
+      filtered = filtered.filter(enquiry => enquiry.status === filters.status)
+    }
+    if (filters.state !== 'All') {
+      filtered = filtered.filter(enquiry => enquiry.state === filters.state)
+    }
+    if (filters.nationality !== 'All') {
+      filtered = filtered.filter(enquiry => enquiry.nationality === filters.nationality)
+    }
+    if (filters.callTakenBy !== 'All') {
+      filtered = filtered.filter(enquiry => 
+        (enquiry.callTakenBy || enquiry.call_taken_by) === filters.callTakenBy
+      )
+    }
+    if (filters.hearAboutUs !== 'All') {
+      filtered = filtered.filter(enquiry => enquiry.source === filters.hearAboutUs)
+    }
+    if (filters.enquirySource !== 'All') {
+      filtered = filtered.filter(enquiry => 
+        (enquiry.eventSource || enquiry.enquiry_source) === filters.enquirySource
+      )
+    }
+
+    setFilteredEnquiries(filtered)
+    setCurrentPage(1) // Reset to first page when filters change
+  }
+
+  const handleFilterChange = (filterName: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }))
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-AU', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const formatProductInterest = (products: any) => {
+    if (!products) return ''
+    if (typeof products === 'string') {
+      try {
+        const parsed = JSON.parse(products)
+        return Array.isArray(parsed) ? parsed.join(', ') : products
+      } catch {
+        return products
+      }
+    }
+    return Array.isArray(products) ? products.join(', ') : products.toString()
+  }
+
+  // Pagination
+  const totalPages = Math.ceil(filteredEnquiries.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentEnquiries = filteredEnquiries.slice(startIndex, endIndex)
+
+  const getStatusIcon = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'new': return '🟢'
+      case 'in progress': return '🟡' 
+      case 'completed': return '✅'
+      case 'follow up': return '🔄'
+      default: return '⚪'
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-gray-600">Manage and view all enquiries</p>
-        </div>
-        <a 
-          href="/form"
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Enquiry
-        </a>
-      </div>
-
-      {/* Filter Section */}
-      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <input
-              type="date"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">All</option>
-              <option value="New">New</option>
-              <option value="Sold">Sold</option>
-              <option value="Finalized">Finalized</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">All</option>
-              <option value="NSW">NSW</option>
-              <option value="VIC">VIC</option>
-              <option value="QLD">QLD</option>
-              <option value="SA">SA</option>
-              <option value="WA">WA</option>
-              <option value="TAS">TAS</option>
-              <option value="NT">NT</option>
-              <option value="ACT">ACT</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">All</option>
-              <option value="Steinway">Steinway</option>
-              <option value="Boston">Boston</option>
-              <option value="Essex">Essex</option>
-              <option value="Kawai">Kawai</option>
-              <option value="Yamaha">Yamaha</option>
-              <option value="Used Piano">Used Piano</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end space-x-2">
-          <button className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
-            Clear Filters
-          </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            Apply Filters
-          </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-black text-white p-4">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-xl font-semibold">📧 Exclusive Piano Group - Enquiry List</h1>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Filters Section */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+            {/* Date Filters */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Enquiries</p>
-              <p className="text-2xl font-bold text-gray-900">1,234</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Piano Model</label>
+              <select
+                value={filters.pianoModel}
+                onChange={(e) => handleFilterChange('pianoModel', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {PIANO_MODELS.map(model => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Rating</label>
+              <select
+                value={filters.customerRating}
+                onChange={(e) => handleFilterChange('customerRating', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {CUSTOMER_RATINGS.map(rating => (
+                  <option key={rating} value={rating}>{rating}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {STATUSES.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <select
+                value={filters.state}
+                onChange={(e) => handleFilterChange('state', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {STATES.map(state => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mail List</label>
+              <select
+                value={filters.mailList}
+                onChange={(e) => handleFilterChange('mailList', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {MAIL_LISTS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Nationality</label>
+              <select
+                value={filters.nationality}
+                onChange={(e) => handleFilterChange('nationality', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {NATIONALITIES.map(nationality => (
+                  <option key={nationality} value={nationality}>{nationality}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Call Taken by</label>
+              <select
+                value={filters.callTakenBy}
+                onChange={(e) => handleFilterChange('callTakenBy', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {STAFF_MEMBERS.map(staff => (
+                  <option key={staff} value={staff}>{staff}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Where did you hear about us?</label>
+              <select
+                value={filters.hearAboutUs}
+                onChange={(e) => handleFilterChange('hearAboutUs', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {HEAR_ABOUT_US.map(source => (
+                  <option key={source} value={source}>{source}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Where did this enquiry come from?</label>
+              <select
+                value={filters.enquirySource}
+                onChange={(e) => handleFilterChange('enquirySource', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {ENQUIRY_SOURCES.map(source => (
+                  <option key={source} value={source}>{source}</option>
+                ))}
+              </select>
             </div>
           </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">New This Month</p>
-              <p className="text-2xl font-bold text-gray-900">89</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Follow-ups Due</p>
-              <p className="text-2xl font-bold text-gray-900">12</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-              <p className="text-2xl font-bold text-gray-900">15.2%</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Enquiries Table */}
-      <div className="bg-white rounded-lg shadow-md border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Enquiries</h2>
-            <div className="flex space-x-2">
-              <button className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
-                Export CSV
+          {/* Additional Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Leads not contacted over 3 months</label>
+              <select
+                value={filters.leadsNotContacted}
+                onChange={(e) => handleFilterChange('leadsNotContacted', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                <option value="- Select -">- Select -</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Leads involving Sales Manager or CEO</label>
+              <select
+                value={filters.leadsInvolvingSales}
+                onChange={(e) => handleFilterChange('leadsInvolvingSales', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                <option value="- Select -">- Select -</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Leads without involving Sales Manager or CEO</label>
+              <select
+                value={filters.leadsWithoutSales}
+                onChange={(e) => handleFilterChange('leadsWithoutSales', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                <option value="- Select -">- Select -</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Summary */}
+        <div className="mb-4 text-sm text-gray-600">
+          Status Icons: 🟢 = New | ✓ = Finalised | $ = Sold
+        </div>
+
+        {/* Results Controls */}
+        <div className="bg-white rounded-lg shadow-sm border p-4 mb-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700">Show</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <label className="text-sm font-medium text-gray-700">entries</label>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">Search:</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="Search..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Data Table */}
+        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-orange-500 text-white">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">ACT</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">STAT</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">FIRST NAME</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">SURNAME</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">EMAIL</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">PHONE</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">STATE</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">SUBURB</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">PRODUCT INTEREST</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">DATE</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">CALL TAKEN BY</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                      Loading enquiries...
+                    </td>
+                  </tr>
+                ) : currentEnquiries.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                      No enquiries found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  currentEnquiries.map((enquiry: any, index) => (
+                    <tr key={enquiry.id || index} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="flex space-x-1">
+                          <button className="text-orange-500 hover:text-orange-700" title="View">👁️</button>
+                          <button className="text-blue-500 hover:text-blue-700" title="Edit">📝</button>
+                          <button className="text-green-500 hover:text-green-700" title="Email">📧</button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-lg">
+                        {getStatusIcon(enquiry.status)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {enquiry.firstName || enquiry.first_name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {enquiry.surname || enquiry.lastName}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-blue-600">
+                        <a href={`mailto:${enquiry.email}`} className="hover:underline">
+                          {enquiry.email}
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {enquiry.phone}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {enquiry.state}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {enquiry.suburb}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {formatProductInterest(enquiry.productInterest || enquiry.products)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {formatDate(enquiry.createdAt || enquiry.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {enquiry.callTakenBy || enquiry.call_taken_by || enquiry.submittedBy}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Pagination */}
+        <div className="bg-white rounded-lg shadow-sm border p-4 mt-4">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredEnquiries.length)} of {filteredEnquiries.length} entries
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
               </button>
-              <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                Refresh
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = i + 1
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 border border-gray-300 rounded-md text-sm ${
+                      currentPage === pageNum ? 'bg-orange-500 text-white' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              })}
+              {totalPages > 5 && (
+                <>
+                  <span className="text-gray-500">...</span>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    className={`px-3 py-1 border border-gray-300 rounded-md text-sm ${
+                      currentPage === totalPages ? 'bg-orange-500 text-white' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
               </button>
             </div>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Products
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              <tr>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">John Smith</div>
-                    <div className="text-sm text-gray-500">ABC Music School</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">john@example.com</div>
-                  <div className="text-sm text-gray-500">+61 2 1234 5678</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  NSW, Sydney
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  Steinway, Boston
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
-                    New
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  2024-01-15
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-3">View</button>
-                  <button className="text-green-600 hover:text-green-900">Edit</button>
-                </td>
-              </tr>
-              {/* Add more sample rows as needed */}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

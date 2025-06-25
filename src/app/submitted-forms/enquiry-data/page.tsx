@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
 import { getAllStaffWithLabels, getAllStaffForFiltering } from '@/lib/staff-management'
+import { isAdmin, getUserRole, getCurrentUser } from '@/lib/auth-utils'
 
 // Constants matching the current system
 const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Roland", "Ritmuller", "Ronisch", "Kurzweil", "Other"]
@@ -67,6 +68,7 @@ export default function EnquiryData() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [searchTerm, setSearchTerm] = useState('')
+  const [userRole, setUserRole] = useState<'admin' | 'staff' | null>(null)
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -92,6 +94,8 @@ export default function EnquiryData() {
   const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
 
   useEffect(() => {
+    // Check user role on component mount
+    setUserRole(getUserRole())
     fetchEnquiries()
   }, [])
 
@@ -262,8 +266,34 @@ export default function EnquiryData() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-black text-white p-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-semibold">📧 Exclusive Piano Group - Enquiry Data</h1>
+          <div className="flex items-center space-x-4">
+            {userRole && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-300">Logged in as:</span>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  userRole === 'admin' 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-green-600 text-white'
+                }`}>
+                  {userRole === 'admin' ? '👑 ADMIN' : '👤 STAFF'}
+                </span>
+                {userRole === 'staff' && (
+                  <span className="text-xs text-yellow-300">• View/Follow-up only</span>
+                )}
+              </div>
+            )}
+            <a 
+              href="/"
+              className="inline-flex items-center px-3 py-2 text-white hover:text-gray-300 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Home
+            </a>
+          </div>
         </div>
       </div>
 
@@ -526,8 +556,12 @@ export default function EnquiryData() {
                       <td className="px-4 py-3">
                         <div className="flex space-x-1">
                           <button className="text-orange-500 hover:text-orange-700" title="View" onClick={() => handleViewEnquiry(enquiry)}>👁️</button>
-                          <button className="text-blue-500 hover:text-blue-700" title="Edit" onClick={() => handleEditEnquiry(enquiry)}>📝</button>
-                          <button className="text-red-500 hover:text-red-700" title="Delete" onClick={() => handleDeleteEnquiry(enquiry)}>🗑️</button>
+                          {userRole === 'admin' && (
+                            <>
+                              <button className="text-blue-500 hover:text-blue-700" title="Edit" onClick={() => handleEditEnquiry(enquiry)}>📝</button>
+                              <button className="text-red-500 hover:text-red-700" title="Delete" onClick={() => handleDeleteEnquiry(enquiry)}>🗑️</button>
+                            </>
+                          )}
                           <button className="text-green-500 hover:text-green-700" title="Email" onClick={() => window.location.href = `mailto:${enquiry.email}`}>📧</button>
                         </div>
                       </td>

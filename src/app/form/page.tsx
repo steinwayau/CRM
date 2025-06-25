@@ -83,6 +83,7 @@ export default function EnquiryForm() {
     productInterest: [],
     source: '',
     eventSource: '',
+    eventSourceOther: '',
     comments: '',
     followUpInfo: '',
     bestTimeToFollowUp: '',
@@ -161,6 +162,7 @@ export default function EnquiryForm() {
           productInterest: [],
           source: '',
           eventSource: '',
+          eventSourceOther: '',
           comments: '',
           followUpInfo: '',
           bestTimeToFollowUp: '',
@@ -429,6 +431,20 @@ export default function EnquiryForm() {
                       </option>
                     ))}
                   </select>
+                  
+                  {/* Show text input when "Other" is selected */}
+                  {formData.eventSource === 'Other' && (
+                    <div className="mt-3">
+                      <input
+                        type="text"
+                        name="eventSourceOther"
+                        value={formData.eventSourceOther}
+                        onChange={handleInputChange}
+                        placeholder="Please specify the source..."
+                        className="w-full px-4 py-3 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-blue-50"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

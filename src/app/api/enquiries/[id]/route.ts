@@ -1,47 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Simple in-memory storage for demo - matches main route
-// In production, this should use a proper database
-let enquiries: any[] = [
-  {
-    id: 1,
-    status: 'New',
-    firstName: 'John',
-    surname: 'Smith',
-    email: 'john.smith@example.com',
-    phone: '0412345678',
-    nationality: 'English',
-    state: 'New South Wales',
-    suburb: 'Sydney',
-    institutionName: 'Sydney Conservatorium',
-    productInterest: ['Steinway', 'Boston'],
-    source: 'Google',
-    eventSource: 'Events - Steinway Gallery St Leonards',
-    comments: 'Looking for a grand piano for home use',
-    submittedBy: 'Online Form',
-    createdAt: new Date().toISOString(),
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 2,
-    status: 'In Progress',
-    firstName: 'Sarah',
-    surname: 'Johnson',
-    email: 'sarah.j@example.com',
-    phone: '0423456789',
-    nationality: 'Chinese',
-    state: 'Victoria',
-    suburb: 'Melbourne',
-    institutionName: '',
-    productInterest: ['Yamaha', 'Kawai'],
-    source: 'Recommended by a friend',
-    eventSource: 'Events - Steinway Gallery Melbourne',
-    comments: 'Interested in upright piano for teaching',
-    submittedBy: 'June',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    created_at: new Date(Date.now() - 86400000).toISOString()
-  }
-]
+import { sql } from '@vercel/postgres'
 
 export async function PUT(
   request: NextRequest,
@@ -53,24 +11,67 @@ export async function PUT(
     
     console.log('Updating enquiry:', id, 'with data:', updateData)
 
-    // Find the enquiry to update
-    const enquiryIndex = enquiries.findIndex(e => e.id === id)
-    if (enquiryIndex === -1) {
+    // Combine eventSource and eventSourceOther if "Other" was selected
+    const finalEventSource = updateData.eventSource === 'Other' && updateData.eventSourceOther 
+      ? `Other: ${updateData.eventSourceOther}` 
+      : updateData.eventSource
+
+    // Update the enquiry in database
+    const result = await sql`
+      UPDATE enquiries 
+      SET status = ${updateData.status || 'New'},
+          institution_name = ${updateData.institutionName || ''},
+          first_name = ${updateData.firstName},
+          surname = ${updateData.lastName || updateData.surname || ''},
+          email = ${updateData.email},
+          phone = ${updateData.phone || ''},
+          nationality = ${updateData.nationality || 'English'},
+          state = ${updateData.state},
+          suburb = ${updateData.suburb || ''},
+          products = ${JSON.stringify(Array.isArray(updateData.productInterest) ? updateData.productInterest : [updateData.productInterest].filter(Boolean))},
+          source = ${updateData.source || ''},
+          enquiry_source = ${finalEventSource || ''},
+          comments = ${updateData.comments || ''},
+          call_taken_by = ${updateData.submittedBy || 'Online Form'},
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id, status, institution_name, first_name, surname, email, phone, 
+                nationality, state, suburb, products, source, enquiry_source, 
+                comments, call_taken_by, created_at, updated_at
+    `
+
+    if (result.rows.length === 0) {
       return NextResponse.json(
         { error: 'Enquiry not found' },
         { status: 404 }
       )
     }
 
-    // Update the enquiry with new data
-    enquiries[enquiryIndex] = {
-      ...enquiries[enquiryIndex],
-      ...updateData,
-      updatedAt: new Date().toISOString()
+    const updatedEnquiry = result.rows[0]
+    
+    // Convert to expected format
+    const formattedEnquiry = {
+      id: updatedEnquiry.id,
+      status: updatedEnquiry.status,
+      firstName: updatedEnquiry.first_name,
+      surname: updatedEnquiry.surname,
+      email: updatedEnquiry.email,
+      phone: updatedEnquiry.phone,
+      nationality: updatedEnquiry.nationality,
+      state: updatedEnquiry.state,
+      suburb: updatedEnquiry.suburb,
+      institutionName: updatedEnquiry.institution_name,
+      productInterest: updatedEnquiry.products || [],
+      source: updatedEnquiry.source,
+      eventSource: updatedEnquiry.enquiry_source,
+      comments: updatedEnquiry.comments,
+      submittedBy: updatedEnquiry.call_taken_by,
+      createdAt: updatedEnquiry.created_at,
+      created_at: updatedEnquiry.created_at
     }
 
-    console.log('Successfully updated enquiry:', enquiries[enquiryIndex])
-    return NextResponse.json(enquiries[enquiryIndex])
+    console.log('Successfully updated enquiry:', formattedEnquiry)
+    return NextResponse.json(formattedEnquiry)
   } catch (error) {
     console.error('Error updating enquiry:', error)
     return NextResponse.json(
@@ -87,9 +88,12 @@ export async function DELETE(
   try {
     const id = parseInt(params.id)
 
-    const enquiryIndex = enquiries.findIndex(e => e.id === id)
-    if (enquiryIndex > -1) {
-      enquiries.splice(enquiryIndex, 1)
+    const result = await sql`
+      DELETE FROM enquiries WHERE id = ${id}
+      RETURNING id
+    `
+
+    if (result.rows.length > 0) {
       return NextResponse.json({ message: 'Enquiry deleted successfully' })
     } else {
       return NextResponse.json(
@@ -113,9 +117,41 @@ export async function GET(
   try {
     const id = parseInt(params.id)
 
-    const enquiry = enquiries.find(e => e.id === id)
-    if (enquiry) {
-      return NextResponse.json(enquiry)
+    const result = await sql`
+      SELECT id, status, institution_name, first_name, surname, email, phone, 
+             nationality, state, suburb, products, source, enquiry_source, 
+             comments, follow_up_info, follow_up_date, classification, 
+             step_program, involving, not_involving_reason, newsletter, 
+             call_taken_by, original_follow_up_date, input_date, created_at, updated_at
+      FROM enquiries 
+      WHERE id = ${id}
+    `
+
+    if (result.rows.length > 0) {
+      const enquiry = result.rows[0]
+      
+      // Convert to expected format
+      const formattedEnquiry = {
+        id: enquiry.id,
+        status: enquiry.status,
+        firstName: enquiry.first_name,
+        surname: enquiry.surname,
+        email: enquiry.email,
+        phone: enquiry.phone,
+        nationality: enquiry.nationality,
+        state: enquiry.state,
+        suburb: enquiry.suburb,
+        institutionName: enquiry.institution_name,
+        productInterest: enquiry.products || [],
+        source: enquiry.source,
+        eventSource: enquiry.enquiry_source,
+        comments: enquiry.comments,
+        submittedBy: enquiry.call_taken_by,
+        createdAt: enquiry.created_at,
+        created_at: enquiry.created_at
+      }
+      
+      return NextResponse.json(formattedEnquiry)
     } else {
       return NextResponse.json(
         { error: 'Enquiry not found' },

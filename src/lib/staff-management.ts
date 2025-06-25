@@ -20,6 +20,8 @@ export const STAFF_DATABASE: StaffMember[] = [
   { name: "Olivia", isActive: true, role: "Staff" },
   { name: "Mark", isActive: true, role: "Staff" },
   { name: "Louie", isActive: true, role: "Staff" },
+  { name: "Day", isActive: true, role: "Staff" }, // Restored to active status
+  { name: "Hendra", isActive: true, role: "Staff" }, // Re-added to active staff
   
   // Historical/Inactive Staff (for data integrity, appear with "(Former)" label)
   { name: "Abbey Landgren", isActive: false, role: "Former Staff", email: "abbey@epgpianos.com.au" },
@@ -34,7 +36,6 @@ export const STAFF_DATABASE: StaffMember[] = [
   { name: "Alison West", isActive: false, role: "Former Staff" },
   { name: "Andrea Idato", isActive: false, role: "Former Staff" },
   { name: "Anthea Wong", isActive: false, role: "Former Staff" },
-  { name: "Day Peng", isActive: false, role: "Former Staff" },
   { name: "Davina", isActive: false, role: "Former Staff" },
   { name: "Dolly", isActive: false, role: "Former Staff" },
   { name: "Georgie Jennings", isActive: false, role: "Former Staff" },

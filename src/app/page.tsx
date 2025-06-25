@@ -1,3 +1,5 @@
+'use client'
+
 // EPG CRM System - Authentication System Active
 export default function HomePage() {
   return (

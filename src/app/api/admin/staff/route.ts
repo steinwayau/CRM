@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStaffCredentials, updateStaffCredentials } from '../../auth/login/route'
+import { getStaffCredentials, updateStaffCredentials } from '@/lib/staff-data'
 
 // Helper function to generate secure password
 function generatePassword(): string {

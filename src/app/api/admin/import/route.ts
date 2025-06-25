@@ -249,7 +249,7 @@ function processFieldValue(fieldName: string, value: any): any {
   }
 }
 
-// Export the imported data for other endpoints to access
-export function getImportedData() {
+// Helper function to get imported data (internal use only)
+function getImportedData() {
   return importedData
 } 

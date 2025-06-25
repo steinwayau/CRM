@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       data: {
         status: data.status || 'New',
         firstName: data.firstName,
-        surname: data.lastName || data.surname || '',
+        lastName: data.lastName || data.surname || '',
         email: data.email,
         phone: data.phone || null,
         nationality: data.nationality || 'English',

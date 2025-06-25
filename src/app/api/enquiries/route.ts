@@ -4,32 +4,32 @@ import { sql } from '@vercel/postgres'
 export async function GET(request: NextRequest) {
   try {
     const result = await sql`
-      SELECT id, status, "institutionName", "firstName", "lastName", email, phone, 
-             nationality, state, suburb, "productInterest", source, "eventSource", 
-             comments, "submittedBy", "createdAt", "updatedAt"
+      SELECT id, status, institution_name, first_name, surname, email, phone, 
+             nationality, state, suburb, products, source, enquiry_source, 
+             comment, call_taken_by, created_at, updated_at
       FROM enquiries 
-      ORDER BY "createdAt" DESC
+      ORDER BY created_at DESC
     `
     
     // Convert database rows to expected format
     const enquiries = result.rows.map((row: any) => ({
       id: row.id,
       status: row.status,
-      firstName: row.firstName,
-      lastName: row.lastName,
+      firstName: row.first_name,
+      lastName: row.surname,
       email: row.email,
       phone: row.phone,
       nationality: row.nationality,
       state: row.state,
       suburb: row.suburb,
-      institutionName: row.institutionName,
-      productInterest: row.productInterest || [],
+      institutionName: row.institution_name,
+      productInterest: row.products || [],
       source: row.source,
-      eventSource: row.eventSource,
-      comments: row.comments,
-      submittedBy: row.submittedBy,
-      createdAt: row.createdAt,
-      created_at: row.createdAt
+      eventSource: row.enquiry_source,
+      comments: row.comment,
+      submittedBy: row.call_taken_by,
+      createdAt: row.created_at,
+      created_at: row.created_at
     }))
     
     return NextResponse.json(enquiries)
@@ -61,33 +61,39 @@ export async function POST(request: NextRequest) {
       ? `Other: ${data.eventSourceOther}` 
       : data.eventSource
 
-    // Insert new enquiry into database using correct Prisma column names
+    // Insert new enquiry into database using correct database column names
     const result = await sql`
       INSERT INTO enquiries (
-        status, "institutionName", "firstName", "lastName", email, phone, 
-        nationality, state, suburb, "productInterest", source, "eventSource", 
-        comments, "submittedBy", "createdAt", "updatedAt"
+        status, institution_name, first_name, surname, email, phone, 
+        nationality, state, suburb, products, source, enquiry_source, 
+        comment, call_taken_by, input_date, created_at, updated_at, 
+        classification, step_program, involving, newsletter
       ) VALUES (
         ${data.status || 'New'},
-        ${data.institutionName || ''},
+        ${data.institutionName || null},
         ${data.firstName},
         ${data.lastName || data.surname || ''},
         ${data.email},
-        ${data.phone || ''},
+        ${data.phone || null},
         ${data.nationality || 'English'},
         ${data.state},
-        ${data.suburb || ''},
-        ${JSON.stringify(Array.isArray(data.productInterest) ? data.productInterest : [data.productInterest].filter(Boolean))},
-        ${data.source || ''},
-        ${finalEventSource || ''},
-        ${data.comments || ''},
+        ${data.suburb || null},
+        ${Array.isArray(data.productInterest) ? data.productInterest : (data.productInterest ? [data.productInterest] : null)},
+        ${data.source || null},
+        ${finalEventSource || null},
+        ${data.comments || null},
         ${data.submittedBy || 'Online Form'},
         NOW(),
-        NOW()
+        NOW(),
+        NOW(),
+        ${data.customerRating || 'N/A'},
+        ${data.stepProgram || 'N/A'},
+        ${data.salesManagerInvolved || 'No'},
+        ${data.doNotEmail ? 'No' : 'Yes'}
       )
-      RETURNING id, status, "institutionName", "firstName", "lastName", email, phone, 
-                nationality, state, suburb, "productInterest", source, "eventSource", 
-                comments, "submittedBy", "createdAt", "updatedAt"
+      RETURNING id, status, institution_name, first_name, surname, email, phone, 
+                nationality, state, suburb, products, source, enquiry_source, 
+                comment, call_taken_by, created_at, updated_at
     `
     
     const newEnquiry = result.rows[0]
@@ -96,21 +102,21 @@ export async function POST(request: NextRequest) {
     const formattedEnquiry = {
       id: newEnquiry.id,
       status: newEnquiry.status,
-      firstName: newEnquiry.firstName,
-      lastName: newEnquiry.lastName,
+      firstName: newEnquiry.first_name,
+      lastName: newEnquiry.surname,
       email: newEnquiry.email,
       phone: newEnquiry.phone,
       nationality: newEnquiry.nationality,
       state: newEnquiry.state,
       suburb: newEnquiry.suburb,
-      institutionName: newEnquiry.institutionName,
-      productInterest: newEnquiry.productInterest || [],
+      institutionName: newEnquiry.institution_name,
+      productInterest: newEnquiry.products || [],
       source: newEnquiry.source,
-      eventSource: newEnquiry.eventSource,
-      comments: newEnquiry.comments,
-      submittedBy: newEnquiry.submittedBy,
-      createdAt: newEnquiry.createdAt,
-      created_at: newEnquiry.createdAt
+      eventSource: newEnquiry.enquiry_source,
+      comments: newEnquiry.comment,
+      submittedBy: newEnquiry.call_taken_by,
+      createdAt: newEnquiry.created_at,
+      created_at: newEnquiry.created_at
     }
     
     console.log('Successfully created enquiry:', formattedEnquiry)

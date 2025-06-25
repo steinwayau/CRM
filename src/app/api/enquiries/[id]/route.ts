@@ -16,28 +16,28 @@ export async function PUT(
       ? `Other: ${updateData.eventSourceOther}` 
       : updateData.eventSource
 
-    // Update the enquiry in database using correct Prisma column names
+    // Update the enquiry in database using correct database column names
     const result = await sql`
       UPDATE enquiries 
       SET status = ${updateData.status || 'New'},
-          "institutionName" = ${updateData.institutionName || ''},
-          "firstName" = ${updateData.firstName},
-          "lastName" = ${updateData.lastName || updateData.surname || ''},
+          institution_name = ${updateData.institutionName || null},
+          first_name = ${updateData.firstName},
+          surname = ${updateData.lastName || updateData.surname || ''},
           email = ${updateData.email},
-          phone = ${updateData.phone || ''},
+          phone = ${updateData.phone || null},
           nationality = ${updateData.nationality || 'English'},
           state = ${updateData.state},
-          suburb = ${updateData.suburb || ''},
-          "productInterest" = ${JSON.stringify(Array.isArray(updateData.productInterest) ? updateData.productInterest : [updateData.productInterest].filter(Boolean))},
-          source = ${updateData.source || ''},
-          "eventSource" = ${finalEventSource || ''},
-          comments = ${updateData.comments || ''},
-          "submittedBy" = ${updateData.submittedBy || 'Online Form'},
-          "updatedAt" = NOW()
+          suburb = ${updateData.suburb || null},
+          products = ${Array.isArray(updateData.productInterest) ? updateData.productInterest : (updateData.productInterest ? [updateData.productInterest] : null)},
+          source = ${updateData.source || null},
+          enquiry_source = ${finalEventSource || null},
+          comment = ${updateData.comments || null},
+          call_taken_by = ${updateData.submittedBy || 'Online Form'},
+          updated_at = NOW()
       WHERE id = ${id}
-      RETURNING id, status, "institutionName", "firstName", "lastName", email, phone, 
-                nationality, state, suburb, "productInterest", source, "eventSource", 
-                comments, "submittedBy", "createdAt", "updatedAt"
+      RETURNING id, status, institution_name, first_name, surname, email, phone, 
+                nationality, state, suburb, products, source, enquiry_source, 
+                comment, call_taken_by, created_at, updated_at
     `
 
     if (result.rows.length === 0) {
@@ -53,21 +53,21 @@ export async function PUT(
     const formattedEnquiry = {
       id: updatedEnquiry.id,
       status: updatedEnquiry.status,
-      firstName: updatedEnquiry.firstName,
-      lastName: updatedEnquiry.lastName,
+      firstName: updatedEnquiry.first_name,
+      lastName: updatedEnquiry.surname,
       email: updatedEnquiry.email,
       phone: updatedEnquiry.phone,
       nationality: updatedEnquiry.nationality,
       state: updatedEnquiry.state,
       suburb: updatedEnquiry.suburb,
-      institutionName: updatedEnquiry.institutionName,
-      productInterest: updatedEnquiry.productInterest || [],
+      institutionName: updatedEnquiry.institution_name,
+      productInterest: updatedEnquiry.products || [],
       source: updatedEnquiry.source,
-      eventSource: updatedEnquiry.eventSource,
-      comments: updatedEnquiry.comments,
-      submittedBy: updatedEnquiry.submittedBy,
-      createdAt: updatedEnquiry.createdAt,
-      created_at: updatedEnquiry.createdAt
+      eventSource: updatedEnquiry.enquiry_source,
+      comments: updatedEnquiry.comment,
+      submittedBy: updatedEnquiry.call_taken_by,
+      createdAt: updatedEnquiry.created_at,
+      created_at: updatedEnquiry.created_at
     }
 
     console.log('Successfully updated enquiry:', formattedEnquiry)
@@ -118,9 +118,9 @@ export async function GET(
     const id = parseInt(params.id)
 
     const result = await sql`
-      SELECT id, status, "institutionName", "firstName", "lastName", email, phone, 
-             nationality, state, suburb, "productInterest", source, "eventSource", 
-             comments, "submittedBy", "createdAt", "updatedAt"
+      SELECT id, status, institution_name, first_name, surname, email, phone, 
+             nationality, state, suburb, products, source, enquiry_source, 
+             comment, call_taken_by, created_at, updated_at
       FROM enquiries 
       WHERE id = ${id}
     `
@@ -132,21 +132,21 @@ export async function GET(
       const formattedEnquiry = {
         id: enquiry.id,
         status: enquiry.status,
-        firstName: enquiry.firstName,
-        lastName: enquiry.lastName,
+        firstName: enquiry.first_name,
+        lastName: enquiry.surname,
         email: enquiry.email,
         phone: enquiry.phone,
         nationality: enquiry.nationality,
         state: enquiry.state,
         suburb: enquiry.suburb,
-        institutionName: enquiry.institutionName,
-        productInterest: enquiry.productInterest || [],
+        institutionName: enquiry.institution_name,
+        productInterest: enquiry.products || [],
         source: enquiry.source,
-        eventSource: enquiry.eventSource,
-        comments: enquiry.comments,
-        submittedBy: enquiry.submittedBy,
-        createdAt: enquiry.createdAt,
-        created_at: enquiry.createdAt
+        eventSource: enquiry.enquiry_source,
+        comments: enquiry.comment,
+        submittedBy: enquiry.call_taken_by,
+        createdAt: enquiry.created_at,
+        created_at: enquiry.created_at
       }
       
       return NextResponse.json(formattedEnquiry)

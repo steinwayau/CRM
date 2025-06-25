@@ -2,6 +2,11 @@
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Remove the default navigation for this page */}
+      <style jsx global>{`
+        nav { display: none !important; }
+      `}</style>
+      
       <div className="max-w-6xl mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-12">
@@ -174,62 +179,9 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Quick Links Section */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
-          <h3 className="text-2xl font-semibold text-gray-900 mb-6 text-center">Quick Access</h3>
-          <div className="grid md:grid-cols-3 gap-4">
-            <a 
-              href="/form" 
-              className="flex items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group"
-            >
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">New Enquiry</h4>
-                <p className="text-sm text-gray-600">Create customer enquiry</p>
-              </div>
-            </a>
-            
-            <a 
-              href="https://crm-mu-black.vercel.app/dashboard" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group"
-            >
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-green-200 transition-colors">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Staff Dashboard</h4>
-                <p className="text-sm text-gray-600">CRM applications</p>
-              </div>
-            </a>
-            
-            <a 
-              href="/submitted-forms/enquiry-data" 
-              className="flex items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group"
-            >
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-orange-200 transition-colors">
-                <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Enquiry Data</h4>
-                <p className="text-sm text-gray-600">View all enquiries</p>
-              </div>
-            </a>
-          </div>
-        </div>
-
         {/* Footer */}
         <div className="text-center mt-12 text-gray-500">
-          <p>© 2024 Steinway Galleries Australia - Secure CRM Platform</p>
+          <p>© 2025 Steinway Galleries Australia - Secure CRM Platform</p>
         </div>
       </div>
     </div>

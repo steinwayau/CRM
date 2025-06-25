@@ -31,7 +31,7 @@ export default function RootLayout({
 
               {/* Navigation Links */}
               <div className="hidden md:flex items-center space-x-8">
-                <a href="/" className="hover:text-gray-300 transition-colors">
+                <a href="/admin" className="hover:text-gray-300 transition-colors">
                   🏠 Dashboard
                 </a>
                 
@@ -64,8 +64,8 @@ export default function RootLayout({
                   </div>
                 </div>
 
-                <a href="/staff-roster" className="hover:text-gray-300 transition-colors">
-                  👥 Staff Roster
+                <a href="/admin" className="hover:text-gray-300 transition-colors">
+                  👑 Admin Panel
                 </a>
                 
                 <a href="/form" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors">

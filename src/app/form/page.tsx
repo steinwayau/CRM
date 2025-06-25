@@ -1,10 +1,11 @@
 // @ts-nocheck
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
 import DateTimePicker from '@/components/ui/date-time-picker'
 import { getActiveStaff } from '@/lib/staff-management'
+import { getCurrentUser, getUserName } from '@/lib/auth-utils'
 
 // Simple constants defined inline
 const STATES = [
@@ -67,6 +68,8 @@ const STEP_PROGRAM_OPTIONS = [
 ]
 
 export default function EnquiryForm() {
+  const [currentUser, setCurrentUser] = useState<string>('Online Form')
+  
   const [formData, setFormData] = useState({
     status: 'New',
     institutionName: '',
@@ -92,6 +95,25 @@ export default function EnquiryForm() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState('')
+
+  // Auto-detect logged-in user on component mount
+  useEffect(() => {
+    const user = getCurrentUser()
+    if (user && user.authenticated) {
+      const userName = user.user.role === 'admin' ? 'Administrator' : user.user.name
+      setCurrentUser(userName)
+      setFormData(prev => ({
+        ...prev,
+        submittedBy: userName
+      }))
+    } else {
+      setCurrentUser('Online Form')
+      setFormData(prev => ({
+        ...prev,
+        submittedBy: 'Online Form'
+      }))
+    }
+  }, [])
 
   const handleInputChange = (e: any) => {
     const { name, value, type, checked } = e.target

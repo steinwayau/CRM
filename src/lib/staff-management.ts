@@ -11,6 +11,7 @@ export interface StaffMember {
 // Complete staff database with active/inactive status
 export const STAFF_DATABASE: StaffMember[] = [
   // Current/Active Staff (these will appear in customer inquiry form)
+  { name: "Administrator", isActive: true, role: "Admin" }, // Admin user for enquiry submissions
   { name: "June", isActive: true, role: "Staff" },
   { name: "Chris", isActive: true, role: "Staff" },
   { name: "Mike", isActive: true, role: "Staff" },

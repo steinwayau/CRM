@@ -106,13 +106,34 @@ export default function FollowUpPage() {
     setSaving(true)
 
     try {
-      // For now, just show success message (database update would go here)
-      console.log('Follow-up data saved:', followUpData)
+      console.log('Saving follow-up data:', followUpData)
+      
+      // Call the API to update the enquiry with follow-up data
+      const response = await fetch(`/api/enquiries/${enquiryId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...followUpData,
+          lastUpdated: new Date().toISOString(),
+          hasFollowUp: true
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save follow-up data')
+      }
+
+      const updatedEnquiry = await response.json()
+      console.log('Follow-up data saved successfully:', updatedEnquiry)
+      
       alert('Follow-up information saved successfully!')
       router.push('/submitted-forms/enquiry-data')
     } catch (error) {
       console.error('Error saving follow-up:', error)
-      alert('Error saving follow-up information')
+      alert(`Error saving follow-up information: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setSaving(false)
     }

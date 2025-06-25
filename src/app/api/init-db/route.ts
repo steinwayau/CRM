@@ -84,16 +84,15 @@ export async function GET(request: NextRequest) {
       ON CONFLICT (name) DO NOTHING
     `
 
-    // Insert sample enquiries to restore lost data
+    // Insert sample enquiries to restore lost data - using minimal safe fields
     await sql`
       INSERT INTO enquiries (
-        status, institution_name, first_name, surname, email, phone, 
+        status, first_name, surname, email, phone, 
         nationality, state, suburb, products, source, enquiry_source, 
-        comments, call_taken_by, created_at, updated_at
+        call_taken_by, created_at, updated_at
       ) VALUES 
         (
           'New',
-          'Sydney Conservatorium',
           'John',
           'Smith',
           'john.smith@example.com',
@@ -104,14 +103,12 @@ export async function GET(request: NextRequest) {
           '["Steinway", "Boston"]',
           'Google',
           'Events - Steinway Gallery St Leonards',
-          'Looking for a grand piano for home use',
           'Online Form',
           NOW() - INTERVAL '2 days',
           NOW() - INTERVAL '2 days'
         ),
         (
           'In Progress',
-          'Melbourne Music Academy',
           'Sarah',
           'Johnson',
           'sarah.j@example.com',
@@ -122,14 +119,12 @@ export async function GET(request: NextRequest) {
           '["Yamaha", "Kawai"]',
           'Recommended by a friend',
           'Events - Steinway Gallery Melbourne',
-          'Interested in upright piano for teaching',
           'June',
           NOW() - INTERVAL '1 day',
           NOW() - INTERVAL '1 day'
         ),
         (
           'New',
-          '',
           'Mike',
           'Chen',
           'mike.chen@example.com',
@@ -140,7 +135,6 @@ export async function GET(request: NextRequest) {
           '["Essex", "Used Piano"]',
           'WeChat',
           'Other: Music teacher recommendation',
-          'Student needs an affordable piano for practice',
           'Angela Liu',
           NOW() - INTERVAL '6 hours',
           NOW() - INTERVAL '6 hours'

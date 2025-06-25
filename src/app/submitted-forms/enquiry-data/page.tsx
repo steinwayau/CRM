@@ -554,7 +554,10 @@ export default function EnquiryData() {
                   currentEnquiries.map((enquiry: any, index) => (
                     <tr key={enquiry.id || index} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <div className="flex space-x-1">
+                        <div className="flex items-center space-x-1">
+                          {enquiry.hasFollowUp && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded" title="Has follow-up data">📋</span>
+                          )}
                           <button className="text-orange-500 hover:text-orange-700" title="View" onClick={() => handleViewEnquiry(enquiry)}>👁️</button>
                           {userRole === 'admin' && (
                             <>

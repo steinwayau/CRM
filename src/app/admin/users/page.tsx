@@ -22,7 +22,9 @@ export default function UsersPage() {
   const [editMode, setEditMode] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [openDropdown, setOpenDropdown] = useState<number | null>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number }>({})
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const buttonRefs = useRef<{ [key: number]: HTMLButtonElement | null }>({})
 
   useEffect(() => {
     fetchUsers()
@@ -171,8 +173,35 @@ export default function UsersPage() {
     }
   }
 
+  const calculateDropdownPosition = (buttonElement: HTMLButtonElement) => {
+    const rect = buttonElement.getBoundingClientRect()
+    const dropdownHeight = 200 // Approximate dropdown height
+    const viewportHeight = window.innerHeight
+    const spaceBelow = viewportHeight - rect.bottom
+    const spaceAbove = rect.top
+    
+    // If there's not enough space below but enough space above, position above
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      return { bottom: 32 } // Position above the button
+    }
+    
+    // Default: position below
+    return { top: 32 }
+  }
+
   const toggleDropdown = (id: number) => {
-    setOpenDropdown(openDropdown === id ? null : id)
+    if (openDropdown === id) {
+      setOpenDropdown(null)
+      return
+    }
+    
+    const buttonElement = buttonRefs.current[id]
+    if (buttonElement) {
+      const position = calculateDropdownPosition(buttonElement)
+      setDropdownPosition(position)
+    }
+    
+    setOpenDropdown(id)
   }
 
   if (loading) {
@@ -319,6 +348,7 @@ export default function UsersPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="relative" ref={openDropdown === user.id ? dropdownRef : undefined}>
                         <button
+                          ref={(el) => { buttonRefs.current[user.id] = el }}
                           onClick={() => toggleDropdown(user.id)}
                           className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           title="More actions"
@@ -330,7 +360,10 @@ export default function UsersPage() {
 
                         {/* Dropdown Menu */}
                         {openDropdown === user.id && (
-                          <div className="absolute right-0 z-10 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                          <div 
+                            className="absolute right-0 z-10 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                            style={dropdownPosition}
+                          >
                             <button
                               onClick={() => handleViewUser(user)}
                               className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"

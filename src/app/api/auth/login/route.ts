@@ -56,16 +56,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create session token (in production, use JWT or proper session management)
-    const sessionToken = Buffer.from(JSON.stringify({
-      userId: user.id,
-      username: user.username,
-      name: user.name,
-      role: user.role,
+    // Create session data
+    const sessionData = {
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role
+      },
+      authenticated: true,
       timestamp: Date.now()
-    })).toString('base64')
+    }
 
-    // Set cookie
+    // Set cookie based on role
     const response = NextResponse.json({
       success: true,
       user: {
@@ -76,12 +79,21 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    response.cookies.set('auth-token', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
+    if (role === 'admin') {
+      response.cookies.set('admin-session', JSON.stringify(sessionData), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      })
+    } else {
+      response.cookies.set('staff-session', JSON.stringify(sessionData), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      })
+    }
 
     return response
 

@@ -60,26 +60,35 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // Insert default staff members
+    // Insert default staff members with proper updated_at values
     await sql`
-      INSERT INTO staff (name, email) VALUES 
-        ('Abbey Landgren', 'abbey@epgpianos.com.au'),
-        ('Alexa Curtis', 'alexa@epgpianos.com.au'),
-        ('Angela Liu', 'angela@epgpianos.com.au'),
-        ('Chris', 'chris@epgpianos.com.au'),
-        ('Daryl', 'daryl@epgpianos.com.au'),
-        ('Jeremy', 'jeremy@epgpianos.com.au'),
-        ('Jessica Herz', 'jessica@epgpianos.com.au'),
-        ('Lucy', 'lucy@epgpianos.com.au'),
-        ('Mark', 'mark@epgpianos.com.au'),
-        ('Sargoon', 'sargoon@epgpianos.com.au'),
-        ('Teresa', 'teresa@epgpianos.com.au')
+      INSERT INTO staff (name, email, created_at, updated_at) VALUES 
+        ('Abbey Landgren', 'abbey@epgpianos.com.au', NOW(), NOW()),
+        ('Alexa Curtis', 'alexa@epgpianos.com.au', NOW(), NOW()),
+        ('Angela Liu', 'angela@epgpianos.com.au', NOW(), NOW()),
+        ('Chris', 'chris@epgpianos.com.au', NOW(), NOW()),
+        ('Daryl', 'daryl@epgpianos.com.au', NOW(), NOW()),
+        ('Jeremy', 'jeremy@epgpianos.com.au', NOW(), NOW()),
+        ('Jessica Herz', 'jessica@epgpianos.com.au', NOW(), NOW()),
+        ('Lucy', 'lucy@epgpianos.com.au', NOW(), NOW()),
+        ('Mark', 'mark@epgpianos.com.au', NOW(), NOW()),
+        ('Sargoon', 'sargoon@epgpianos.com.au', NOW(), NOW()),
+        ('Teresa', 'teresa@epgpianos.com.au', NOW(), NOW()),
+        ('Day', 'day@epgpianos.com.au', NOW(), NOW()),
+        ('Hendra', 'hendra@epgpianos.com.au', NOW(), NOW()),
+        ('June', 'june@epgpianos.com.au', NOW(), NOW()),
+        ('Mike', 'mike@epgpianos.com.au', NOW(), NOW()),
+        ('Alison', 'alison@epgpianos.com.au', NOW(), NOW()),
+        ('Angela', 'angela@epgpianos.com.au', NOW(), NOW()),
+        ('Olivia', 'olivia@epgpianos.com.au', NOW(), NOW()),
+        ('Louie', 'louie@epgpianos.com.au', NOW(), NOW())
       ON CONFLICT (name) DO NOTHING
     `
 
     return NextResponse.json({ 
       message: 'Database initialized successfully',
-      tables: ['enquiries', 'staff', 'users']
+      tables: ['enquiries', 'staff', 'users'],
+      staff_added: 'Day and Hendra included in staff database'
     })
   } catch (error) {
     console.error('Error initializing database:', error)

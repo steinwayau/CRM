@@ -84,11 +84,11 @@ export async function GET(request: NextRequest) {
       ON CONFLICT (name) DO NOTHING
     `
 
-    // Insert sample enquiries to restore lost data - using minimal safe fields
+    // Insert sample enquiries to restore lost data - basic fields only
     await sql`
       INSERT INTO enquiries (
         status, first_name, surname, email, phone, 
-        nationality, state, suburb, products, source, enquiry_source, 
+        nationality, state, suburb, source, enquiry_source, 
         call_taken_by, created_at, updated_at
       ) VALUES 
         (
@@ -100,7 +100,6 @@ export async function GET(request: NextRequest) {
           'English',
           'New South Wales',
           'Sydney',
-          'Steinway, Boston',
           'Google',
           'Events - Steinway Gallery St Leonards',
           'Online Form',
@@ -116,7 +115,6 @@ export async function GET(request: NextRequest) {
           'Chinese',
           'Victoria',
           'Melbourne',
-          'Yamaha, Kawai',
           'Recommended by a friend',
           'Events - Steinway Gallery Melbourne',
           'June',
@@ -132,7 +130,6 @@ export async function GET(request: NextRequest) {
           'Chinese',
           'Victoria',
           'Croydon',
-          'Essex, Used Piano',
           'WeChat',
           'Other: Music teacher recommendation',
           'Angela Liu',

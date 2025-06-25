@@ -7,6 +7,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Exclusive Piano Group - CRM',
   description: 'Customer Relationship Management System for Exclusive Piano Group',
+  icons: {
+    icon: '/images.png',
+    shortcut: '/images.png',
+    apple: '/images.png',
+  },
 }
 
 export default function RootLayout({
@@ -16,6 +21,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/images.png" type="image/png" />
+        <link rel="shortcut icon" href="/images.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/images.png" />
+      </head>
       <body className={inter.className}>
         {/* Navigation */}
         <nav className="bg-black text-white">
@@ -24,8 +34,8 @@ export default function RootLayout({
               {/* Logo */}
               <div className="flex items-center space-x-4">
                 <a href="/" className="flex items-center space-x-2">
-                  <span className="text-2xl">🎹</span>
-                  <span className="font-semibold text-lg">Enquiry</span>
+                  <span className="text-2xl">🎼</span>
+                  <span className="font-semibold text-lg">EPG CRM</span>
                 </a>
               </div>
 

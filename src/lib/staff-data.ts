@@ -8,7 +8,9 @@ let staffCredentials = [
   { id: 5, username: 'angela.staff', password: 'Ang3la@2025!', name: 'Angela', role: 'staff', active: true },
   { id: 6, username: 'olivia.staff', password: 'Ol1v1a@2025!', name: 'Olivia', role: 'staff', active: true },
   { id: 7, username: 'mark.staff', password: 'M@rk2025!', name: 'Mark', role: 'staff', active: true },
-  { id: 8, username: 'louie.staff', password: 'L0u1e@2025!', name: 'Louie', role: 'staff', active: true }
+  { id: 8, username: 'louie.staff', password: 'L0u1e@2025!', name: 'Louie', role: 'staff', active: true },
+  { id: 9, username: 'day.staff', password: 'D@y2025!', name: 'Day', role: 'staff', active: true },
+  { id: 10, username: 'hendra.staff', password: 'H3ndr@2025!', name: 'Hendra', role: 'staff', active: true }
 ]
 
 export function getStaffCredentials() {

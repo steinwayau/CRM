@@ -4,34 +4,32 @@ import { sql } from '@vercel/postgres'
 export async function GET(request: NextRequest) {
   try {
     const result = await sql`
-      SELECT id, status, institution_name, first_name, surname, email, phone, 
-             nationality, state, suburb, products, source, enquiry_source, 
-             comments, follow_up_info, follow_up_date, classification, 
-             step_program, involving, not_involving_reason, newsletter, 
-             call_taken_by, original_follow_up_date, input_date, created_at, updated_at
+      SELECT id, status, "institutionName", "firstName", "lastName", email, phone, 
+             nationality, state, suburb, "productInterest", source, "eventSource", 
+             comments, "submittedBy", "createdAt", "updatedAt"
       FROM enquiries 
-      ORDER BY created_at DESC
+      ORDER BY "createdAt" DESC
     `
     
     // Convert database rows to expected format
     const enquiries = result.rows.map((row: any) => ({
       id: row.id,
       status: row.status,
-      firstName: row.first_name,
-      surname: row.surname,
+      firstName: row.firstName,
+      lastName: row.lastName,
       email: row.email,
       phone: row.phone,
       nationality: row.nationality,
       state: row.state,
       suburb: row.suburb,
-      institutionName: row.institution_name,
-      productInterest: row.products || [],
+      institutionName: row.institutionName,
+      productInterest: row.productInterest || [],
       source: row.source,
-      eventSource: row.enquiry_source,
+      eventSource: row.eventSource,
       comments: row.comments,
-      submittedBy: row.call_taken_by,
-      createdAt: row.created_at,
-      created_at: row.created_at
+      submittedBy: row.submittedBy,
+      createdAt: row.createdAt,
+      created_at: row.createdAt
     }))
     
     return NextResponse.json(enquiries)
@@ -63,12 +61,12 @@ export async function POST(request: NextRequest) {
       ? `Other: ${data.eventSourceOther}` 
       : data.eventSource
 
-    // Insert new enquiry into database
+    // Insert new enquiry into database using correct Prisma column names
     const result = await sql`
       INSERT INTO enquiries (
-        status, institution_name, first_name, surname, email, phone, 
-        nationality, state, suburb, products, source, enquiry_source, 
-        comments, call_taken_by, created_at, updated_at
+        status, "institutionName", "firstName", "lastName", email, phone, 
+        nationality, state, suburb, "productInterest", source, "eventSource", 
+        comments, "submittedBy", "createdAt", "updatedAt"
       ) VALUES (
         ${data.status || 'New'},
         ${data.institutionName || ''},
@@ -87,9 +85,9 @@ export async function POST(request: NextRequest) {
         NOW(),
         NOW()
       )
-      RETURNING id, status, institution_name, first_name, surname, email, phone, 
-                nationality, state, suburb, products, source, enquiry_source, 
-                comments, call_taken_by, created_at, updated_at
+      RETURNING id, status, "institutionName", "firstName", "lastName", email, phone, 
+                nationality, state, suburb, "productInterest", source, "eventSource", 
+                comments, "submittedBy", "createdAt", "updatedAt"
     `
     
     const newEnquiry = result.rows[0]
@@ -98,21 +96,21 @@ export async function POST(request: NextRequest) {
     const formattedEnquiry = {
       id: newEnquiry.id,
       status: newEnquiry.status,
-      firstName: newEnquiry.first_name,
-      surname: newEnquiry.surname,
+      firstName: newEnquiry.firstName,
+      lastName: newEnquiry.lastName,
       email: newEnquiry.email,
       phone: newEnquiry.phone,
       nationality: newEnquiry.nationality,
       state: newEnquiry.state,
       suburb: newEnquiry.suburb,
-      institutionName: newEnquiry.institution_name,
-      productInterest: newEnquiry.products || [],
+      institutionName: newEnquiry.institutionName,
+      productInterest: newEnquiry.productInterest || [],
       source: newEnquiry.source,
-      eventSource: newEnquiry.enquiry_source,
+      eventSource: newEnquiry.eventSource,
       comments: newEnquiry.comments,
-      submittedBy: newEnquiry.call_taken_by,
-      createdAt: newEnquiry.created_at,
-      created_at: newEnquiry.created_at
+      submittedBy: newEnquiry.submittedBy,
+      createdAt: newEnquiry.createdAt,
+      created_at: newEnquiry.createdAt
     }
     
     console.log('Successfully created enquiry:', formattedEnquiry)

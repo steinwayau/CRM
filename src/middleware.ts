@@ -24,8 +24,8 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Check if the request is for staff dashboard
-  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Check if the request is for staff dashboard or submitted forms
+  if (request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/submitted-forms')) {
     // Check for any valid session (admin or staff)
     const adminSession = request.cookies.get('admin-session')
     const staffSession = request.cookies.get('staff-session')
@@ -56,9 +56,9 @@ export function middleware(request: NextRequest) {
       }
     }
     
-    // If no valid session found, redirect to staff login
+    // If no valid session found, redirect to login page
     if (!hasValidSession) {
-      return NextResponse.redirect(new URL('/staff', request.url))
+      return NextResponse.redirect(new URL('/login', request.url))
     }
   }
 
@@ -68,6 +68,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/dashboard/:path*'
+    '/dashboard/:path*',
+    '/submitted-forms/:path*'
   ]
 } 

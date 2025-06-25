@@ -1,28 +1,69 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+
+interface Backup {
+  id: number
+  date: string
+  size: string
+  type: 'Auto' | 'Manual'
+  status: 'Complete' | 'In Progress' | 'Failed'
+}
 
 export default function DatabasePage() {
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
   const [message, setMessage] = useState('')
-  
-  const backupHistory = [
-    { id: 1, date: '2024-01-15 09:30', size: '2.4 MB', type: 'Auto', status: 'Complete' },
-    { id: 2, date: '2024-01-14 09:30', size: '2.3 MB', type: 'Auto', status: 'Complete' },
-    { id: 3, date: '2024-01-13 15:22', size: '2.2 MB', type: 'Manual', status: 'Complete' },
-    { id: 4, date: '2024-01-12 09:30', size: '2.1 MB', type: 'Auto', status: 'Complete' },
-  ]
+  const [backupHistory, setBackupHistory] = useState<Backup[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchBackups()
+  }, [])
+
+  const fetchBackups = async () => {
+    try {
+      const response = await fetch('/api/admin/backup')
+      const data = await response.json()
+      
+      if (data.success) {
+        setBackupHistory(data.backups)
+      }
+    } catch (error) {
+      console.error('Error fetching backups:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleBackup = async () => {
     setIsBackingUp(true)
     setMessage('')
-    // Simulate backup process
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    setMessage('Database backup completed successfully!')
-    setIsBackingUp(false)
-    setTimeout(() => setMessage(''), 5000)
+    
+    try {
+      const response = await fetch('/api/admin/backup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: 'Manual' }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage('Database backup completed successfully!')
+        await fetchBackups() // Refresh backup list
+      } else {
+        setMessage(`Backup failed: ${data.error}`)
+      }
+    } catch (error) {
+      setMessage('Network error during backup')
+    } finally {
+      setIsBackingUp(false)
+      setTimeout(() => setMessage(''), 5000)
+    }
   }
 
   const handleRestore = async (backupId: number) => {
@@ -31,11 +72,66 @@ export default function DatabasePage() {
     }
     setIsRestoring(true)
     setMessage('')
-    // Simulate restore process
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setMessage(`Database restored from backup #${backupId} successfully!`)
-    setIsRestoring(false)
-    setTimeout(() => setMessage(''), 5000)
+    
+    try {
+      const response = await fetch('/api/admin/backup', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ backupId }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage(`Database restored from backup #${backupId} successfully!`)
+      } else {
+        setMessage(`Restore failed: ${data.error}`)
+      }
+    } catch (error) {
+      setMessage('Network error during restore')
+    } finally {
+      setIsRestoring(false)
+      setTimeout(() => setMessage(''), 5000)
+    }
+  }
+
+  const handleDeleteBackup = async (backupId: number) => {
+    if (!confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/admin/backup?id=${backupId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage(`Backup #${backupId} deleted successfully`)
+        await fetchBackups() // Refresh backup list
+      } else {
+        setMessage(`Delete failed: ${data.error}`)
+      }
+    } catch (error) {
+      setMessage('Network error during delete')
+    } finally {
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin h-8 w-8 border-4 border-red-500 border-t-transparent rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -109,11 +205,15 @@ export default function DatabasePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Database Size:</span>
-                <span className="text-sm font-medium text-gray-900">2.4 MB</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {backupHistory.length > 0 ? backupHistory[0].size : '2.4 MB'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Last Backup:</span>
-                <span className="text-sm font-medium text-gray-900">Today 09:30</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {backupHistory.length > 0 ? backupHistory[0].date : 'Never'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Status:</span>
@@ -188,7 +288,10 @@ export default function DatabasePage() {
                       <button className="text-green-600 hover:text-green-800">
                         Download
                       </button>
-                      <button className="text-red-600 hover:text-red-800">
+                      <button 
+                        onClick={() => handleDeleteBackup(backup.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
                         Delete
                       </button>
                     </td>

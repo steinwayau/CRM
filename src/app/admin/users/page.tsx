@@ -1,27 +1,141 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
+interface User {
+  id: number
+  username: string
+  role: string
+  name: string
+  active: boolean
+  lastLogin?: string
+  password?: string
+}
+
 export default function UsersPage() {
-  const [users] = useState([
-    { id: 1, username: 'MarkandLouie2025@', role: 'admin', name: 'Mark & Louie', active: true, lastLogin: '2024-01-15 10:30' },
-    { id: 2, username: 'june.staff', role: 'staff', name: 'June', active: true, lastLogin: '2024-01-15 09:15' },
-    { id: 3, username: 'chris.staff', role: 'staff', name: 'Chris', active: true, lastLogin: '2024-01-14 16:45' },
-    { id: 4, username: 'mike.staff', role: 'staff', name: 'Mike', active: true, lastLogin: '2024-01-14 14:20' },
-    { id: 5, username: 'alison.staff', role: 'staff', name: 'Alison', active: true, lastLogin: '2024-01-13 11:30' },
-    { id: 6, username: 'angela.staff', role: 'staff', name: 'Angela', active: true, lastLogin: '2024-01-12 15:10' },
-    { id: 7, username: 'olivia.staff', role: 'staff', name: 'Olivia', active: true, lastLogin: '2024-01-11 13:45' },
-    { id: 8, username: 'mark.staff', role: 'staff', name: 'Mark', active: true, lastLogin: '2024-01-10 10:20' },
-    { id: 9, username: 'louie.staff', role: 'staff', name: 'Louie', active: true, lastLogin: '2024-01-09 16:30' },
-  ])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
 
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/staff')
+      const data = await response.json()
+      
+      if (data.success) {
+        // Add admin user manually since it's not in staff data
+        const adminUser: User = {
+          id: 0,
+          username: 'MarkandLouie2025@',
+          role: 'admin',
+          name: 'Mark & Louie',
+          active: true,
+          lastLogin: new Date().toISOString().slice(0, 16).replace('T', ' ')
+        }
+        
+        // Convert staff data to user format with mock last login
+        const staffUsers: User[] = data.staff.map((staff: any) => ({
+          ...staff,
+          lastLogin: generateMockLastLogin()
+        }))
+        
+        setUsers([adminUser, ...staffUsers])
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generateMockLastLogin = () => {
+    const now = new Date()
+    const daysAgo = Math.floor(Math.random() * 7) + 1
+    const hoursAgo = Math.floor(Math.random() * 24)
+    const minutesAgo = Math.floor(Math.random() * 60)
+    
+    const loginTime = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000) - (hoursAgo * 60 * 60 * 1000) - (minutesAgo * 60 * 1000))
+    return loginTime.toISOString().slice(0, 16).replace('T', ' ')
+  }
 
   const handleViewUser = (user: any) => {
     setSelectedUser(user)
     setShowModal(true)
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUser({...user})
+    setEditMode(true)
+  }
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return
+    
+    try {
+      const response = await fetch('/api/admin/staff', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingUser.id,
+          name: editingUser.name,
+          active: editingUser.active
+        }),
+      })
+
+      if (response.ok) {
+        await fetchUsers() // Refresh the list
+        setEditMode(false)
+        setEditingUser(null)
+      }
+    } catch (error) {
+      console.error('Error updating user:', error)
+    }
+  }
+
+  const toggleUserStatus = async (user: User) => {
+    if (user.role === 'admin') return // Don't allow deactivating admin
+    
+    try {
+      const response = await fetch('/api/admin/staff', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: user.id,
+          active: !user.active
+        }),
+      })
+
+      if (response.ok) {
+        await fetchUsers() // Refresh the list
+      }
+    } catch (error) {
+      console.error('Error toggling user status:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -171,11 +285,17 @@ export default function UsersPage() {
                       >
                         View
                       </button>
-                      <button className="text-indigo-600 hover:text-indigo-800">
+                      <button 
+                        onClick={() => handleEditUser(user)}
+                        className="text-indigo-600 hover:text-indigo-800"
+                      >
                         Edit
                       </button>
                       {user.role !== 'admin' && (
-                        <button className="text-red-600 hover:text-red-800">
+                        <button 
+                          onClick={() => toggleUserStatus(user)}
+                          className="text-red-600 hover:text-red-800"
+                        >
                           {user.active ? 'Deactivate' : 'Activate'}
                         </button>
                       )}
@@ -253,6 +373,104 @@ export default function UsersPage() {
                       Close
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit User Modal */}
+        {editMode && editingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Edit User</h3>
+                  <button
+                    onClick={() => {
+                      setEditMode(false)
+                      setEditingUser(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={editingUser.name}
+                      onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      disabled={editingUser.role === 'admin'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input
+                      type="text"
+                      value={editingUser.username}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                      disabled
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Username cannot be changed</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <input
+                      type="text"
+                      value={editingUser.role}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                      disabled
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Role cannot be changed</p>
+                  </div>
+
+                  {editingUser.role !== 'admin' && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900">Active Status</h4>
+                        <p className="text-sm text-gray-600">Enable or disable user access</p>
+                      </div>
+                      <button
+                        onClick={() => setEditingUser({...editingUser, active: !editingUser.active})}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                          editingUser.active ? 'bg-indigo-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            editingUser.active ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex space-x-3 pt-6">
+                  <button
+                    onClick={handleSaveUser}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditMode(false)
+                      setEditingUser(null)
+                    }}
+                    className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             </div>

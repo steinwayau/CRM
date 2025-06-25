@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface StaffMember {
   id: number
@@ -29,9 +29,25 @@ export default function StaffManagementPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newStaffCredentials, setNewStaffCredentials] = useState<NewStaffResult | null>(null)
   const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set())
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchStaff()
+  }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   const fetchStaff = async () => {
@@ -94,9 +110,64 @@ export default function StaffManagementPage() {
       })
 
       if (response.ok) {
+        setOpenDropdown(null) // Close dropdown after action
         fetchStaff() // Refresh the list
       } else {
         setError('Failed to update staff status')
+      }
+    } catch (error) {
+      setError('Network error updating staff')
+    }
+  }
+
+  const deleteStaff = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this staff member? This will deactivate their account but preserve all their data.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/staff?id=${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setOpenDropdown(null) // Close dropdown after action
+        fetchStaff() // Refresh the list
+      } else {
+        setError('Failed to delete staff member')
+      }
+    } catch (error) {
+      setError('Network error deleting staff')
+    }
+  }
+
+  const handleViewStaff = (member: StaffMember) => {
+    alert(`Staff Details:\n\nName: ${member.name}\nUsername: ${member.username}\nRole: ${member.role}\nStatus: ${member.active ? 'Active' : 'Inactive'}\nID: ${member.id}`)
+    setOpenDropdown(null)
+  }
+
+  const handleEditStaff = (member: StaffMember) => {
+    const newName = prompt('Enter new name for staff member:', member.name)
+    if (newName && newName.trim() !== '' && newName.trim() !== member.name) {
+      updateStaffName(member.id, newName.trim())
+    }
+    setOpenDropdown(null)
+  }
+
+  const updateStaffName = async (id: number, name: string) => {
+    try {
+      const response = await fetch('/api/admin/staff', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, name }),
+      })
+
+      if (response.ok) {
+        fetchStaff() // Refresh the list
+      } else {
+        setError('Failed to update staff name')
       }
     } catch (error) {
       setError('Network error updating staff')
@@ -115,6 +186,10 @@ export default function StaffManagementPage() {
       newVisiblePasswords.add(id)
     }
     setVisiblePasswords(newVisiblePasswords)
+  }
+
+  const toggleDropdown = (id: number) => {
+    setOpenDropdown(openDropdown === id ? null : id)
   }
 
   if (loading) {
@@ -274,16 +349,76 @@ export default function StaffManagementPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button
-                        onClick={() => toggleStaffStatus(member.id, member.active)}
-                        className={`px-3 py-1 rounded text-xs font-medium ${
-                          member.active
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                            : 'bg-green-100 text-green-700 hover:bg-green-200'
-                        }`}
-                      >
-                        {member.active ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <div className="relative" ref={openDropdown === member.id ? dropdownRef : undefined}>
+                        <button
+                          onClick={() => toggleDropdown(member.id)}
+                          className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          title="More actions"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                          </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {openDropdown === member.id && (
+                          <div className="absolute right-0 z-10 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                            <button
+                              onClick={() => handleViewStaff(member)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View Details
+                            </button>
+                            
+                            <button
+                              onClick={() => handleEditStaff(member)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit Name
+                            </button>
+
+                            <button
+                              onClick={() => toggleStaffStatus(member.id, member.active)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              {member.active ? (
+                                <>
+                                  <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L12 21l-1.5-1.5m1.5 1.5l1.5-1.5M21 12l-1.5-1.5m1.5 1.5l-1.5-1.5m-12.728 0L12 3l1.5 1.5M12 3L10.5 4.5M3 12l1.5 1.5M3 12l1.5-1.5" />
+                                  </svg>
+                                  Deactivate
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Activate
+                                </>
+                              )}
+                            </button>
+
+                            <div className="border-t border-gray-100 my-1"></div>
+                            
+                            <button
+                              onClick={() => deleteStaff(member.id)}
+                              className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

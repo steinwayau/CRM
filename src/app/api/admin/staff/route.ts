@@ -21,18 +21,10 @@ export async function GET() {
   try {
     const staffList = getStaffCredentials()
     
-    // Return staff without passwords for security
-    const safeStaffList = staffList.map(staff => ({
-      id: staff.id,
-      username: staff.username,
-      name: staff.name,
-      role: staff.role,
-      active: staff.active
-    }))
-
+    // For admin staff management, return all data including passwords
     return NextResponse.json({
       success: true,
-      staff: safeStaffList
+      staff: staffList
     })
   } catch (error) {
     return NextResponse.json(

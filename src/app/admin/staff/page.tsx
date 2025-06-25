@@ -28,6 +28,7 @@ export default function StaffManagementPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newStaffCredentials, setNewStaffCredentials] = useState<NewStaffResult | null>(null)
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchStaff()
@@ -104,6 +105,16 @@ export default function StaffManagementPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
+  }
+
+  const togglePasswordVisibility = (id: number) => {
+    const newVisiblePasswords = new Set(visiblePasswords)
+    if (newVisiblePasswords.has(id)) {
+      newVisiblePasswords.delete(id)
+    } else {
+      newVisiblePasswords.add(id)
+    }
+    setVisiblePasswords(newVisiblePasswords)
   }
 
   if (loading) {
@@ -186,6 +197,9 @@ export default function StaffManagementPage() {
                     Username
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Password
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -214,6 +228,36 @@ export default function StaffManagementPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-mono text-gray-900">{member.username}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm font-mono text-gray-900">
+                          {visiblePasswords.has(member.id) ? member.password : '••••••••••••'}
+                        </div>
+                        <button
+                          onClick={() => togglePasswordVisibility(member.id)}
+                          className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                          title={visiblePasswords.has(member.id) ? 'Hide password' : 'Show password'}
+                        >
+                          {visiblePasswords.has(member.id) ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(member.password || '')}
+                          className="text-blue-600 hover:text-blue-800 text-xs"
+                          title="Copy password"
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">

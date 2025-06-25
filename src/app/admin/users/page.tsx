@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 interface User {
@@ -21,9 +21,25 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchUsers()
+  }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   const fetchUsers = async () => {
@@ -70,11 +86,13 @@ export default function UsersPage() {
   const handleViewUser = (user: any) => {
     setSelectedUser(user)
     setShowModal(true)
+    setOpenDropdown(null)
   }
 
   const handleEditUser = (user: User) => {
     setEditingUser({...user})
     setEditMode(true)
+    setOpenDropdown(null)
   }
 
   const handleSaveUser = async () => {
@@ -119,11 +137,42 @@ export default function UsersPage() {
       })
 
       if (response.ok) {
+        setOpenDropdown(null) // Close dropdown after action
         await fetchUsers() // Refresh the list
       }
     } catch (error) {
       console.error('Error toggling user status:', error)
     }
+  }
+
+  const deleteUser = async (user: User) => {
+    if (user.role === 'admin') {
+      alert('Cannot delete admin user')
+      return
+    }
+
+    if (!confirm('Are you sure you want to delete this user? This will deactivate their account but preserve all their data.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/staff?id=${user.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setOpenDropdown(null) // Close dropdown after action
+        await fetchUsers() // Refresh the list
+      } else {
+        alert('Failed to delete user')
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error)
+    }
+  }
+
+  const toggleDropdown = (id: number) => {
+    setOpenDropdown(openDropdown === id ? null : id)
   }
 
   if (loading) {
@@ -209,33 +258,22 @@ export default function UsersPage() {
         </div>
 
         {/* Users Table */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="p-6 border-b">
-            <h3 className="text-lg font-semibold text-gray-900">All Users</h3>
-            <p className="text-sm text-gray-600">Complete list of system users</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">All Users</h2>
+            <p className="text-sm text-gray-600 mt-1">Complete list of system users and their access levels</p>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Username
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Login
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -244,7 +282,7 @@ export default function UsersPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
-                          user.role === 'admin' ? 'bg-red-500' : 'bg-blue-500'
+                          user.role === 'admin' ? 'bg-red-500' : user.active ? 'bg-blue-500' : 'bg-gray-400'
                         }`}>
                           {user.name.charAt(0).toUpperCase()}
                         </div>
@@ -267,9 +305,6 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.lastLogin}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         user.active 
                           ? 'bg-green-100 text-green-800' 
@@ -278,27 +313,86 @@ export default function UsersPage() {
                         {user.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">
-                      <button 
-                        onClick={() => handleViewUser(user)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        View
-                      </button>
-                      <button 
-                        onClick={() => handleEditUser(user)}
-                        className="text-indigo-600 hover:text-indigo-800"
-                      >
-                        Edit
-                      </button>
-                      {user.role !== 'admin' && (
-                        <button 
-                          onClick={() => toggleUserStatus(user)}
-                          className="text-red-600 hover:text-red-800"
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.lastLogin}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="relative" ref={openDropdown === user.id ? dropdownRef : undefined}>
+                        <button
+                          onClick={() => toggleDropdown(user.id)}
+                          className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          title="More actions"
                         >
-                          {user.active ? 'Deactivate' : 'Activate'}
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                          </svg>
                         </button>
-                      )}
+
+                        {/* Dropdown Menu */}
+                        {openDropdown === user.id && (
+                          <div className="absolute right-0 z-10 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                            <button
+                              onClick={() => handleViewUser(user)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View Details
+                            </button>
+                            
+                            <button
+                              onClick={() => handleEditUser(user)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit User
+                            </button>
+
+                            {user.role !== 'admin' && (
+                              <button
+                                onClick={() => toggleUserStatus(user)}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                              >
+                                {user.active ? (
+                                  <>
+                                    <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L12 21l-1.5-1.5m1.5 1.5l1.5-1.5M21 12l-1.5-1.5m1.5 1.5l-1.5-1.5m-12.728 0L12 3l1.5 1.5M12 3L10.5 4.5M3 12l1.5 1.5M3 12l1.5-1.5" />
+                                    </svg>
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Activate
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {user.role !== 'admin' && (
+                              <>
+                                <div className="border-t border-gray-100 my-1"></div>
+                                
+                                <button
+                                  onClick={() => deleteUser(user)}
+                                  className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center"
+                                >
+                                  <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -363,7 +457,10 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex space-x-3 pt-4">
-                    <button className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <button 
+                      onClick={() => handleEditUser(selectedUser)}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
                       Edit User
                     </button>
                     <button

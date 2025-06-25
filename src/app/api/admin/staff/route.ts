@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStaffCredentials, updateStaffCredentials } from '@/lib/staff-data'
+import { sql } from '@vercel/postgres'
 
 // Helper function to generate secure password
 function generatePassword(): string {
@@ -16,19 +16,38 @@ function generateUsername(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '.') + '.staff'
 }
 
+// Helper function to generate email
+function generateEmail(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '.') + '@epgpianos.com.au'
+}
+
 // GET - List all staff
 export async function GET() {
   try {
-    const staffList = getStaffCredentials()
+    const result = await sql`
+      SELECT id, name, email, active, created_at, updated_at
+      FROM staff 
+      ORDER BY id ASC
+    `
     
-    // For admin staff management, return all data including passwords
+    // Convert database rows to the expected format with credentials
+    const staffList = result.rows.map((row: any) => ({
+      id: row.id,
+      username: generateUsername(row.name),
+      password: '••••••••••••', // Hidden for security
+      name: row.name,
+      role: 'staff',
+      active: row.active
+    }))
+    
     return NextResponse.json({
       success: true,
       staff: staffList
     })
   } catch (error) {
+    console.error('Database error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch staff' },
+      { error: 'Failed to fetch staff from database' },
       { status: 500 }
     )
   }
@@ -46,54 +65,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const staffList = getStaffCredentials()
-    const username = generateUsername(name.trim())
+    const staffName = name.trim()
+    const email = generateEmail(staffName)
+    const username = generateUsername(staffName)
     const password = generatePassword()
     
-    // Check if username already exists
-    const existingStaff = staffList.find(staff => staff.username === username)
-    if (existingStaff) {
+    // Check if staff member already exists
+    const existingStaff = await sql`
+      SELECT id FROM staff WHERE name = ${staffName} OR email = ${email}
+    `
+    
+    if (existingStaff.rows.length > 0) {
       return NextResponse.json(
         { error: 'Staff member with this name already exists' },
         { status: 400 }
       )
     }
 
-    // Create new staff member
-    const newStaff = {
-      id: Math.max(...staffList.map(s => s.id), 0) + 1,
-      username,
-      password,
-      name: name.trim(),
-      role: 'staff',
-      active: true
-    }
+    // Insert new staff member into database
+    const result = await sql`
+      INSERT INTO staff (name, email, active, created_at, updated_at)
+      VALUES (${staffName}, ${email}, true, NOW(), NOW())
+      RETURNING id, name, email, active
+    `
 
-    const updatedStaffList = [...staffList, newStaff]
-    updateStaffCredentials(updatedStaffList)
+    const newStaff = result.rows[0]
 
     return NextResponse.json({
       success: true,
       message: 'Staff member created successfully',
       staff: {
         id: newStaff.id,
-        username: newStaff.username,
-        password: newStaff.password, // Only return password when creating
+        username: username,
+        password: password, // Only return password when creating
         name: newStaff.name,
-        role: newStaff.role,
+        role: 'staff',
         active: newStaff.active
       }
     })
 
   } catch (error) {
+    console.error('Database error:', error)
     return NextResponse.json(
-      { error: 'Failed to create staff member' },
+      { error: 'Failed to create staff member in database' },
       { status: 500 }
     )
   }
 }
 
-// PUT - Update staff member (activate/deactivate)
+// PUT - Update staff member (activate/deactivate or change name)
 export async function PUT(request: NextRequest) {
   try {
     const { id, active, name } = await request.json()
@@ -105,42 +125,68 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const staffList = getStaffCredentials()
-    const staffIndex = staffList.findIndex(staff => staff.id === id)
+    // Build dynamic update query
+    let updateFields = []
+    let updateValues = []
+    
+    if (active !== undefined) {
+      updateFields.push('active = $' + (updateValues.length + 1))
+      updateValues.push(active)
+    }
+    
+    if (name && name.trim() !== '') {
+      updateFields.push('name = $' + (updateValues.length + 1))
+      updateValues.push(name.trim())
+      
+      // Also update email if name is changed
+      updateFields.push('email = $' + (updateValues.length + 1))
+      updateValues.push(generateEmail(name.trim()))
+    }
+    
+    updateFields.push('updated_at = NOW()')
+    updateValues.push(id) // ID is always the last parameter
 
-    if (staffIndex === -1) {
+    if (updateFields.length === 1) { // Only updated_at, no actual changes
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
+    }
+
+    const query = `
+      UPDATE staff 
+      SET ${updateFields.join(', ')}
+      WHERE id = $${updateValues.length}
+      RETURNING id, name, email, active
+    `
+
+    const result = await sql.query(query, updateValues)
+
+    if (result.rows.length === 0) {
       return NextResponse.json(
         { error: 'Staff member not found' },
         { status: 404 }
       )
     }
 
-    // Update staff member
-    if (active !== undefined) {
-      staffList[staffIndex].active = active
-    }
-    
-    if (name && name.trim() !== '') {
-      staffList[staffIndex].name = name.trim()
-    }
-
-    updateStaffCredentials(staffList)
+    const updatedStaff = result.rows[0]
 
     return NextResponse.json({
       success: true,
-      message: `Staff member ${active ? 'activated' : 'deactivated'} successfully`,
+      message: `Staff member updated successfully`,
       staff: {
-        id: staffList[staffIndex].id,
-        username: staffList[staffIndex].username,
-        name: staffList[staffIndex].name,
-        role: staffList[staffIndex].role,
-        active: staffList[staffIndex].active
+        id: updatedStaff.id,
+        username: generateUsername(updatedStaff.name),
+        name: updatedStaff.name,
+        role: 'staff',
+        active: updatedStaff.active
       }
     })
 
   } catch (error) {
+    console.error('Database error:', error)
     return NextResponse.json(
-      { error: 'Failed to update staff member' },
+      { error: 'Failed to update staff member in database' },
       { status: 500 }
     )
   }
@@ -159,20 +205,20 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const staffList = getStaffCredentials()
-    const staffIndex = staffList.findIndex(staff => staff.id === id)
+    // Soft delete by deactivating
+    const result = await sql`
+      UPDATE staff 
+      SET active = false, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id, name
+    `
 
-    if (staffIndex === -1) {
+    if (result.rows.length === 0) {
       return NextResponse.json(
         { error: 'Staff member not found' },
         { status: 404 }
       )
     }
-
-    // Soft delete by deactivating
-    staffList[staffIndex].active = false
-
-    updateStaffCredentials(staffList)
 
     return NextResponse.json({
       success: true,
@@ -180,8 +226,9 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
+    console.error('Database error:', error)
     return NextResponse.json(
-      { error: 'Failed to delete staff member' },
+      { error: 'Failed to delete staff member from database' },
       { status: 500 }
     )
   }

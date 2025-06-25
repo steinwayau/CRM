@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
         ('June', 'june@epgpianos.com.au', NOW(), NOW()),
         ('Mike', 'mike@epgpianos.com.au', NOW(), NOW()),
         ('Alison', 'alison@epgpianos.com.au', NOW(), NOW()),
-        ('Angela', 'angela@epgpianos.com.au', NOW(), NOW()),
         ('Olivia', 'olivia@epgpianos.com.au', NOW(), NOW()),
         ('Louie', 'louie@epgpianos.com.au', NOW(), NOW())
       ON CONFLICT (name) DO NOTHING

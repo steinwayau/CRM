@@ -30,13 +30,9 @@ export function middleware(request: NextRequest) {
     const adminSession = request.cookies.get('admin-session')
     const staffSession = request.cookies.get('staff-session')
     
-    if (!adminSession && !staffSession) {
-      return NextResponse.redirect(new URL('/staff', request.url))
-    }
-    
-    // Verify at least one session is valid
     let hasValidSession = false
     
+    // Check admin session first
     if (adminSession) {
       try {
         const sessionData = JSON.parse(adminSession.value)
@@ -44,21 +40,23 @@ export function middleware(request: NextRequest) {
           hasValidSession = true
         }
       } catch (error) {
-        // Invalid admin session
+        console.log('Invalid admin session:', error)
       }
     }
     
-    if (staffSession && !hasValidSession) {
+    // Check staff session if admin session is not valid
+    if (!hasValidSession && staffSession) {
       try {
         const sessionData = JSON.parse(staffSession.value)
         if (sessionData.user && sessionData.authenticated) {
           hasValidSession = true
         }
       } catch (error) {
-        // Invalid staff session
+        console.log('Invalid staff session:', error)
       }
     }
     
+    // If no valid session found, redirect to staff login
     if (!hasValidSession) {
       return NextResponse.redirect(new URL('/staff', request.url))
     }

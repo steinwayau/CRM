@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
 import { getAllStaffWithLabels, getAllStaffForFiltering } from '@/lib/staff-management'
-import { isAdmin, getUserRole, getCurrentUser } from '@/lib/auth-utils'
+import { isAdminSync, getUserRoleSync, getCurrentUser, clearAuthCache } from '@/lib/auth-utils'
 
 // Constants matching the current system
 const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Roland", "Ritmuller", "Ronisch", "Kurzweil", "Other"]
@@ -95,7 +95,17 @@ export default function EnquiryData() {
 
   useEffect(() => {
     // Check user role on component mount
-    setUserRole(getUserRole())
+    const checkAuth = async () => {
+      try {
+        await getCurrentUser() // This will populate the cache
+        setUserRole(getUserRoleSync())
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        setUserRole(null)
+      }
+    }
+    
+    checkAuth()
     fetchEnquiries()
   }, [])
 

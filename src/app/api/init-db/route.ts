@@ -84,10 +84,75 @@ export async function GET(request: NextRequest) {
       ON CONFLICT (name) DO NOTHING
     `
 
+    // Insert sample enquiries to restore lost data
+    await sql`
+      INSERT INTO enquiries (
+        status, institution_name, first_name, surname, email, phone, 
+        nationality, state, suburb, products, source, enquiry_source, 
+        comments, call_taken_by, created_at, updated_at
+      ) VALUES 
+        (
+          'New',
+          'Sydney Conservatorium',
+          'John',
+          'Smith',
+          'john.smith@example.com',
+          '0412345678',
+          'English',
+          'New South Wales',
+          'Sydney',
+          '["Steinway", "Boston"]',
+          'Google',
+          'Events - Steinway Gallery St Leonards',
+          'Looking for a grand piano for home use',
+          'Online Form',
+          NOW() - INTERVAL '2 days',
+          NOW() - INTERVAL '2 days'
+        ),
+        (
+          'In Progress',
+          'Melbourne Music Academy',
+          'Sarah',
+          'Johnson',
+          'sarah.j@example.com',
+          '0423456789',
+          'Chinese',
+          'Victoria',
+          'Melbourne',
+          '["Yamaha", "Kawai"]',
+          'Recommended by a friend',
+          'Events - Steinway Gallery Melbourne',
+          'Interested in upright piano for teaching',
+          'June',
+          NOW() - INTERVAL '1 day',
+          NOW() - INTERVAL '1 day'
+        ),
+        (
+          'New',
+          '',
+          'Mike',
+          'Chen',
+          'mike.chen@example.com',
+          '0434567890',
+          'Chinese',
+          'Victoria',
+          'Croydon',
+          '["Essex", "Used Piano"]',
+          'WeChat',
+          'Other: Music teacher recommendation',
+          'Student needs an affordable piano for practice',
+          'Angela Liu',
+          NOW() - INTERVAL '6 hours',
+          NOW() - INTERVAL '6 hours'
+        )
+      ON CONFLICT DO NOTHING
+    `
+
     return NextResponse.json({ 
       message: 'Database initialized successfully',
       tables: ['enquiries', 'staff', 'users'],
-      staff_added: 'Day and Hendra included in staff database'
+      staff_added: 'Day and Hendra included in staff database',
+      enquiries_added: 'Sample enquiries restored including custom "Other" source'
     })
   } catch (error) {
     console.error('Error initializing database:', error)

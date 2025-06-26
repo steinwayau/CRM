@@ -116,4 +116,47 @@ export const addNewStaff = (name: string, isActive: boolean = true, role?: strin
 
 export const getStaffMember = (name: string): StaffMember | undefined => {
   return STAFF_DATABASE.find(staff => staff.name === name)
+}
+
+// Get staff options for follow-up form based on the enquiry
+export const getFollowUpStaffOptions = (originalSubmitter?: string): Array<{ value: string; label: string; isActive: boolean }> => {
+  const options: Array<{ value: string; label: string; isActive: boolean }> = []
+  
+  // Always include all current active staff
+  const activeStaff = STAFF_DATABASE
+    .filter(staff => staff.isActive)
+    .map(staff => ({
+      value: staff.name,
+      label: staff.name,
+      isActive: true
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  
+  options.push(...activeStaff)
+  
+  // If there's an original submitter and they're not already in the active list, add them
+  if (originalSubmitter) {
+    const isAlreadyIncluded = options.some(option => option.value === originalSubmitter)
+    
+    if (!isAlreadyIncluded) {
+      const originalStaffMember = STAFF_DATABASE.find(staff => staff.name === originalSubmitter)
+      if (originalStaffMember) {
+        // It's a former staff member who was the original submitter
+        options.unshift({
+          value: originalSubmitter,
+          label: `${originalSubmitter} (Original Submitter - Former)`,
+          isActive: false
+        })
+      } else {
+        // Original submitter is not in our staff database (maybe "Online Form" or external)
+        options.unshift({
+          value: originalSubmitter,
+          label: `${originalSubmitter} (Original Submitter)`,
+          isActive: false
+        })
+      }
+    }
+  }
+  
+  return options
 } 

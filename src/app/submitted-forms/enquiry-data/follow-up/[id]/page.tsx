@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { getAllStaffWithLabels } from '@/lib/staff-management'
+import { getFollowUpStaffOptions } from '@/lib/staff-management'
 import DateTimePicker from '@/components/ui/date-time-picker'
 
 const CUSTOMER_RATINGS = [
@@ -15,7 +15,7 @@ const STEP_PROGRAM_OPTIONS = [
   "N/A", "Interested", "Not interested"
 ]
 
-const STAFF_MEMBERS_WITH_LABELS = getAllStaffWithLabels()
+// Staff options will be generated dynamically based on the enquiry
 
 type Enquiry = {
   id?: number
@@ -45,6 +45,7 @@ export default function FollowUpPage() {
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [staffOptions, setStaffOptions] = useState<Array<{ value: string; label: string; isActive: boolean }>>([])
   
   const [followUpData, setFollowUpData] = useState({
     bestTimeToFollowUp: '',
@@ -69,6 +70,11 @@ export default function FollowUpPage() {
         const foundEnquiry = data.find((e: Enquiry) => e.id?.toString() === enquiryId)
         if (foundEnquiry) {
           setEnquiry(foundEnquiry)
+          
+          // Generate staff options based on the original submitter
+          const staffOptions = getFollowUpStaffOptions(foundEnquiry.submittedBy)
+          setStaffOptions(staffOptions)
+          
           // Pre-populate existing follow-up data if available
           setFollowUpData({
             bestTimeToFollowUp: foundEnquiry.bestTimeToFollowUp || '',
@@ -299,7 +305,7 @@ export default function FollowUpPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">- select -</option>
-                  {STAFF_MEMBERS_WITH_LABELS.map((staff) => (
+                  {staffOptions.map((staff) => (
                     <option key={staff.value} value={staff.value}>
                       {staff.label}
                     </option>

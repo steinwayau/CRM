@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getFollowUpStaffOptions } from '@/lib/staff-management'
-import DateTimePicker from '@/components/ui/date-time-picker'
+import CompactDateTimePicker from '@/components/ui/compact-date-time-picker'
 
 const CUSTOMER_RATINGS = [
   "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
@@ -246,7 +246,7 @@ export default function FollowUpPage() {
             {/* Best Time to Follow Up & Customer Rating */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <DateTimePicker
+                <CompactDateTimePicker
                   value={followUpData.bestTimeToFollowUp}
                   onChange={(value) => setFollowUpData(prev => ({ ...prev, bestTimeToFollowUp: value }))}
                   label="Best Time to Follow Up"

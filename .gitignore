@@ -42,5 +42,8 @@ next-env.d.ts
 # OS generated files
 Thumbs.db
 
+# Mac OS metadata files
+._*
+
 # Mac specific
 ._* 

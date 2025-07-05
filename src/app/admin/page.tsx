@@ -13,11 +13,18 @@ export default function AdminDashboard() {
 
   const adminSections = [
     {
-      title: 'Staff Management',
+      title: 'Staff Email Management',
+      description: 'Manage staff email addresses for reminder system',
+      href: '/admin/staff-management',
+      icon: '📧',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'Staff Roles & Permissions',
       description: 'Manage staff members, roles, and permissions',
       href: '/admin/staff',
       icon: '👥',
-      color: 'bg-blue-500'
+      color: 'bg-cyan-500'
     },
     {
       title: 'Data Import',

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
+export const dynamic = 'force-dynamic'
+
 // Helper function to generate secure password
 function generatePassword(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*'
@@ -199,53 +201,47 @@ export async function DELETE(request: NextRequest) {
     const id = parseInt(searchParams.get('id') || '')
     const permanent = searchParams.get('permanent') === 'true'
 
-    if (!id) {
+    if (!id || isNaN(id)) {
       return NextResponse.json(
-        { error: 'Staff ID is required' },
+        { error: 'Valid staff ID is required' },
         { status: 400 }
       )
     }
 
+    let result
+    let message
+
     if (permanent) {
-      // Permanent delete - completely remove from database
-      const result = await sql`
+      // Permanent deletion
+      result = await sql`
         DELETE FROM staff 
         WHERE id = ${id}
         RETURNING id, name
       `
-
-      if (result.rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Staff member not found' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Staff member permanently deleted'
-      })
+      message = 'Staff member permanently deleted'
     } else {
-      // Soft delete by deactivating
-      const result = await sql`
+      // Soft delete - just deactivate
+      result = await sql`
         UPDATE staff 
         SET active = false, updated_at = NOW()
         WHERE id = ${id}
-        RETURNING id, name
+        RETURNING id, name, active
       `
-
-      if (result.rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Staff member not found' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Staff member deactivated successfully'
-      })
+      message = 'Staff member deactivated'
     }
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Staff member not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: message,
+      staff: result.rows[0]
+    })
 
   } catch (error) {
     console.error('Database error:', error)

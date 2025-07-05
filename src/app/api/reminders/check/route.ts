@@ -38,9 +38,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get all active staff members
+    // Get all active staff members from users table
     const staffResult = await sql`
-      SELECT name, email, active FROM staff WHERE active = true
+      SELECT name, email, active FROM users WHERE role = 'staff' AND active = true
     `
     const activeStaff = staffResult.rows
 

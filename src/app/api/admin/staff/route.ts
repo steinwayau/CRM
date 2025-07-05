@@ -254,4 +254,136 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// GET - Retrieve all staff with email addresses
+export async function GET_EMAILS() {
+  try {
+    const result = await sql`
+      SELECT id, name, email, role, active 
+      FROM users 
+      WHERE role = 'staff' 
+      ORDER BY name ASC
+    `
+    
+    return NextResponse.json({
+      success: true,
+      staff: result.rows
+    })
+  } catch (error) {
+    console.error('Database error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch staff from database' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Add or update staff email addresses
+export async function POST_EMAILS(request: NextRequest) {
+  try {
+    const { staffUpdates } = await request.json()
+
+    if (!staffUpdates || !Array.isArray(staffUpdates)) {
+      return NextResponse.json(
+        { error: 'staffUpdates array is required' },
+        { status: 400 }
+      )
+    }
+
+    let updated = 0
+    let errors = 0
+    const errorDetails: string[] = []
+
+    for (const staff of staffUpdates) {
+      try {
+        if (!staff.name || !staff.email) {
+          errorDetails.push(`Missing name or email for staff record`)
+          errors++
+          continue
+        }
+
+        // Update or insert staff member with email
+        await sql`
+          INSERT INTO users (name, email, role, active) 
+          VALUES (${staff.name}, ${staff.email}, 'staff', ${staff.active !== false})
+          ON CONFLICT (email) 
+          DO UPDATE SET 
+            name = ${staff.name}, 
+            active = ${staff.active !== false}
+        `
+        
+        updated++
+      } catch (error) {
+        errorDetails.push(`Error updating ${staff.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        errors++
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Updated ${updated} staff members`,
+      updated,
+      errors,
+      ...(errorDetails.length > 0 && { errorDetails })
+    })
+
+  } catch (error) {
+    console.error('Database error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update staff in database' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT - Quick setup with default staff emails
+export async function PUT_EMAILS() {
+  try {
+    const defaultStaff = [
+      { name: "Abbey Landgren", email: "abbey@epgpianos.com.au", active: true },
+      { name: "Angela Liu", email: "angela@epgpianos.com.au", active: true },
+      { name: "Chris", email: "chris@epgpianos.com.au", active: true },
+      { name: "Mark", email: "mark@epgpianos.com.au", active: true },
+      { name: "Day", email: "day@epgpianos.com.au", active: true },
+      { name: "Hendra", email: "hendra@epgpianos.com.au", active: true },
+      { name: "June", email: "june@epgpianos.com.au", active: true },
+      { name: "Mike", email: "mike@epgpianos.com.au", active: true },
+      { name: "Alison", email: "alison@epgpianos.com.au", active: true },
+      { name: "Olivia", email: "olivia@epgpianos.com.au", active: true },
+      { name: "Louie", email: "louie@epgpianos.com.au", active: true }
+    ]
+
+    let updated = 0
+    
+    for (const staff of defaultStaff) {
+      try {
+        await sql`
+          INSERT INTO users (name, email, role, active) 
+          VALUES (${staff.name}, ${staff.email}, 'staff', ${staff.active})
+          ON CONFLICT (email) 
+          DO UPDATE SET 
+            name = ${staff.name}, 
+            active = ${staff.active}
+        `
+        updated++
+      } catch (error) {
+        console.error(`Error updating ${staff.name}:`, error)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Set up ${updated} staff members with default email addresses`,
+      updated,
+      staff: defaultStaff
+    })
+
+  } catch (error) {
+    console.error('Database error:', error)
+    return NextResponse.json(
+      { error: 'Failed to set up default staff emails' },
+      { status: 500 }
+    )
+  }
 } 

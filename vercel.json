@@ -16,12 +16,6 @@
       "maxDuration": 30
     }
   },
-  "crons": [
-    {
-      "path": "/api/reminders/check",
-      "schedule": "0 * * * *"
-    }
-  ],
   "env": {
     "NEXT_PUBLIC_APP_URL": "https://crm-mu-black.vercel.app"
   }

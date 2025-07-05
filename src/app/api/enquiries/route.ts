@@ -6,7 +6,9 @@ export async function GET(request: NextRequest) {
     const result = await sql`
       SELECT id, status, institution_name, first_name, surname, email, phone, 
              nationality, state, suburb, products, source, enquiry_source, 
-             comment, call_taken_by, created_at, updated_at
+             comment, call_taken_by, follow_up_date, classification, step_program,
+             involving, not_involving_reason, follow_up_info, newsletter,
+             created_at, updated_at
       FROM enquiries 
       ORDER BY created_at DESC
     `
@@ -28,6 +30,14 @@ export async function GET(request: NextRequest) {
       eventSource: row.enquiry_source,
       comments: row.comment,
       submittedBy: row.call_taken_by,
+      bestTimeToFollowUp: row.follow_up_date,
+      customerRating: row.classification,
+      stepProgram: row.step_program,
+      salesManagerInvolved: row.involving,
+      salesManagerExplanation: row.not_involving_reason,
+      followUpNotes: row.follow_up_info,
+      doNotEmail: row.newsletter === 'No',
+      hasFollowUp: !!(row.follow_up_date || row.follow_up_info),
       createdAt: row.created_at,
       created_at: row.created_at
     }))

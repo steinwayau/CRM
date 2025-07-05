@@ -41,7 +41,7 @@ export default function RootLayout({
 
               {/* Navigation Links */}
               <div className="hidden md:flex items-center space-x-8">
-                <a href="/admin" className="hover:text-gray-300 transition-colors">
+                <a href="/dashboard" className="hover:text-gray-300 transition-colors">
                   🏠 Dashboard
                 </a>
                 

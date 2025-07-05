@@ -122,13 +122,22 @@ export default function StaffManagementPage() {
     }
   }
 
-  const deleteStaff = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this staff member? This will deactivate their account but preserve all their data.')) {
+  const deleteStaff = async (id: number, permanent: boolean = false) => {
+    const action = permanent ? 'permanently delete' : 'deactivate'
+    const warning = permanent 
+      ? 'This will PERMANENTLY REMOVE the staff member from the database. This action cannot be undone!'
+      : 'This will deactivate their account but preserve all their data.'
+    
+    if (!confirm(`Are you sure you want to ${action} this staff member? ${warning}`)) {
       return
     }
 
     try {
-      const response = await fetch(`/api/admin/staff?id=${id}`, {
+      const url = permanent 
+        ? `/api/admin/staff?id=${id}&permanent=true`
+        : `/api/admin/staff?id=${id}`
+      
+      const response = await fetch(url, {
         method: 'DELETE',
       })
 
@@ -136,10 +145,10 @@ export default function StaffManagementPage() {
         setOpenDropdown(null) // Close dropdown after action
         fetchStaff() // Refresh the list
       } else {
-        setError('Failed to delete staff member')
+        setError(`Failed to ${action} staff member`)
       }
     } catch (error) {
-      setError('Network error deleting staff')
+      setError(`Network error ${action.replace('ing', '')}ing staff`)
     }
   }
 
@@ -441,13 +450,13 @@ export default function StaffManagementPage() {
                             <div className="border-t border-gray-100 my-1"></div>
                             
                             <button
-                              onClick={() => deleteStaff(member.id)}
+                              onClick={() => deleteStaff(member.id, true)}
                               className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center"
                             >
                               <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                              Delete
+                              Delete Permanently
                             </button>
                           </div>
                         )}

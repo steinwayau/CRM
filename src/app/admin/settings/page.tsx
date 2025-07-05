@@ -18,11 +18,25 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setSaveMessage('Settings saved successfully!')
-    setIsSaving(false)
-    setTimeout(() => setSaveMessage(''), 3000)
+    
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ settings }),
+      })
+
+      if (response.ok) {
+        setSaveMessage('Settings saved successfully!')
+        setTimeout(() => setSaveMessage(''), 3000)
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -84,6 +98,7 @@ export default function SettingsPage() {
                     <option value="30 minutes">30 minutes</option>
                     <option value="1 hour">1 hour</option>
                     <option value="2 hours">2 hours</option>
+                    <option value="never">Never (Stay logged in)</option>
                   </select>
                 </div>
               </div>

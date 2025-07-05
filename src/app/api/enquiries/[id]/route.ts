@@ -16,6 +16,12 @@ export async function PUT(
       ? `Other: ${updateData.eventSourceOther}` 
       : updateData.eventSource
 
+    // Handle follow-up date conversion
+    let followUpDate = null
+    if (updateData.bestTimeToFollowUp) {
+      followUpDate = new Date(updateData.bestTimeToFollowUp).toISOString()
+    }
+
     // Update the enquiry in database using correct database column names
     const result = await sql`
       UPDATE enquiries 
@@ -33,11 +39,20 @@ export async function PUT(
           enquiry_source = ${finalEventSource || null},
           comment = ${updateData.comments || null},
           call_taken_by = ${updateData.submittedBy || 'Online Form'},
+          follow_up_date = ${followUpDate},
+          classification = ${updateData.customerRating || 'N/A'},
+          step_program = ${updateData.stepProgram || 'N/A'},
+          involving = ${updateData.salesManagerInvolved || 'No'},
+          not_involving_reason = ${updateData.salesManagerExplanation || null},
+          follow_up_info = ${updateData.followUpNotes || null},
+          newsletter = ${updateData.doNotEmail ? 'No' : 'Yes'},
           updated_at = NOW()
       WHERE id = ${id}
       RETURNING id, status, institution_name, first_name, surname, email, phone, 
                 nationality, state, suburb, products, source, enquiry_source, 
-                comment, call_taken_by, created_at, updated_at
+                comment, call_taken_by, follow_up_date, classification, step_program,
+                involving, not_involving_reason, follow_up_info, newsletter,
+                created_at, updated_at
     `
 
     if (result.rows.length === 0) {
@@ -66,6 +81,14 @@ export async function PUT(
       eventSource: updatedEnquiry.enquiry_source,
       comments: updatedEnquiry.comment,
       submittedBy: updatedEnquiry.call_taken_by,
+      bestTimeToFollowUp: updatedEnquiry.follow_up_date,
+      customerRating: updatedEnquiry.classification,
+      stepProgram: updatedEnquiry.step_program,
+      salesManagerInvolved: updatedEnquiry.involving,
+      salesManagerExplanation: updatedEnquiry.not_involving_reason,
+      followUpNotes: updatedEnquiry.follow_up_info,
+      doNotEmail: updatedEnquiry.newsletter === 'No',
+      hasFollowUp: !!(updatedEnquiry.follow_up_date || updatedEnquiry.follow_up_info),
       createdAt: updatedEnquiry.created_at,
       created_at: updatedEnquiry.created_at
     }
@@ -120,7 +143,9 @@ export async function GET(
     const result = await sql`
       SELECT id, status, institution_name, first_name, surname, email, phone, 
              nationality, state, suburb, products, source, enquiry_source, 
-             comment, call_taken_by, created_at, updated_at
+             comment, call_taken_by, follow_up_date, classification, step_program,
+             involving, not_involving_reason, follow_up_info, newsletter,
+             created_at, updated_at
       FROM enquiries 
       WHERE id = ${id}
     `
@@ -145,6 +170,14 @@ export async function GET(
         eventSource: enquiry.enquiry_source,
         comments: enquiry.comment,
         submittedBy: enquiry.call_taken_by,
+        bestTimeToFollowUp: enquiry.follow_up_date,
+        customerRating: enquiry.classification,
+        stepProgram: enquiry.step_program,
+        salesManagerInvolved: enquiry.involving,
+        salesManagerExplanation: enquiry.not_involving_reason,
+        followUpNotes: enquiry.follow_up_info,
+        doNotEmail: enquiry.newsletter === 'No',
+        hasFollowUp: !!(enquiry.follow_up_date || enquiry.follow_up_info),
         createdAt: enquiry.created_at,
         created_at: enquiry.created_at
       }

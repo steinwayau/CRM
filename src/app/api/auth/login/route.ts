@@ -1,10 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getStaffCredentials } from '@/lib/staff-data'
+import { sql } from '@vercel/postgres'
 
 // Admin credentials (in production, store these securely/encrypted)
 const ADMIN_USERNAME = 'MarkandLouie2025@'
 const ADMIN_PASSWORD = 'ySz7JY^4tj@GmUqK'
+
+// Get session timeout from system settings
+async function getSessionTimeout(): Promise<number> {
+  try {
+    const result = await sql`
+      SELECT value FROM system_settings WHERE key = 'sessionTimeout'
+    `
+    
+    if (result.rows.length > 0) {
+      const timeout = result.rows[0].value
+      
+      // Convert timeout to seconds
+      if (timeout === 'never') {
+        return 60 * 60 * 24 * 365 * 10 // 10 years
+      } else if (timeout === '15 minutes') {
+        return 60 * 15
+      } else if (timeout === '30 minutes') {
+        return 60 * 30
+      } else if (timeout === '1 hour') {
+        return 60 * 60
+      } else if (timeout === '2 hours') {
+        return 60 * 60 * 2
+      }
+    }
+    
+    // Default to 7 days if not found
+    return 60 * 60 * 24 * 7
+  } catch (error) {
+    console.error('Error getting session timeout:', error)
+    // Default to 7 days on error
+    return 60 * 60 * 24 * 7
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,6 +102,9 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now()
     }
 
+    // Get session timeout from settings
+    const sessionTimeout = await getSessionTimeout()
+
     // Set cookie based on role
     const response = NextResponse.json({
       success: true,
@@ -84,14 +121,14 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 7 days
+        maxAge: sessionTimeout
       })
     } else {
       response.cookies.set('staff-session', JSON.stringify(sessionData), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 7 days
+        maxAge: sessionTimeout
       })
     }
 

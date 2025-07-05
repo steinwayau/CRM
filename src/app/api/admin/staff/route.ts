@@ -192,11 +192,12 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Remove staff member (soft delete by deactivating)
+// DELETE - Remove staff member (soft delete by deactivating OR permanent delete)
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = parseInt(searchParams.get('id') || '')
+    const permanent = searchParams.get('permanent') === 'true'
 
     if (!id) {
       return NextResponse.json(
@@ -205,25 +206,46 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Soft delete by deactivating
-    const result = await sql`
-      UPDATE staff 
-      SET active = false, updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING id, name
-    `
+    if (permanent) {
+      // Permanent delete - completely remove from database
+      const result = await sql`
+        DELETE FROM staff 
+        WHERE id = ${id}
+        RETURNING id, name
+      `
 
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Staff member not found' },
-        { status: 404 }
-      )
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Staff member not found' },
+          { status: 404 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Staff member permanently deleted'
+      })
+    } else {
+      // Soft delete by deactivating
+      const result = await sql`
+        UPDATE staff 
+        SET active = false, updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING id, name
+      `
+
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Staff member not found' },
+          { status: 404 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Staff member deactivated successfully'
+      })
     }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Staff member deactivated successfully'
-    })
 
   } catch (error) {
     console.error('Database error:', error)

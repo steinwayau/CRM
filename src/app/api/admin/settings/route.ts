@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
 // GET - Retrieve system settings
+// Force new deployment to apply build fixes
 export async function GET() {
   try {
     const result = await sql`

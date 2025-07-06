@@ -6,15 +6,18 @@ export const dynamic = 'force-dynamic'
 // GET - Check current staff email setup
 export async function GET() {
   try {
-    // Get all staff members from the staff table
-    const staffResult = await sql`
+    // Use EXACTLY the same query as the working /api/admin/staff endpoint
+    const result = await sql`
       SELECT id, name, email, active, created_at, updated_at
       FROM staff 
-      ORDER BY name ASC
+      ORDER BY id ASC
     `
     
-    // Map the database results to the expected format
-    const staffWithDefaults = staffResult.rows.map((row: any) => ({
+    console.log('Raw database result:', result.rows.length, 'rows')
+    console.log('First row sample:', result.rows[0])
+    
+    // Map the database results to the expected format for staff management
+    const staffWithDefaults = result.rows.map((row: any) => ({
       id: row.id.toString(),
       name: row.name,
       email: row.email || '', // Default to empty string if null
@@ -25,16 +28,27 @@ export async function GET() {
       department: '' // Default empty since column doesn't exist
     }))
     
+    console.log('Mapped result:', staffWithDefaults.length, 'staff members')
+    
     return NextResponse.json({
       success: true,
       staff: staffWithDefaults,
-      message: `Found ${staffResult.rows.length} staff members`
+      message: `Found ${result.rows.length} staff members`,
+      debug: {
+        raw_count: result.rows.length,
+        mapped_count: staffWithDefaults.length,
+        sample_raw: result.rows[0] || null,
+        sample_mapped: staffWithDefaults[0] || null
+      }
     })
     
   } catch (error) {
     console.error('Database error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch staff from database' },
+      { 
+        error: 'Failed to fetch staff from database',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

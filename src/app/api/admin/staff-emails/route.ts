@@ -4,42 +4,35 @@ import { sql } from '@vercel/postgres'
 export const dynamic = 'force-dynamic'
 
 // GET - Check current staff email setup
+// COPIED EXACT WORKING CODE FROM /api/admin/staff
 export async function GET() {
   try {
-    // Use IDENTICAL query to the working staff API
     const result = await sql`
       SELECT id, name, email, active, created_at, updated_at
       FROM staff 
       ORDER BY id ASC
     `
     
-    // Convert database rows to staff management format
+    // Use exact same format as working staff API
     const staffList = result.rows.map((row: any) => ({
-      id: row.id.toString(),
+      id: row.id,
       name: row.name,
-      email: row.email || '', // Default to empty string if null
+      email: row.email || '',
       role: 'staff',
       active: row.active,
-      phone: '', // Default empty since column doesn't exist
-      position: '', // Default empty since column doesn't exist
-      department: '' // Default empty since column doesn't exist
+      phone: '',
+      position: '',
+      department: ''
     }))
     
     return NextResponse.json({
       success: true,
-      staff: staffList,
-      message: `Found ${result.rows.length} staff members`,
-      version: "2.0-fixed"
+      staff: staffList
     })
-    
   } catch (error) {
     console.error('Database error:', error)
     return NextResponse.json(
-      { 
-        error: 'Failed to fetch staff from database',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        version: "2.0-fixed"
-      },
+      { error: 'Failed to fetch staff from database' },
       { status: 500 }
     )
   }

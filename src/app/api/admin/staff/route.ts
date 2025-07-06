@@ -24,23 +24,42 @@ function generateEmail(name: string): string {
 }
 
 // GET - List all staff
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const emailFormat = searchParams.get('email_format') === 'true'
+    
     const result = await sql`
       SELECT id, name, email, active, created_at, updated_at
       FROM staff 
       ORDER BY id ASC
     `
     
-    // Convert database rows to the expected format with credentials
-    const staffList = result.rows.map((row: any) => ({
-      id: row.id,
-      username: generateUsername(row.name),
-      password: '••••••••••••', // Hidden for security
-      name: row.name,
-      role: 'staff',
-      active: row.active
-    }))
+    let staffList
+    
+    if (emailFormat) {
+      // Format for email management interface
+      staffList = result.rows.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email || '',
+        role: 'staff',
+        active: row.active,
+        phone: '',
+        position: '',
+        department: ''
+      }))
+    } else {
+      // Standard format with credentials
+      staffList = result.rows.map((row: any) => ({
+        id: row.id,
+        username: generateUsername(row.name),
+        password: '••••••••••••', // Hidden for security
+        name: row.name,
+        role: 'staff',
+        active: row.active
+      }))
+    }
     
     return NextResponse.json({
       success: true,
@@ -189,6 +208,51 @@ export async function PUT(request: NextRequest) {
     console.error('Database error:', error)
     return NextResponse.json(
       { error: 'Failed to update staff member in database' },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH - Update staff email addresses (for email management)
+export async function PATCH(request: NextRequest) {
+  try {
+    const { staff } = await request.json()
+
+    if (!staff || !Array.isArray(staff)) {
+      return NextResponse.json(
+        { error: 'Staff array is required' },
+        { status: 400 }
+      )
+    }
+
+    let updatedCount = 0
+
+    for (const member of staff) {
+      const { id, email } = member
+
+      if (!id) {
+        continue
+      }
+
+      await sql`
+        UPDATE staff 
+        SET email = ${email || null}, 
+            updated_at = NOW()
+        WHERE id = ${id}
+      `
+      updatedCount++
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Updated ${updatedCount} staff email addresses`,
+      updatedCount
+    })
+
+  } catch (error) {
+    console.error('Database error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update staff email addresses' },
       { status: 500 }
     )
   }

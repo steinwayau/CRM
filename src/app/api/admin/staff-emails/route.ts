@@ -3,7 +3,7 @@ import { sql } from '@vercel/postgres'
 
 export const dynamic = 'force-dynamic'
 
-// GET - Check current staff email setup
+// GET - List all staff with email management format
 // COPIED EXACT WORKING CODE FROM /api/admin/staff
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
       ORDER BY id ASC
     `
     
-    // Use exact same format as working staff API
+    // Convert database rows to staff email management format
     const staffList = result.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
@@ -51,43 +51,28 @@ export async function POST(request: NextRequest) {
     }
 
     let updatedCount = 0
-    let createdCount = 0
 
     for (const member of staff) {
-      const { id, name, email, active } = member
+      const { id, email } = member
 
-      if (!name) {
-        continue // Skip entries without names
+      if (!id) {
+        continue // Skip entries without IDs
       }
 
-      // Check if this is a new staff member (ID starts with 'new-')
-      if (id.toString().startsWith('new-')) {
-        // Create new staff member
-        await sql`
-          INSERT INTO staff (name, email, active, created_at, updated_at)
-          VALUES (${name}, ${email || null}, ${active !== false}, NOW(), NOW())
-        `
-        createdCount++
-      } else {
-        // Update existing staff member
-        await sql`
-          UPDATE staff 
-          SET name = ${name}, 
-              email = ${email || null}, 
-              active = ${active !== false}, 
-              updated_at = NOW()
-          WHERE id = ${id}
-        `
-        updatedCount++
-      }
+      // Update staff member email
+      await sql`
+        UPDATE staff 
+        SET email = ${email || null}, 
+            updated_at = NOW()
+        WHERE id = ${id}
+      `
+      updatedCount++
     }
 
     return NextResponse.json({
       success: true,
-      message: `Updated ${updatedCount} staff members, created ${createdCount} new staff members`,
-      updatedCount,
-      createdCount,
-      version: "2.0-fixed"
+      message: `Updated ${updatedCount} staff email addresses`,
+      updatedCount
     })
 
   } catch (error) {

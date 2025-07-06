@@ -13,18 +13,11 @@ export default function AdminDashboard() {
 
   const adminSections = [
     {
-      title: 'Staff Email Management',
-      description: 'Manage staff email addresses for reminder system',
-      href: '/admin/staff-management',
-      icon: '📧',
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Staff Roles & Permissions',
-      description: 'Manage staff members, roles, and permissions',
+      title: 'Staff Management',
+      description: 'Unified staff management - credentials, emails, roles & permissions',
       href: '/admin/staff',
       icon: '👥',
-      color: 'bg-cyan-500'
+      color: 'bg-blue-500'
     },
     {
       title: 'Data Import',
@@ -190,11 +183,11 @@ export default function AdminDashboard() {
               Import Customer Data
             </Link>
             <Link
-              href="/admin/staff/new"
+              href="/admin/staff"
               className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
-              <span className="mr-2">➕</span>
-              Add New Staff Member
+              <span className="mr-2">👥</span>
+              Manage Staff
             </Link>
             <Link
               href="/submitted-forms/enquiry-data"

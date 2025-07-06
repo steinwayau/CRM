@@ -6,40 +6,30 @@ export const dynamic = 'force-dynamic'
 // GET - Check current staff email setup
 export async function GET() {
   try {
-    // Use EXACTLY the same query as the working /api/admin/staff endpoint
+    // Use IDENTICAL query to the working staff API
     const result = await sql`
       SELECT id, name, email, active, created_at, updated_at
       FROM staff 
       ORDER BY id ASC
     `
     
-    console.log('Raw database result:', result.rows.length, 'rows')
-    console.log('First row sample:', result.rows[0])
-    
-    // Map the database results to the expected format for staff management
-    const staffWithDefaults = result.rows.map((row: any) => ({
+    // Convert database rows to staff management format
+    const staffList = result.rows.map((row: any) => ({
       id: row.id.toString(),
       name: row.name,
       email: row.email || '', // Default to empty string if null
-      role: 'staff', // Default role since it doesn't exist in DB
+      role: 'staff',
       active: row.active,
       phone: '', // Default empty since column doesn't exist
       position: '', // Default empty since column doesn't exist
       department: '' // Default empty since column doesn't exist
     }))
     
-    console.log('Mapped result:', staffWithDefaults.length, 'staff members')
-    
     return NextResponse.json({
       success: true,
-      staff: staffWithDefaults,
+      staff: staffList,
       message: `Found ${result.rows.length} staff members`,
-      debug: {
-        raw_count: result.rows.length,
-        mapped_count: staffWithDefaults.length,
-        sample_raw: result.rows[0] || null,
-        sample_mapped: staffWithDefaults[0] || null
-      }
+      version: "2.0-fixed"
     })
     
   } catch (error) {
@@ -47,7 +37,8 @@ export async function GET() {
     return NextResponse.json(
       { 
         error: 'Failed to fetch staff from database',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        version: "2.0-fixed"
       },
       { status: 500 }
     )
@@ -102,7 +93,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `Updated ${updatedCount} staff members, created ${createdCount} new staff members`,
       updatedCount,
-      createdCount
+      createdCount,
+      version: "2.0-fixed"
     })
 
   } catch (error) {

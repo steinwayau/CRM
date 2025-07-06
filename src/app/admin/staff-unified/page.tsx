@@ -363,6 +363,7 @@ export default function UnifiedStaffManagement() {
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
           <p>Unified Staff Management System • Only active staff will receive reminder emails</p>
+          <p className="mt-1 text-xs text-gray-400">Deployed: {new Date().toLocaleString()}</p>
         </div>
       </div>
     </div>

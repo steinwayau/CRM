@@ -6,18 +6,29 @@ export const dynamic = 'force-dynamic'
 // GET - Check current staff email setup
 export async function GET() {
   try {
-    // Check users table for staff with emails
-    const usersResult = await sql`
-      SELECT id, name, email, role, active 
-      FROM users 
-      WHERE role = 'staff' 
+    // Get all staff members from the staff table
+    const staffResult = await sql`
+      SELECT id, name, email, active, created_at, updated_at
+      FROM staff 
       ORDER BY name ASC
     `
     
+    // Map the database results to the expected format
+    const staffWithDefaults = staffResult.rows.map((row: any) => ({
+      id: row.id.toString(),
+      name: row.name,
+      email: row.email || '', // Default to empty string if null
+      role: 'staff', // Default role since it doesn't exist in DB
+      active: row.active,
+      phone: '', // Default empty since column doesn't exist
+      position: '', // Default empty since column doesn't exist
+      department: '' // Default empty since column doesn't exist
+    }))
+    
     return NextResponse.json({
       success: true,
-      staff: usersResult.rows,
-      message: `Found ${usersResult.rows.length} staff members`
+      staff: staffWithDefaults,
+      message: `Found ${staffResult.rows.length} staff members`
     })
     
   } catch (error) {
@@ -45,25 +56,28 @@ export async function POST(request: NextRequest) {
     let createdCount = 0
 
     for (const member of staff) {
-      const { id, name, email, role, active } = member
+      const { id, name, email, active } = member
 
-      if (!name || !email) {
-        continue // Skip incomplete entries
+      if (!name) {
+        continue // Skip entries without names
       }
 
       // Check if this is a new staff member (ID starts with 'new-')
-      if (id.startsWith('new-')) {
+      if (id.toString().startsWith('new-')) {
         // Create new staff member
         await sql`
-          INSERT INTO users (name, email, role, active, created_at, updated_at)
-          VALUES (${name}, ${email}, ${role || 'staff'}, ${active}, NOW(), NOW())
+          INSERT INTO staff (name, email, active, created_at, updated_at)
+          VALUES (${name}, ${email || null}, ${active !== false}, NOW(), NOW())
         `
         createdCount++
       } else {
         // Update existing staff member
         await sql`
-          UPDATE users 
-          SET name = ${name}, email = ${email}, role = ${role || 'staff'}, active = ${active}, updated_at = NOW()
+          UPDATE staff 
+          SET name = ${name}, 
+              email = ${email || null}, 
+              active = ${active !== false}, 
+              updated_at = NOW()
           WHERE id = ${id}
         `
         updatedCount++

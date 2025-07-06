@@ -8,6 +8,9 @@ interface StaffMember {
   email: string
   role: string
   active: boolean
+  phone?: string
+  position?: string
+  department?: string
 }
 
 export default function StaffManagement() {
@@ -40,6 +43,12 @@ export default function StaffManagement() {
   const updateStaffEmail = (id: string, email: string) => {
     setStaff(staff.map(member => 
       member.id === id ? { ...member, email } : member
+    ))
+  }
+
+  const updateStaffName = (id: string, name: string) => {
+    setStaff(staff.map(member => 
+      member.id === id ? { ...member, name } : member
     ))
   }
 
@@ -90,7 +99,15 @@ export default function StaffManagement() {
   }
 
   const removeStaff = (id: string) => {
-    setStaff(staff.filter(member => member.id !== id))
+    if (id.toString().startsWith('new-')) {
+      // Remove new staff members immediately
+      setStaff(staff.filter(member => member.id !== id))
+    } else {
+      // For existing staff, just deactivate them
+      setStaff(staff.map(member => 
+        member.id === id ? { ...member, active: false } : member
+      ))
+    }
   }
 
   if (loading) {
@@ -101,12 +118,15 @@ export default function StaffManagement() {
     )
   }
 
+  const existingStaff = staff.filter(member => !member.id.toString().startsWith('new-'))
+  const newStaff = staff.filter(member => member.id.toString().startsWith('new-'))
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Staff Management</h1>
+        <h1 className="text-3xl font-bold mb-2">Staff Email Management</h1>
         <p className="text-gray-600">
-          Manage staff email addresses for the reminder system. Only active staff will receive reminder emails.
+          Add email addresses to existing staff members for the reminder system. Only active staff will receive reminder emails.
         </p>
       </div>
 
@@ -116,10 +136,66 @@ export default function StaffManagement() {
         </div>
       )}
 
+      {/* Existing Staff Section */}
+      <div className="bg-white border rounded-lg shadow mb-6">
+        <div className="px-6 py-4 border-b">
+          <h2 className="text-xl font-semibold">Existing Staff Members</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Add email addresses to your existing staff members
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            {existingStaff.map((member) => (
+              <div key={member.id} className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-gray-900">{member.name}</span>
+                    {member.position && (
+                      <span className="text-sm text-gray-500">({member.position})</span>
+                    )}
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="Add email address for reminders"
+                    value={member.email || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateStaffEmail(member.id, e.target.value)}
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={member.active}
+                      onChange={() => toggleStaffActive(member.id)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Active</span>
+                  </label>
+                </div>
+              </div>
+            ))}
+            
+            {existingStaff.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No existing staff members found.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* New Staff Section */}
       <div className="bg-white border rounded-lg shadow">
         <div className="px-6 py-4 border-b">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Staff Email Addresses</h2>
+            <div>
+              <h2 className="text-xl font-semibold">Add New Staff Members</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Create new staff members with email addresses
+              </p>
+            </div>
             <button
               onClick={addNewStaff}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
@@ -130,24 +206,22 @@ export default function StaffManagement() {
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            {staff.map((member) => (
-              <div key={member.id} className="flex items-center gap-4 p-4 border rounded-lg">
+            {newStaff.map((member) => (
+              <div key={member.id} className="flex items-center gap-4 p-4 border rounded-lg border-blue-200 bg-blue-50">
                 <div className="flex-1">
                   <input
                     type="text"
                     placeholder="Staff Name"
                     value={member.name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStaff(staff.map(s => 
-                      s.id === member.id ? { ...s, name: e.target.value } : s
-                    ))}
-                    className="w-full p-2 border rounded mb-2"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateStaffName(member.id, e.target.value)}
+                    className="w-full p-2 border rounded mb-2 focus:ring-2 focus:ring-blue-500"
                   />
                   <input
                     type="email"
                     placeholder="Email Address"
                     value={member.email}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateStaffEmail(member.id, e.target.value)}
-                    className="w-full p-2 border rounded"
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -170,25 +244,27 @@ export default function StaffManagement() {
               </div>
             ))}
             
-            {staff.length === 0 && (
+            {newStaff.length === 0 && (
               <div className="text-center py-8 text-gray-500">
-                No staff members found. Click "Add New Staff" to get started.
+                No new staff members added. Click "Add New Staff" to create new staff members.
               </div>
             )}
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button 
-              onClick={saveChanges} 
-              disabled={saving}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save All Changes'}
-            </button>
           </div>
         </div>
       </div>
 
+      {/* Save Button */}
+      <div className="mt-6 flex justify-end">
+        <button 
+          onClick={saveChanges} 
+          disabled={saving}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save All Changes'}
+        </button>
+      </div>
+
+      {/* Info Section */}
       <div className="bg-white border rounded-lg shadow mt-6">
         <div className="px-6 py-4 border-b">
           <h2 className="text-xl font-semibold">How Email Reminders Work</h2>

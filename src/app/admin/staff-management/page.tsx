@@ -25,7 +25,7 @@ export default function StaffManagement() {
 
   const fetchStaff = async () => {
     try {
-      const response = await fetch('/api/admin/staff-emails')
+      const response = await fetch('/api/admin/staff')
       const data = await response.json()
       
       if (data.success) {

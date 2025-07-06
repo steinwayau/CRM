@@ -9,6 +9,7 @@ interface StaffMember {
   role: string
   active: boolean
   password?: string
+  email?: string
 }
 
 interface NewStaffResult {
@@ -33,6 +34,9 @@ export default function StaffManagementPage() {
   const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number }>({})
   const dropdownRef = useRef<HTMLDivElement>(null)
   const buttonRefs = useRef<{ [key: number]: HTMLButtonElement | null }>({})
+  const [activeTab, setActiveTab] = useState<'credentials' | 'emails'>('credentials')
+  const [emailData, setEmailData] = useState<{[key: number]: string}>({})
+  const [isUpdatingEmails, setIsUpdatingEmails] = useState(false)
 
   useEffect(() => {
     fetchStaff()
@@ -52,13 +56,22 @@ export default function StaffManagementPage() {
     }
   }, [])
 
-  const fetchStaff = async () => {
+  const fetchStaff = async (includeEmails: boolean = false) => {
     try {
-      const response = await fetch('/api/admin/staff')
+      const url = includeEmails ? '/api/admin/staff?email_format=true' : '/api/admin/staff'
+      const response = await fetch(url)
       const data = await response.json()
       
       if (data.success) {
         setStaff(data.staff)
+        // Initialize email data for editing
+        if (includeEmails) {
+          const emailMap: {[key: number]: string} = {}
+          data.staff.forEach((member: StaffMember) => {
+            emailMap[member.id] = member.email || ''
+          })
+          setEmailData(emailMap)
+        }
       } else {
         setError('Failed to load staff')
       }
@@ -189,6 +202,57 @@ export default function StaffManagementPage() {
     navigator.clipboard.writeText(text)
   }
 
+  const handleTabChange = (tab: 'credentials' | 'emails') => {
+    setActiveTab(tab)
+    setLoading(true)
+    if (tab === 'emails') {
+      fetchStaff(true) // Fetch with email data
+    } else {
+      fetchStaff(false) // Fetch regular credential data
+    }
+  }
+
+  const handleEmailChange = (id: number, email: string) => {
+    setEmailData(prev => ({
+      ...prev,
+      [id]: email
+    }))
+  }
+
+  const updateStaffEmails = async () => {
+    setIsUpdatingEmails(true)
+    setError('')
+
+    try {
+      const staffUpdates = Object.entries(emailData).map(([id, email]) => ({
+        id: parseInt(id),
+        email: email.trim()
+      }))
+
+      const response = await fetch('/api/admin/staff', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ staff: staffUpdates }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Show success message
+        alert(`Successfully updated ${data.updatedCount} email addresses`)
+        fetchStaff(true) // Refresh email data
+      } else {
+        setError(data.error || 'Failed to update email addresses')
+      }
+    } catch (error) {
+      setError('Network error updating email addresses')
+    } finally {
+      setIsUpdatingEmails(false)
+    }
+  }
+
   const togglePasswordVisibility = (id: number) => {
     const newVisiblePasswords = new Set(visiblePasswords)
     if (newVisiblePasswords.has(id)) {
@@ -292,15 +356,51 @@ export default function StaffManagementPage() {
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8 px-6">
+              <button
+                onClick={() => handleTabChange('credentials')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'credentials'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Credential Management
+              </button>
+              <button
+                onClick={() => handleTabChange('emails')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'emails'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Email Management
+              </button>
+            </nav>
+          </div>
+        </div>
+
         {/* Staff List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Current Staff Members</h2>
-            <p className="text-sm text-gray-600 mt-1">Total: {staff.length} staff members</p>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {activeTab === 'credentials' ? 'Staff Credentials' : 'Staff Email Addresses'}
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {activeTab === 'credentials' 
+                ? `Total: ${staff.length} staff members` 
+                : `Manage email addresses for ${staff.length} staff members`}
+            </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          {/* Credential Management View */}
+          {activeTab === 'credentials' && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -467,6 +567,72 @@ export default function StaffManagementPage() {
               </tbody>
             </table>
           </div>
+          )}
+
+          {/* Email Management View */}
+          {activeTab === 'emails' && (
+            <div className="p-6">
+              <div className="space-y-4">
+                {staff.map((member) => (
+                  <div key={member.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
+                          member.active ? 'bg-blue-500' : 'bg-gray-400'
+                        }`}>
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{member.name}</div>
+                          <div className="text-xs text-gray-500">ID: {member.id}</div>
+                        </div>
+                      </div>
+                      <div className="flex-1 max-w-md mx-4">
+                        <input
+                          type="email"
+                          value={emailData[member.id] || ''}
+                          onChange={(e) => handleEmailChange(member.id, e.target.value)}
+                          placeholder="Enter email address"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          member.active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {member.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  onClick={() => fetchStaff(true)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  Reload
+                </button>
+                <button
+                  onClick={updateStaffEmails}
+                  disabled={isUpdatingEmails}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isUpdatingEmails && (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>{isUpdatingEmails ? 'Updating...' : 'Update All Emails'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* New Staff Credentials Modal */}

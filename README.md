@@ -214,3 +214,40 @@ This project is proprietary to Exclusive Piano Group.
 
 **Built with ❤️ for Exclusive Piano Group by Louie V. - 2025** # Webhook test Sat Jul  5 22:12:11 AEST 2025
 # Webhook test Sat Jul  5 22:18:34 AEST 2025
+
+## Deployment Testing 🧪
+
+### Automated Testing
+Run the automated deployment test to verify all URLs are working:
+
+```bash
+# Run the test script directly
+./scripts/test-urls.sh
+
+# Or use npm script
+npm run test-deployment
+```
+
+### Manual Testing
+After deployment, manually test these key areas:
+
+1. **Public Access (no login required):**
+   - ✅ Main page: `https://epg-crm.vercel.app/`
+   - ✅ Login page: `https://epg-crm.vercel.app/login`
+   - ✅ API endpoints: `https://epg-crm.vercel.app/api/admin/staff`
+
+2. **Protected Areas (requires login):**
+   - ✅ Admin dashboard: `https://epg-crm.vercel.app/admin`
+   - ✅ Staff Management: `https://epg-crm.vercel.app/admin/staff-unified`
+   - ✅ Legacy Staff Page: `https://epg-crm.vercel.app/admin/staff-management`
+
+### Expected Behavior
+- **Public pages**: Should return `200 OK`
+- **Protected pages**: Should return `307 Redirect` to login (when not authenticated)
+- **After login**: Protected pages should return `200 OK`
+
+### If Tests Fail
+1. Wait 30 seconds (deployment may still be in progress)
+2. Run the test again
+3. Check Vercel dashboard for build errors
+4. Clear browser cache if seeing 404 errors

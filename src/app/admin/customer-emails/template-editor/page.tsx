@@ -72,6 +72,11 @@ export default function TemplateEditorPage() {
     return 320
   })
   const [isResizing, setIsResizing] = useState(false)
+  const [snapToGrid, setSnapToGrid] = useState(true)
+  const [showGrid, setShowGrid] = useState(true)
+  const [gridSize, setGridSize] = useState(10)
+  const [showAlignmentGuides, setShowAlignmentGuides] = useState<{type: string, position: number, label: string}[]>([])
+  const [isDragging, setIsDragging] = useState(false)
 
   // Close color picker when clicking outside
   useEffect(() => {
@@ -126,6 +131,38 @@ export default function TemplateEditorPage() {
 
   const handleResizeDoubleClick = () => {
     setPropertiesPanelWidth(320)
+  }
+
+  // Quick alignment actions
+  const centerHorizontally = (elementId: string) => {
+    const element = editorElements.find(el => el.id === elementId)
+    if (element) {
+      const newX = (canvasSize.width - element.style.width) / 2
+      updateElement(elementId, {
+        style: { ...element.style, position: { x: newX, y: element.style.position.y } }
+      })
+    }
+  }
+
+  const centerVertically = (elementId: string) => {
+    const element = editorElements.find(el => el.id === elementId)
+    if (element) {
+      const newY = (canvasSize.height - element.style.height) / 2
+      updateElement(elementId, {
+        style: { ...element.style, position: { x: element.style.position.x, y: newY } }
+      })
+    }
+  }
+
+  const centerBoth = (elementId: string) => {
+    const element = editorElements.find(el => el.id === elementId)
+    if (element) {
+      const newX = (canvasSize.width - element.style.width) / 2
+      const newY = (canvasSize.height - element.style.height) / 2
+      updateElement(elementId, {
+        style: { ...element.style, position: { x: newX, y: newY } }
+      })
+    }
   }
 
   // Video utility functions
@@ -185,6 +222,103 @@ export default function TemplateEditorPage() {
       content: videoUrl,
       videoData
     })
+  }
+
+  // Snap and alignment functions
+  const snapToGridValue = (value: number) => {
+    if (!snapToGrid) return value
+    return Math.round(value / gridSize) * gridSize
+  }
+
+  const getAlignmentGuides = (draggedElement: EditorElement, newX: number, newY: number) => {
+    const guides = []
+    const threshold = 5 // pixels
+    const otherElements = editorElements.filter(el => el.id !== draggedElement.id)
+    
+    // Canvas center lines
+    const canvasCenterX = canvasSize.width / 2
+    const canvasCenterY = canvasSize.height / 2
+    const elementCenterX = newX + draggedElement.style.width / 2
+    const elementCenterY = newY + draggedElement.style.height / 2
+    
+    // Snap to canvas center
+    if (Math.abs(elementCenterX - canvasCenterX) < threshold) {
+      guides.push({ type: 'vertical', position: canvasCenterX, label: 'Center' })
+    }
+    if (Math.abs(elementCenterY - canvasCenterY) < threshold) {
+      guides.push({ type: 'horizontal', position: canvasCenterY, label: 'Center' })
+    }
+    
+    // Snap to other elements
+    otherElements.forEach(element => {
+      const elLeft = element.style.position.x
+      const elRight = element.style.position.x + element.style.width
+      const elTop = element.style.position.y
+      const elBottom = element.style.position.y + element.style.height
+      const elCenterX = element.style.position.x + element.style.width / 2
+      const elCenterY = element.style.position.y + element.style.height / 2
+      
+      // Vertical alignment guides
+      if (Math.abs(newX - elLeft) < threshold) {
+        guides.push({ type: 'vertical', position: elLeft, label: 'Align Left' })
+      }
+      if (Math.abs(newX + draggedElement.style.width - elRight) < threshold) {
+        guides.push({ type: 'vertical', position: elRight, label: 'Align Right' })
+      }
+      if (Math.abs(elementCenterX - elCenterX) < threshold) {
+        guides.push({ type: 'vertical', position: elCenterX, label: 'Align Center' })
+      }
+      
+      // Horizontal alignment guides
+      if (Math.abs(newY - elTop) < threshold) {
+        guides.push({ type: 'horizontal', position: elTop, label: 'Align Top' })
+      }
+      if (Math.abs(newY + draggedElement.style.height - elBottom) < threshold) {
+        guides.push({ type: 'horizontal', position: elBottom, label: 'Align Bottom' })
+      }
+      if (Math.abs(elementCenterY - elCenterY) < threshold) {
+        guides.push({ type: 'horizontal', position: elCenterY, label: 'Align Middle' })
+      }
+    })
+    
+    return guides
+  }
+
+  const snapPosition = (draggedElement: EditorElement, newX: number, newY: number) => {
+    let snappedX = snapToGridValue(newX)
+    let snappedY = snapToGridValue(newY)
+    
+    const guides = getAlignmentGuides(draggedElement, snappedX, snappedY)
+    const threshold = 5
+    
+    // Apply snapping based on guides
+    guides.forEach(guide => {
+      if (guide.type === 'vertical') {
+        const elementCenterX = snappedX + draggedElement.style.width / 2
+        if (Math.abs(elementCenterX - guide.position) < threshold) {
+          snappedX = guide.position - draggedElement.style.width / 2
+        } else if (Math.abs(snappedX - guide.position) < threshold) {
+          snappedX = guide.position
+        } else if (Math.abs(snappedX + draggedElement.style.width - guide.position) < threshold) {
+          snappedX = guide.position - draggedElement.style.width
+        }
+      } else if (guide.type === 'horizontal') {
+        const elementCenterY = snappedY + draggedElement.style.height / 2
+        if (Math.abs(elementCenterY - guide.position) < threshold) {
+          snappedY = guide.position - draggedElement.style.height / 2
+        } else if (Math.abs(snappedY - guide.position) < threshold) {
+          snappedY = guide.position
+        } else if (Math.abs(snappedY + draggedElement.style.height - guide.position) < threshold) {
+          snappedY = guide.position - draggedElement.style.height
+        }
+      }
+    })
+    
+    // Keep within canvas bounds
+    snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))
+    snappedY = Math.max(0, Math.min(canvasSize.height - draggedElement.style.height, snappedY))
+    
+    return { x: snappedX, y: snappedY, guides }
   }
 
   // Load existing template if editing
@@ -453,7 +587,11 @@ export default function TemplateEditorPage() {
     onClose: () => void
   }) => {
     const [hexInput, setHexInput] = useState(currentColor || '#000000')
-    const [selectedPalette, setSelectedPalette] = useState<keyof typeof colorPalettes>('common')
+    const [selectedPalette, setSelectedPalette] = useState<keyof typeof colorPalettes>(() => {
+      // Maintain palette selection from localStorage
+      const saved = localStorage.getItem('selectedColorPalette')
+      return (saved as keyof typeof colorPalettes) || 'common'
+    })
 
     const applyColor = (color: string) => {
       const element = editorElements.find(el => el.id === elementId)
@@ -519,7 +657,11 @@ export default function TemplateEditorPage() {
             {Object.keys(colorPalettes).map((palette) => (
               <button
                 key={palette}
-                onClick={() => setSelectedPalette(palette as keyof typeof colorPalettes)}
+                onClick={() => {
+                  const newPalette = palette as keyof typeof colorPalettes
+                  setSelectedPalette(newPalette)
+                  localStorage.setItem('selectedColorPalette', newPalette)
+                }}
                 className={`px-3 py-1 text-sm rounded ${
                   selectedPalette === palette
                     ? 'bg-blue-600 text-white'
@@ -730,6 +872,46 @@ export default function TemplateEditorPage() {
                   <option value="1000">1000px (Desktop)</option>
                 </select>
               </div>
+              
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <label className="flex items-center space-x-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={snapToGrid}
+                      onChange={(e) => setSnapToGrid(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <span>Snap to Grid</span>
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <label className="flex items-center space-x-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={showGrid}
+                      onChange={(e) => setShowGrid(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <span>Show Grid</span>
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Grid:</span>
+                  <select 
+                    value={gridSize}
+                    onChange={(e) => setGridSize(parseInt(e.target.value))}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="5">5px</option>
+                    <option value="10">10px</option>
+                    <option value="20">20px</option>
+                    <option value="25">25px</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -740,10 +922,66 @@ export default function TemplateEditorPage() {
               style={{ 
                 width: `${canvasSize.width}px`, 
                 minHeight: `${canvasSize.height}px`,
-                border: '1px solid #e5e7eb'
+                border: '1px solid #e5e7eb',
+                backgroundImage: showGrid ? 
+                  `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
+                backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
               }}
               onClick={() => setSelectedElement(null)}
             >
+              {/* Grid overlay */}
+              {showGrid && (
+                <div 
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: `
+                      linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)
+                    `,
+                    backgroundSize: `${gridSize}px ${gridSize}px`
+                  }}
+                />
+              )}
+              
+              {/* Alignment guides */}
+              {showAlignmentGuides.map((guide, index) => (
+                <div
+                  key={index}
+                  className="absolute pointer-events-none z-50"
+                  style={{
+                    ...(guide.type === 'vertical' ? {
+                      left: guide.position,
+                      top: 0,
+                      width: '1px',
+                      height: '100%',
+                      backgroundColor: '#3b82f6',
+                      boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
+                    } : {
+                      left: 0,
+                      top: guide.position,
+                      width: '100%',
+                      height: '1px',
+                      backgroundColor: '#3b82f6',
+                      boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
+                    })
+                  }}
+                >
+                  <div 
+                    className="absolute bg-blue-600 text-white px-2 py-1 text-xs rounded"
+                    style={{
+                      ...(guide.type === 'vertical' ? {
+                        left: '4px',
+                        top: '10px'
+                      } : {
+                        left: '10px',
+                        top: '-24px'
+                      })
+                    }}
+                  >
+                    {guide.label}
+                  </div>
+                </div>
+              ))}
               {editorElements.map((element) => (
                 <div
                   key={element.id}
@@ -762,10 +1000,15 @@ export default function TemplateEditorPage() {
                   onMouseDown={(e) => {
                     const startX = e.clientX - element.style.position.x
                     const startY = e.clientY - element.style.position.y
+                    setIsDragging(true)
                     
                     const handleMouseMove = (e: MouseEvent) => {
-                      const newX = Math.max(0, Math.min(canvasSize.width - element.style.width, e.clientX - startX))
-                      const newY = Math.max(0, Math.min(canvasSize.height - element.style.height, e.clientY - startY))
+                      const rawX = e.clientX - startX
+                      const rawY = e.clientY - startY
+                      
+                      const { x: newX, y: newY, guides } = snapPosition(element, rawX, rawY)
+                      
+                      setShowAlignmentGuides(guides)
                       
                       updateElement(element.id, {
                         style: {
@@ -776,6 +1019,8 @@ export default function TemplateEditorPage() {
                     }
                     
                     const handleMouseUp = () => {
+                      setIsDragging(false)
+                      setShowAlignmentGuides([])
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
                     }
@@ -835,7 +1080,10 @@ export default function TemplateEditorPage() {
                         justifyContent: 'center',
                         cursor: 'pointer',
                         fontSize: element.style.fontSize || 14,
-                        fontWeight: element.style.fontWeight || 'medium'
+                        fontWeight: element.style.fontWeight || 'medium',
+                        fontFamily: element.style.fontFamily,
+                        fontStyle: element.style.fontStyle,
+                        textDecoration: element.style.textDecoration
                       }}
                     >
                       {element.content}
@@ -1083,6 +1331,34 @@ export default function TemplateEditorPage() {
                           })}
                           className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         />
+                      </div>
+                    </div>
+
+                    {/* Quick Alignment Controls */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Quick Alignment</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        <button
+                          onClick={() => centerHorizontally(element.id)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Center Horizontally"
+                        >
+                          ↔️ H
+                        </button>
+                        <button
+                          onClick={() => centerVertically(element.id)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Center Vertically"
+                        >
+                          ↕️ V
+                        </button>
+                        <button
+                          onClick={() => centerBoth(element.id)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Center Both"
+                        >
+                          ⊕ Both
+                        </button>
                       </div>
                     </div>
                     

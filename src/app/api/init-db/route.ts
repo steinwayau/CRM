@@ -3,9 +3,16 @@ import { sql } from '@vercel/postgres'
 
 export async function GET(request: NextRequest) {
   try {
+    // Drop existing tables to ensure clean slate
+    await sql`DROP TABLE IF EXISTS enquiries CASCADE`
+    await sql`DROP TABLE IF EXISTS staff CASCADE`
+    await sql`DROP TABLE IF EXISTS users CASCADE`
+    await sql`DROP TABLE IF EXISTS system_settings CASCADE`
+    await sql`DROP TABLE IF EXISTS import_logs CASCADE`
+
     // Create enquiries table with camelCase column names matching Prisma schema
     await sql`
-      CREATE TABLE IF NOT EXISTS enquiries (
+      CREATE TABLE enquiries (
         id SERIAL PRIMARY KEY,
         status VARCHAR(50) DEFAULT 'New',
         "institutionName" VARCHAR(255),
@@ -36,9 +43,9 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // Create staff table
+    // Create staff table with camelCase column names
     await sql`
-      CREATE TABLE IF NOT EXISTS staff (
+      CREATE TABLE staff (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) UNIQUE NOT NULL,
         email VARCHAR(255) UNIQUE,
@@ -56,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     // Create users table
     await sql`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE users (
         id VARCHAR(50) PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         name VARCHAR(100),
@@ -67,8 +74,7 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // Drop and recreate system_settings table with correct column names
-    await sql`DROP TABLE IF EXISTS system_settings`
+    // Create system_settings table
     await sql`
       CREATE TABLE system_settings (
         id SERIAL PRIMARY KEY,
@@ -80,8 +86,7 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // Drop and recreate import_logs table with correct column names
-    await sql`DROP TABLE IF EXISTS import_logs`
+    // Create import_logs table
     await sql`
       CREATE TABLE import_logs (
         id SERIAL PRIMARY KEY,
@@ -96,7 +101,7 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // Insert default staff members with proper updated_at values
+    // Insert default staff members
     await sql`
       INSERT INTO staff (name, email, "createdAt", "updatedAt") VALUES 
         ('Abbey Landgren', 'abbey@epgpianos.com.au', NOW(), NOW()),
@@ -117,7 +122,6 @@ export async function GET(request: NextRequest) {
         ('Alison', 'alison@epgpianos.com.au', NOW(), NOW()),
         ('Olivia', 'olivia@epgpianos.com.au', NOW(), NOW()),
         ('Louie', 'louie@epgpianos.com.au', NOW(), NOW())
-      ON CONFLICT (name) DO NOTHING
     `
 
     // Insert sample enquiries with camelCase column names
@@ -172,16 +176,14 @@ export async function GET(request: NextRequest) {
           NOW() - INTERVAL '6 hours',
           NOW() - INTERVAL '6 hours'
         )
-      ON CONFLICT DO NOTHING
     `
 
     return NextResponse.json({ 
-      message: 'Database initialized successfully with camelCase schema',
+      message: 'Database completely rebuilt with camelCase schema',
       tables: ['enquiries', 'staff', 'users', 'system_settings', 'import_logs'],
-      staff_added: 'Day and Hendra included in staff database',
-      enquiries_added: 'Sample enquiries restored with camelCase columns',
-      system_tables_added: 'System settings and import logs tables created',
-      schema_update: 'Updated to match Prisma schema with camelCase column names'
+      staff_added: 'All staff members added with camelCase columns',
+      enquiries_added: 'Sample enquiries with camelCase columns',
+      schema_update: 'Tables dropped and recreated with correct Prisma schema'
     })
   } catch (error) {
     console.error('Error initializing database:', error)

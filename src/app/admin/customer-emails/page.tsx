@@ -1046,12 +1046,12 @@ export default function CustomerEmailsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    HTML Content
-                    <span className="text-xs text-gray-500 ml-2">
-                      Use {{firstName}}, {{lastName}}, {{fullName}}, {{email}} for personalization
-                    </span>
-                  </label>
+                                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                     HTML Content
+                     <span className="text-xs text-gray-500 ml-2">
+                       Use {'{'}firstName{'}}'}, {'{'}lastName{'}}'}, {'{'}fullName{'}}'}, {'{'}email{'}}'}  for personalization
+                     </span>
+                   </label>
                   <textarea
                     value={templateForm.htmlContent}
                     onChange={(e) => setTemplateForm({...templateForm, htmlContent: e.target.value})}
@@ -1079,10 +1079,10 @@ export default function CustomerEmailsPage() {
                   <h4 className="font-medium text-blue-900 mb-2">Personalization Variables</h4>
                   <p className="text-sm text-blue-700 mb-2">You can use these variables in your email content:</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{firstName}}</code> - Customer's first name</div>
-                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{lastName}}</code> - Customer's last name</div>
-                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{fullName}}</code> - Full name</div>
-                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{email}}</code> - Email address</div>
+                                         <div><code className="bg-blue-100 px-2 py-1 rounded">{'{'}firstName{'}'}</code> - Customer's first name</div>
+                     <div><code className="bg-blue-100 px-2 py-1 rounded">{'{'}lastName{'}'}</code> - Customer's last name</div>
+                     <div><code className="bg-blue-100 px-2 py-1 rounded">{'{'}fullName{'}'}</code> - Full name</div>
+                     <div><code className="bg-blue-100 px-2 py-1 rounded">{'{'}email{'}'}</code> - Email address</div>
                   </div>
                 </div>
               </div>

@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
   try {
     const { fieldName, fieldLabel } = await request.json()
 
+    console.log('Creating custom field:', { fieldName, fieldLabel })
+
     if (!fieldName || !fieldLabel) {
       return NextResponse.json(
         { error: 'Field name and label are required' },
@@ -49,14 +51,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Clean field name (remove spaces, special chars)
+    // More permissive field name cleaning - keep underscores and numbers
     const cleanFieldName = fieldName.toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_{2,}/g, '_')
+      .replace(/^_+|_+$/g, '')
       .trim()
 
-    if (!cleanFieldName) {
+    console.log('Cleaned field name:', cleanFieldName)
+
+    if (!cleanFieldName || cleanFieldName.length < 2) {
       return NextResponse.json(
-        { error: 'Invalid field name' },
+        { error: `Invalid field name. Cleaned name "${cleanFieldName}" is too short.` },
         { status: 400 }
       )
     }
@@ -70,19 +76,21 @@ export async function POST(request: NextRequest) {
 
     if (existingField) {
       return NextResponse.json(
-        { error: 'Custom field already exists' },
+        { error: `Custom field "${cleanFieldName}" already exists` },
         { status: 409 }
       )
     }
 
     // Create new custom field
-    await prisma.systemSetting.create({
+    const newField = await prisma.systemSetting.create({
       data: {
         key: `custom_field_${cleanFieldName}`,
         value: fieldLabel.trim(),
         type: 'custom_field'
       }
     })
+
+    console.log('Custom field created successfully:', newField)
 
     return NextResponse.json({
       message: 'Custom field created successfully',
@@ -95,9 +103,26 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error creating custom field:', error)
+    console.error('Detailed error creating custom field:', error)
+    
+    // More specific error handling
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: 'Custom field already exists in database' },
+          { status: 409 }
+        )
+      }
+      if (error.message.includes('connect')) {
+        return NextResponse.json(
+          { error: 'Database connection error' },
+          { status: 500 }
+        )
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to create custom field' },
+      { error: `Failed to create custom field: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     )
   }

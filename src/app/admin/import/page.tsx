@@ -113,6 +113,14 @@ export default function ImportPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
+      // Check file size (Vercel limit is 4.5MB, but we'll be conservative at 3MB)
+      const maxSize = 3 * 1024 * 1024 // 3MB in bytes
+      if (selectedFile.size > maxSize) {
+        alert(`File too large! Maximum size is ${maxSize / (1024 * 1024)}MB. Your file is ${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB. Please split your data into smaller files.`)
+        e.target.value = '' // Clear the input
+        return
+      }
+      
       setFile(selectedFile)
       processFilePreview(selectedFile)
     }
@@ -323,6 +331,16 @@ export default function ImportPage() {
       } catch (parseError) {
         console.error('JSON Parse Error:', parseError)
         console.error('Response text that failed to parse:', responseText)
+        
+        // Check for specific Vercel errors
+        if (responseText.includes('Request Entity Too Large') || responseText.includes('FUNCTION_PAYLOAD_TOO_LARGE')) {
+          throw new Error('File or data too large for processing. Please try with a smaller file (under 3MB) or fewer field mappings.')
+        }
+        
+        if (responseText.includes('Function Execution Timeout')) {
+          throw new Error('Import process timed out. Please try with a smaller file or contact support.')
+        }
+        
         throw new Error(`Server returned invalid JSON. Response: ${responseText.substring(0, 200)}...`)
       }
       

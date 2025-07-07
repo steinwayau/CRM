@@ -474,7 +474,7 @@ export default function TemplateEditorPage() {
                         width: '100%',
                         height: '100%',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
                         border: '1px solid #e5e7eb'
                       }}
                     >

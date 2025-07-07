@@ -54,11 +54,51 @@ export default function ImportPage() {
   const [customClassifications, setCustomClassifications] = useState<string[]>([])
   const [newClassification, setNewClassification] = useState<string>('')
   const [availableClassifications, setAvailableClassifications] = useState<string[]>(DEFAULT_CLASSIFICATIONS)
+  const [customFields, setCustomFields] = useState<any[]>([])
+  const [allFormFields, setAllFormFields] = useState<any[]>(FORM_FIELDS)
+  const [unmappedFields, setUnmappedFields] = useState<string[]>([])
+  const [newCustomField, setNewCustomField] = useState({ name: '', label: '' })
+  const [showCustomFieldModal, setShowCustomFieldModal] = useState(false)
+  const [selectedUnmappedField, setSelectedUnmappedField] = useState<string>('')
 
-  // Load available classifications on component mount
+  // Load available classifications and custom fields on component mount
   useEffect(() => {
     loadClassifications()
+    loadCustomFields()
   }, [])
+
+  // Update unmapped fields when field mappings change
+  useEffect(() => {
+    if (importPreview) {
+      const mappedFields = fieldMappings.map(m => m.sourceField)
+      const unmapped = importPreview.headers.filter(header => {
+        const mapping = fieldMappings.find(m => m.sourceField === header)
+        return !mapping || !mapping.targetField
+      })
+      setUnmappedFields(unmapped)
+    }
+  }, [fieldMappings, importPreview])
+
+  const loadCustomFields = async () => {
+    try {
+      const response = await fetch('/api/admin/custom-fields')
+      if (response.ok) {
+        const data = await response.json()
+        setCustomFields(data.customFields || [])
+        
+        // Combine default fields with custom fields
+        const combinedFields = [...FORM_FIELDS, ...data.customFields.map((field: any) => ({
+          key: field.key,
+          label: field.label,
+          required: field.required || false,
+          isCustom: true
+        }))]
+        setAllFormFields(combinedFields)
+      }
+    } catch (error) {
+      console.error('Error loading custom fields:', error)
+    }
+  }
 
   const loadClassifications = async () => {
     try {
@@ -218,6 +258,70 @@ export default function ImportPage() {
      }
   }
 
+  const addCustomField = async () => {
+    if (!newCustomField.name.trim() || !newCustomField.label.trim()) {
+      alert('Please enter both field name and label')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/custom-fields', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fieldName: newCustomField.name.trim(),
+          fieldLabel: newCustomField.label.trim()
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Add to custom fields
+        setCustomFields(prev => [...prev, data.field])
+        
+        // Add to all form fields
+        setAllFormFields(prev => [...prev, {
+          key: data.field.key,
+          label: data.field.label,
+          required: false,
+          isCustom: true
+        }])
+
+        // If we were mapping a specific unmapped field, do the mapping
+        if (selectedUnmappedField) {
+          const fieldIndex = fieldMappings.findIndex(m => m.sourceField === selectedUnmappedField)
+          if (fieldIndex !== -1) {
+            updateFieldMapping(fieldIndex, data.field.key)
+          }
+        }
+
+        // Reset form
+        setNewCustomField({ name: '', label: '' })
+        setShowCustomFieldModal(false)
+        setSelectedUnmappedField('')
+        
+      } else {
+        const errorData = await response.json()
+        alert(`Error adding custom field: ${errorData.error}`)
+      }
+    } catch (error) {
+      console.error('Error adding custom field:', error)
+      alert('Error adding custom field')
+    }
+  }
+
+  const openCustomFieldModal = (sourceField?: string) => {
+    setSelectedUnmappedField(sourceField || '')
+    setNewCustomField({ 
+      name: sourceField || '', 
+      label: sourceField ? sourceField.charAt(0).toUpperCase() + sourceField.slice(1) : '' 
+    })
+    setShowCustomFieldModal(true)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -304,6 +408,43 @@ export default function ImportPage() {
                   Map your data fields to the CRM system fields. Required fields are marked with *.
                 </p>
                 
+                {/* Unmapped Fields Alert */}
+                {unmappedFields.length > 0 && (
+                  <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start">
+                      <svg className="h-5 w-5 text-yellow-400 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-yellow-800">Unmapped Fields Detected</h3>
+                        <div className="mt-2 text-sm text-yellow-700">
+                          <p className="mb-2">The following CSV columns don't have matching field options:</p>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {unmappedFields.map(field => (
+                              <div key={field} className="flex items-center bg-yellow-100 px-2 py-1 rounded text-xs">
+                                <span className="font-medium">{field}</span>
+                                <button
+                                  onClick={() => openCustomFieldModal(field)}
+                                  className="ml-2 text-yellow-600 hover:text-yellow-800"
+                                  title="Create custom field mapping"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => openCustomFieldModal()}
+                            className="text-sm bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
+                          >
+                            Create Custom Field Mapping
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Custom Classifications Management */}
                 {customClassifications.length > 0 && (
                   <div className="mb-4 p-4 bg-blue-50 rounded-lg">
@@ -324,11 +465,33 @@ export default function ImportPage() {
                   </div>
                 )}
 
+                {/* Custom Fields Management */}
+                {customFields.length > 0 && (
+                  <div className="mb-4 p-4 bg-green-50 rounded-lg">
+                    <h3 className="text-sm font-medium text-green-900 mb-2">Custom Fields Available:</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {customFields.map(field => (
+                        <span key={field.key} className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                          {field.label}
+                          <span className="ml-1 text-green-600 text-xs">({field.key})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {fieldMappings.map((mapping, index) => (
-                    <div key={index} className="grid grid-cols-3 gap-4 items-center p-3 bg-gray-50 rounded-lg">
-                      <div>
+                    <div key={index} className={`grid grid-cols-3 gap-4 items-center p-3 rounded-lg ${
+                      !mapping.targetField ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
+                    }`}>
+                      <div className="flex items-center">
                         <span className="text-sm font-medium text-gray-700">{mapping.sourceField}</span>
+                        {!mapping.targetField && (
+                          <span className="ml-2 text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
+                            Unmapped
+                          </span>
+                        )}
                       </div>
                       <div className="text-center text-gray-400">→</div>
                       <div>
@@ -340,9 +503,9 @@ export default function ImportPage() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                             >
                               <option value="">- Skip this field -</option>
-                              {FORM_FIELDS.map(field => (
+                              {allFormFields.map(field => (
                                 <option key={field.key} value={field.key}>
-                                  {field.label} {field.required ? '*' : ''} {field.note ? `(${field.note})` : ''}
+                                  {field.label} {field.required ? '*' : ''} {field.isCustom ? '(Custom)' : ''} {field.note ? `(${field.note})` : ''}
                                 </option>
                               ))}
                             </select>
@@ -371,22 +534,90 @@ export default function ImportPage() {
                             </div>
                           </div>
                         ) : (
-                          <select
-                            value={mapping.targetField}
-                            onChange={(e) => updateFieldMapping(index, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          >
-                            <option value="">- Skip this field -</option>
-                            {FORM_FIELDS.map(field => (
-                              <option key={field.key} value={field.key}>
-                                {field.label} {field.required ? '*' : ''} {field.note ? `(${field.note})` : ''}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="flex space-x-2">
+                            <select
+                              value={mapping.targetField}
+                              onChange={(e) => updateFieldMapping(index, e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value="">- Skip this field -</option>
+                              {allFormFields.map(field => (
+                                <option key={field.key} value={field.key}>
+                                  {field.label} {field.required ? '*' : ''} {field.isCustom ? '(Custom)' : ''} {field.note ? `(${field.note})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            {!mapping.targetField && (
+                              <button
+                                onClick={() => openCustomFieldModal(mapping.sourceField)}
+                                className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                                title="Create custom field for this column"
+                              >
+                                + Field
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Custom Field Modal */}
+            {showCustomFieldModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+                  <h3 className="text-lg font-medium mb-4">Create Custom Field Mapping</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Field Name (from CSV)
+                      </label>
+                      <input
+                        type="text"
+                        value={newCustomField.name}
+                        onChange={(e) => setNewCustomField({...newCustomField, name: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        placeholder="e.g., leadScore"
+                        readOnly={!!selectedUnmappedField}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Display Label
+                      </label>
+                      <input
+                        type="text"
+                        value={newCustomField.label}
+                        onChange={(e) => setNewCustomField({...newCustomField, label: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        placeholder="e.g., Lead Score"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 mt-6">
+                    <button
+                      onClick={() => {
+                        setShowCustomFieldModal(false)
+                        setNewCustomField({ name: '', label: '' })
+                        setSelectedUnmappedField('')
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={addCustomField}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                    >
+                      Create Field
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

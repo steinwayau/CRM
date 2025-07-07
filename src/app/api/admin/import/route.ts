@@ -49,7 +49,18 @@ export async function POST(request: NextRequest) {
     }
 
     const mappings: FieldMapping[] = JSON.parse(mappingsString)
-    const activemappings = mappings.filter(m => m.targetField !== '')
+    const activeMappings = mappings.filter(m => m.targetField !== '')
+    
+    // Get custom fields to identify which mappings are custom
+    const customFields = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          startsWith: 'custom_field_'
+        }
+      }
+    })
+    
+    const customFieldKeys = customFields.map(f => f.key.replace('custom_field_', ''))
     
     // Process file content
     const text = await file.text()
@@ -85,10 +96,11 @@ export async function POST(request: NextRequest) {
 
         // Map fields according to user's mapping
         const mappedData: any = {}
+        const customFieldData: any = {}
         let hasRequiredFields = true
         const missingRequired: string[] = []
 
-        for (const mapping of activemappings) {
+        for (const mapping of activeMappings) {
           const sourceValue = row[mapping.sourceField]
           
           if (mapping.targetField) {
@@ -99,10 +111,20 @@ export async function POST(request: NextRequest) {
               continue
             }
 
-            // Process and validate the field value
-            const processedValue = processFieldValue(mapping.targetField, sourceValue)
-            if (processedValue !== null) {
-              mappedData[mapping.targetField] = processedValue
+            // Check if this is a custom field
+            if (customFieldKeys.includes(mapping.targetField)) {
+              // Store custom field data
+              const customField = customFields.find(f => f.key === `custom_field_${mapping.targetField}`)
+              customFieldData[mapping.targetField] = {
+                label: customField?.value || mapping.targetField,
+                value: sourceValue || null
+              }
+            } else {
+              // Process and validate standard field values
+              const processedValue = processFieldValue(mapping.targetField, sourceValue)
+              if (processedValue !== null) {
+                mappedData[mapping.targetField] = processedValue
+              }
             }
           }
         }
@@ -112,12 +134,6 @@ export async function POST(request: NextRequest) {
           results.errorDetails.push(`Row ${rowIndex}: Missing required fields: ${missingRequired.join(', ')}`)
           continue
         }
-
-        // Add system fields
-        mappedData.importSource = `Import from ${file.name}`
-        mappedData.originalId = row.id || row.ID || `import_${Date.now()}_${i}`
-        mappedData.createdAt = mappedData.createdAt || new Date().toISOString()
-        mappedData.updatedAt = new Date().toISOString()
 
         // Set defaults
         if (!mappedData.status) mappedData.status = 'New'
@@ -152,8 +168,10 @@ export async function POST(request: NextRequest) {
               submittedBy: mappedData.submittedBy,
               customerRating: mappedData.customerRating,
               doNotEmail: mappedData.doNotEmail,
-              importSource: mappedData.importSource,
-              originalId: mappedData.originalId,
+              importSource: mappedData.importSource || `Import from ${file.name}`,
+              originalId: mappedData.originalId || row.id || row.ID || `import_${Date.now()}_${i}`,
+              // Store custom fields as JSON
+              followUpInfo: Object.keys(customFieldData).length > 0 ? JSON.stringify(customFieldData) : null,
               createdAt: mappedData.createdAt ? new Date(mappedData.createdAt) : new Date(),
               updatedAt: new Date(),
             }

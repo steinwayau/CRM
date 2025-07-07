@@ -60,30 +60,32 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // Create system_settings table
+    // Drop and recreate system_settings table with correct column names
+    await sql`DROP TABLE IF EXISTS system_settings`
     await sql`
-      CREATE TABLE IF NOT EXISTS system_settings (
+      CREATE TABLE system_settings (
         id SERIAL PRIMARY KEY,
         key VARCHAR(255) UNIQUE NOT NULL,
         value TEXT NOT NULL,
         type VARCHAR(50) DEFAULT 'string',
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
       )
     `
 
-    // Create import_logs table
+    // Drop and recreate import_logs table with correct column names
+    await sql`DROP TABLE IF EXISTS import_logs`
     await sql`
-      CREATE TABLE IF NOT EXISTS import_logs (
+      CREATE TABLE import_logs (
         id SERIAL PRIMARY KEY,
-        file_name VARCHAR(255) NOT NULL,
-        records_imported INTEGER DEFAULT 0,
-        records_skipped INTEGER DEFAULT 0,
-        records_errored INTEGER DEFAULT 0,
+        "fileName" VARCHAR(255) NOT NULL,
+        "recordsImported" INTEGER DEFAULT 0,
+        "recordsSkipped" INTEGER DEFAULT 0,
+        "recordsErrored" INTEGER DEFAULT 0,
         status VARCHAR(50) DEFAULT 'pending',
-        error_log TEXT,
-        imported_by VARCHAR(100),
-        created_at TIMESTAMP DEFAULT NOW()
+        "errorLog" TEXT,
+        "importedBy" VARCHAR(100),
+        "createdAt" TIMESTAMP DEFAULT NOW()
       )
     `
 

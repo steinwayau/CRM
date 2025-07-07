@@ -3,35 +3,36 @@ import { sql } from '@vercel/postgres'
 
 export async function GET(request: NextRequest) {
   try {
-    // Create enquiries table
+    // Create enquiries table with camelCase column names matching Prisma schema
     await sql`
       CREATE TABLE IF NOT EXISTS enquiries (
         id SERIAL PRIMARY KEY,
         status VARCHAR(50) DEFAULT 'New',
-        institution_name VARCHAR(255),
-        first_name VARCHAR(100) NOT NULL,
-        surname VARCHAR(100),
+        "institutionName" VARCHAR(255),
+        "firstName" VARCHAR(100) NOT NULL,
+        "lastName" VARCHAR(100),
         email VARCHAR(255) NOT NULL,
         phone VARCHAR(50),
         nationality VARCHAR(100) DEFAULT 'English',
         state VARCHAR(100) NOT NULL,
         suburb VARCHAR(100),
-        products JSONB DEFAULT '[]',
+        "productInterest" JSONB DEFAULT '[]',
         source VARCHAR(255),
-        enquiry_source VARCHAR(255),
+        "eventSource" VARCHAR(255),
         comments TEXT,
-        follow_up_info TEXT,
-        follow_up_date TIMESTAMP,
-        classification VARCHAR(100) DEFAULT 'N/A',
-        step_program VARCHAR(100) DEFAULT 'N/A',
-        involving VARCHAR(50) DEFAULT 'No',
-        not_involving_reason TEXT,
-        newsletter VARCHAR(10) DEFAULT 'Yes',
-        call_taken_by VARCHAR(100) DEFAULT 'Online Form',
-        original_follow_up_date TIMESTAMP,
-        input_date TIMESTAMP DEFAULT NOW(),
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        "followUpInfo" TEXT,
+        "bestTimeToFollowUp" TIMESTAMP,
+        "customerRating" VARCHAR(100) DEFAULT 'N/A',
+        "stepProgram" VARCHAR(100) DEFAULT 'N/A',
+        "salesManagerInvolved" VARCHAR(50) DEFAULT 'No',
+        "salesManagerExplanation" TEXT,
+        "followUpNotes" TEXT,
+        "doNotEmail" BOOLEAN DEFAULT false,
+        "submittedBy" VARCHAR(100) DEFAULT 'Online Form',
+        "importSource" VARCHAR(255),
+        "originalId" VARCHAR(255),
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
       )
     `
 
@@ -40,10 +41,16 @@ export async function GET(request: NextRequest) {
       CREATE TABLE IF NOT EXISTS staff (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        email VARCHAR(255) UNIQUE,
+        role VARCHAR(50),
+        "isActive" BOOLEAN DEFAULT true,
+        phone VARCHAR(50),
+        position VARCHAR(100),
+        department VARCHAR(100),
+        "startDate" TIMESTAMP,
+        "endDate" TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
       )
     `
 
@@ -55,8 +62,8 @@ export async function GET(request: NextRequest) {
         name VARCHAR(100),
         role VARCHAR(50) DEFAULT 'staff',
         active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        "created_at" TIMESTAMP DEFAULT NOW(),
+        "updated_at" TIMESTAMP DEFAULT NOW()
       )
     `
 
@@ -91,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     // Insert default staff members with proper updated_at values
     await sql`
-      INSERT INTO staff (name, email, created_at, updated_at) VALUES 
+      INSERT INTO staff (name, email, "createdAt", "updatedAt") VALUES 
         ('Abbey Landgren', 'abbey@epgpianos.com.au', NOW(), NOW()),
         ('Alexa Curtis', 'alexa@epgpianos.com.au', NOW(), NOW()),
         ('Angela Liu', 'angela@epgpianos.com.au', NOW(), NOW()),
@@ -113,12 +120,12 @@ export async function GET(request: NextRequest) {
       ON CONFLICT (name) DO NOTHING
     `
 
-    // Insert sample enquiries to restore lost data - basic fields only
+    // Insert sample enquiries with camelCase column names
     await sql`
       INSERT INTO enquiries (
-        status, first_name, surname, email, phone, 
-        nationality, state, suburb, source, enquiry_source, 
-        call_taken_by, created_at, updated_at
+        status, "firstName", "lastName", email, phone, 
+        nationality, state, suburb, source, "eventSource", 
+        "submittedBy", "createdAt", "updatedAt"
       ) VALUES 
         (
           'New',
@@ -169,11 +176,12 @@ export async function GET(request: NextRequest) {
     `
 
     return NextResponse.json({ 
-      message: 'Database initialized successfully',
+      message: 'Database initialized successfully with camelCase schema',
       tables: ['enquiries', 'staff', 'users', 'system_settings', 'import_logs'],
       staff_added: 'Day and Hendra included in staff database',
-      enquiries_added: 'Sample enquiries restored including custom "Other" source',
-      system_tables_added: 'System settings and import logs tables created'
+      enquiries_added: 'Sample enquiries restored with camelCase columns',
+      system_tables_added: 'System settings and import logs tables created',
+      schema_update: 'Updated to match Prisma schema with camelCase column names'
     })
   } catch (error) {
     console.error('Error initializing database:', error)

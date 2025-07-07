@@ -148,31 +148,45 @@ export async function POST(request: NextRequest) {
 
         // Save to database using Prisma
         try {
+          // Build dynamic data object based on mappings
+          const prismaData: any = {
+            // Always set these system fields
+            createdAt: mappedData.createdAt ? new Date(mappedData.createdAt) : new Date(),
+            updatedAt: new Date(),
+            importSource: mappedData.importSource || `Import from ${file.name}`,
+            originalId: mappedData.originalId || row.id || row.ID || `import_${Date.now()}_${i}`,
+          }
+
+          // Add mapped fields only if they exist
+          if (mappedData.status) prismaData.status = mappedData.status
+          if (mappedData.institutionName) prismaData.institutionName = mappedData.institutionName
+          if (mappedData.firstName) prismaData.firstName = mappedData.firstName
+          if (mappedData.lastName) prismaData.lastName = mappedData.lastName
+          if (mappedData.email) prismaData.email = mappedData.email
+          if (mappedData.phone) prismaData.phone = mappedData.phone
+          if (mappedData.nationality) prismaData.nationality = mappedData.nationality
+          if (mappedData.state) prismaData.state = mappedData.state
+          if (mappedData.suburb) prismaData.suburb = mappedData.suburb
+          if (mappedData.productInterest) prismaData.productInterest = mappedData.productInterest
+          if (mappedData.source) prismaData.source = mappedData.source
+          if (mappedData.eventSource) prismaData.eventSource = mappedData.eventSource
+          if (mappedData.comments) prismaData.comments = mappedData.comments
+          if (mappedData.submittedBy) prismaData.submittedBy = mappedData.submittedBy
+          if (mappedData.customerRating) prismaData.customerRating = mappedData.customerRating
+          if (mappedData.stepProgram) prismaData.stepProgram = mappedData.stepProgram
+          if (mappedData.salesManagerInvolved) prismaData.salesManagerInvolved = mappedData.salesManagerInvolved
+          if (mappedData.salesManagerExplanation) prismaData.salesManagerExplanation = mappedData.salesManagerExplanation
+          if (mappedData.followUpNotes) prismaData.followUpNotes = mappedData.followUpNotes
+          if (mappedData.bestTimeToFollowUp) prismaData.bestTimeToFollowUp = new Date(mappedData.bestTimeToFollowUp)
+          if (mappedData.doNotEmail !== undefined) prismaData.doNotEmail = mappedData.doNotEmail
+
+          // Store custom fields as JSON in followUpInfo field
+          if (Object.keys(customFieldData).length > 0) {
+            prismaData.followUpInfo = JSON.stringify(customFieldData)
+          }
+
           await prisma.enquiry.create({
-            data: {
-              status: mappedData.status,
-              institutionName: mappedData.institutionName,
-              firstName: mappedData.firstName,
-              lastName: mappedData.lastName,
-              email: mappedData.email,
-              phone: mappedData.phone,
-              nationality: mappedData.nationality,
-              state: mappedData.state,
-              suburb: mappedData.suburb,
-              productInterest: mappedData.productInterest,
-              source: mappedData.source,
-              eventSource: mappedData.eventSource,
-              comments: mappedData.comments,
-              submittedBy: mappedData.submittedBy,
-              customerRating: mappedData.customerRating,
-              doNotEmail: mappedData.doNotEmail,
-              importSource: mappedData.importSource || `Import from ${file.name}`,
-              originalId: mappedData.originalId || row.id || row.ID || `import_${Date.now()}_${i}`,
-              // Store custom fields as JSON in followUpInfo field
-              followUpInfo: Object.keys(customFieldData).length > 0 ? JSON.stringify(customFieldData) : null,
-              createdAt: mappedData.createdAt ? new Date(mappedData.createdAt) : new Date(),
-              updatedAt: new Date(),
-            }
+            data: prismaData
           })
           results.imported++
         } catch (dbError) {

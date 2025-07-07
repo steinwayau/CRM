@@ -83,11 +83,11 @@ export default function TemplateEditorPage() {
       style: {
         position: { x: 50, y: 50 },
         width: type === 'divider' ? 500 : type === 'button' ? 200 : 300,
-        height: type === 'text' ? 50 : type === 'divider' ? 2 : type === 'button' ? 40 : 200,
+        height: type === 'text' ? 120 : type === 'divider' ? 2 : type === 'button' ? 40 : 200,
         fontSize: type === 'text' ? 16 : undefined,
         fontWeight: type === 'text' ? 'normal' : undefined,
         color: type === 'text' ? '#000000' : type === 'button' ? '#ffffff' : undefined,
-        backgroundColor: type === 'button' ? '#3b82f6' : type === 'divider' ? '#e5e7eb' : undefined,
+        backgroundColor: type === 'button' ? '#3b82f6' : type === 'divider' ? '#e5e7eb' : type === 'text' ? '#f9fafb' : undefined,
         padding: type === 'text' || type === 'button' ? 10 : undefined,
         borderRadius: type === 'button' ? 6 : undefined,
         textAlign: type === 'text' ? 'left' as const : undefined
@@ -474,7 +474,8 @@ export default function TemplateEditorPage() {
                         width: '100%',
                         height: '100%',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        border: '1px solid #e5e7eb'
                       }}
                     >
                       {element.content}

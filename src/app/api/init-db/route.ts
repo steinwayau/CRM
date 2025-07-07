@@ -60,6 +60,33 @@ export async function GET(request: NextRequest) {
       )
     `
 
+    // Create system_settings table
+    await sql`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(255) UNIQUE NOT NULL,
+        value TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'string',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+
+    // Create import_logs table
+    await sql`
+      CREATE TABLE IF NOT EXISTS import_logs (
+        id SERIAL PRIMARY KEY,
+        file_name VARCHAR(255) NOT NULL,
+        records_imported INTEGER DEFAULT 0,
+        records_skipped INTEGER DEFAULT 0,
+        records_errored INTEGER DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'pending',
+        error_log TEXT,
+        imported_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+
     // Insert default staff members with proper updated_at values
     await sql`
       INSERT INTO staff (name, email, created_at, updated_at) VALUES 
@@ -141,9 +168,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ 
       message: 'Database initialized successfully',
-      tables: ['enquiries', 'staff', 'users'],
+      tables: ['enquiries', 'staff', 'users', 'system_settings', 'import_logs'],
       staff_added: 'Day and Hendra included in staff database',
-      enquiries_added: 'Sample enquiries restored including custom "Other" source'
+      enquiries_added: 'Sample enquiries restored including custom "Other" source',
+      system_tables_added: 'System settings and import logs tables created'
     })
   } catch (error) {
     console.error('Error initializing database:', error)

@@ -61,16 +61,14 @@ export default function ImportPage() {
   const [showCustomFieldModal, setShowCustomFieldModal] = useState(false)
   const [selectedUnmappedField, setSelectedUnmappedField] = useState<string>('')
 
-  // Load available classifications and custom fields on component mount
+  // Load available classifications on component mount
   useEffect(() => {
     loadClassifications()
-    loadCustomFields()
   }, [])
 
   // Update unmapped fields when field mappings change
   useEffect(() => {
     if (importPreview) {
-      const mappedFields = fieldMappings.map(m => m.sourceField)
       const unmapped = importPreview.headers.filter(header => {
         const mapping = fieldMappings.find(m => m.sourceField === header)
         return !mapping || !mapping.targetField
@@ -78,27 +76,6 @@ export default function ImportPage() {
       setUnmappedFields(unmapped)
     }
   }, [fieldMappings, importPreview])
-
-  const loadCustomFields = async () => {
-    try {
-      const response = await fetch('/api/admin/custom-fields')
-      if (response.ok) {
-        const data = await response.json()
-        setCustomFields(data.customFields || [])
-        
-        // Combine default fields with custom fields
-        const combinedFields = [...FORM_FIELDS, ...data.customFields.map((field: any) => ({
-          key: field.key,
-          label: field.label,
-          required: field.required || false,
-          isCustom: true
-        }))]
-        setAllFormFields(combinedFields)
-      }
-    } catch (error) {
-      console.error('Error loading custom fields:', error)
-    }
-  }
 
   const loadClassifications = async () => {
     try {
@@ -227,6 +204,57 @@ export default function ImportPage() {
     return availableClassifications
   }
 
+  const addCustomField = () => {
+    if (!newCustomField.name.trim() || !newCustomField.label.trim()) {
+      alert('Please enter both field name and label')
+      return
+    }
+
+    // Clean field name locally
+    const cleanFieldName = newCustomField.name.toLowerCase()
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_{2,}/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .trim()
+
+    if (!cleanFieldName || cleanFieldName.length < 2) {
+      alert(`Invalid field name. Cleaned name "${cleanFieldName}" is too short.`)
+      return
+    }
+
+    // Check if field already exists
+    if (customFields.find(f => f.key === cleanFieldName)) {
+      alert(`Custom field "${cleanFieldName}" already exists`)
+      return
+    }
+
+    const newField = {
+      key: cleanFieldName,
+      label: newCustomField.label.trim(),
+      required: false,
+      isCustom: true
+    }
+
+    // Add to custom fields
+    setCustomFields(prev => [...prev, newField])
+    
+    // Add to all form fields
+    setAllFormFields(prev => [...prev, newField])
+
+    // If we were mapping a specific unmapped field, do the mapping
+    if (selectedUnmappedField) {
+      const fieldIndex = fieldMappings.findIndex(m => m.sourceField === selectedUnmappedField)
+      if (fieldIndex !== -1) {
+        updateFieldMapping(fieldIndex, cleanFieldName)
+      }
+    }
+
+    // Reset form
+    setNewCustomField({ name: '', label: '' })
+    setShowCustomFieldModal(false)
+    setSelectedUnmappedField('')
+  }
+
   const handleImport = async () => {
     if (!file || !importPreview) return
 
@@ -234,9 +262,16 @@ export default function ImportPage() {
     setErrorLog([])
 
     try {
+      // Prepare mappings with custom field info
+      const enhancedMappings = fieldMappings.map(mapping => ({
+        ...mapping,
+        isCustomField: customFields.some(cf => cf.key === mapping.targetField)
+      }))
+
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('mappings', JSON.stringify(fieldMappings))
+      formData.append('mappings', JSON.stringify(enhancedMappings))
+      formData.append('customFields', JSON.stringify(customFields))
 
       const response = await fetch('/api/admin/import', {
         method: 'POST',
@@ -252,64 +287,9 @@ export default function ImportPage() {
         setImportStatus('error')
         setErrorLog(result.errors || [result.error])
       }
-         } catch (error) {
-       setImportStatus('error')
-       setErrorLog([`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`])
-     }
-  }
-
-  const addCustomField = async () => {
-    if (!newCustomField.name.trim() || !newCustomField.label.trim()) {
-      alert('Please enter both field name and label')
-      return
-    }
-
-    try {
-      const response = await fetch('/api/admin/custom-fields', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fieldName: newCustomField.name.trim(),
-          fieldLabel: newCustomField.label.trim()
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        
-        // Add to custom fields
-        setCustomFields(prev => [...prev, data.field])
-        
-        // Add to all form fields
-        setAllFormFields(prev => [...prev, {
-          key: data.field.key,
-          label: data.field.label,
-          required: false,
-          isCustom: true
-        }])
-
-        // If we were mapping a specific unmapped field, do the mapping
-        if (selectedUnmappedField) {
-          const fieldIndex = fieldMappings.findIndex(m => m.sourceField === selectedUnmappedField)
-          if (fieldIndex !== -1) {
-            updateFieldMapping(fieldIndex, data.field.key)
-          }
-        }
-
-        // Reset form
-        setNewCustomField({ name: '', label: '' })
-        setShowCustomFieldModal(false)
-        setSelectedUnmappedField('')
-        
-      } else {
-        const errorData = await response.json()
-        alert(`Error adding custom field: ${errorData.error}`)
-      }
     } catch (error) {
-      console.error('Error adding custom field:', error)
-      alert('Error adding custom field')
+      setImportStatus('error')
+      setErrorLog([`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`])
     }
   }
 

@@ -43,24 +43,23 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const mappingsString = formData.get('mappings') as string
+    const customFieldsString = formData.get('customFields') as string
     
     if (!file || !mappingsString) {
       return NextResponse.json({ error: 'File and mappings are required' }, { status: 400 })
     }
 
     const mappings: FieldMapping[] = JSON.parse(mappingsString)
+    const customFields = customFieldsString ? JSON.parse(customFieldsString) : []
     const activeMappings = mappings.filter(m => m.targetField !== '')
     
-    // Get custom fields to identify which mappings are custom
-    const customFields = await prisma.systemSetting.findMany({
-      where: {
-        key: {
-          startsWith: 'custom_field_'
-        }
-      }
-    })
+    console.log('Custom fields received:', customFields)
     
-    const customFieldKeys = customFields.map(f => f.key.replace('custom_field_', ''))
+    // Create a map of custom field keys for quick lookup
+    const customFieldMap = customFields.reduce((map: any, field: any) => {
+      map[field.key] = field
+      return map
+    }, {})
     
     // Process file content
     const text = await file.text()
@@ -112,11 +111,10 @@ export async function POST(request: NextRequest) {
             }
 
             // Check if this is a custom field
-            if (customFieldKeys.includes(mapping.targetField)) {
+            if (customFieldMap[mapping.targetField]) {
               // Store custom field data
-              const customField = customFields.find(f => f.key === `custom_field_${mapping.targetField}`)
               customFieldData[mapping.targetField] = {
-                label: customField?.value || mapping.targetField,
+                label: customFieldMap[mapping.targetField].label,
                 value: sourceValue || null
               }
             } else {
@@ -170,7 +168,7 @@ export async function POST(request: NextRequest) {
               doNotEmail: mappedData.doNotEmail,
               importSource: mappedData.importSource || `Import from ${file.name}`,
               originalId: mappedData.originalId || row.id || row.ID || `import_${Date.now()}_${i}`,
-              // Store custom fields as JSON
+              // Store custom fields as JSON in followUpInfo field
               followUpInfo: Object.keys(customFieldData).length > 0 ? JSON.stringify(customFieldData) : null,
               createdAt: mappedData.createdAt ? new Date(mappedData.createdAt) : new Date(),
               updatedAt: new Date(),
@@ -190,10 +188,11 @@ export async function POST(request: NextRequest) {
 
     // Log import results
     console.log(`Import completed: ${results.imported} imported, ${results.skipped} skipped, ${results.errors} errors`)
+    console.log(`Custom fields processed: ${JSON.stringify(customFields)}`)
 
     return NextResponse.json({
       ...results,
-      message: `Import completed. ${results.imported} records imported successfully.`,
+      message: `Import completed. ${results.imported} records imported successfully.${customFields.length > 0 ? ` Custom fields: ${customFields.map((f: any) => f.label).join(', ')}` : ''}`,
       totalRecords: rawData.length
     })
 

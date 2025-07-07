@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 interface FieldMapping {
   sourceField: string
@@ -20,6 +23,13 @@ const VALID_STATES = [
 
 // Valid customer ratings from your form
 const VALID_RATINGS = [
+  "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
+  "Very interested but not ready to buy", "Looking for information", 
+  "Just browsing for now", "Cold", "Events"
+]
+
+// Valid classifications (same as ratings for now, but separate for flexibility)
+const VALID_CLASSIFICATIONS = [
   "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
   "Very interested but not ready to buy", "Looking for information", 
   "Just browsing for now", "Cold", "Events"
@@ -112,13 +122,47 @@ export async function POST(request: NextRequest) {
         // Set defaults
         if (!mappedData.status) mappedData.status = 'New'
         if (!mappedData.customerRating) mappedData.customerRating = 'N/A'
+        if (!mappedData.classification) mappedData.classification = 'N/A'
         if (!mappedData.stepProgram) mappedData.stepProgram = 'N/A'
         if (!mappedData.salesManagerInvolved) mappedData.salesManagerInvolved = 'No'
         if (mappedData.doNotEmail === undefined) mappedData.doNotEmail = false
 
-        // Add to our temporary storage (in production, save to database)
-        importedData.push(mappedData)
-        results.imported++
+        // Map classification to customerRating if provided
+        if (mappedData.classification && !mappedData.customerRating) {
+          mappedData.customerRating = mappedData.classification
+        }
+
+        // Save to database using Prisma
+        try {
+          await prisma.enquiry.create({
+            data: {
+              status: mappedData.status,
+              institutionName: mappedData.institutionName,
+              firstName: mappedData.firstName,
+              lastName: mappedData.lastName,
+              email: mappedData.email,
+              phone: mappedData.phone,
+              nationality: mappedData.nationality,
+              state: mappedData.state,
+              suburb: mappedData.suburb,
+              productInterest: mappedData.productInterest,
+              source: mappedData.source,
+              eventSource: mappedData.eventSource,
+              comments: mappedData.comments,
+              submittedBy: mappedData.submittedBy,
+              customerRating: mappedData.customerRating,
+              doNotEmail: mappedData.doNotEmail,
+              importSource: mappedData.importSource,
+              originalId: mappedData.originalId,
+              createdAt: mappedData.createdAt ? new Date(mappedData.createdAt) : new Date(),
+              updatedAt: new Date(),
+            }
+          })
+          results.imported++
+        } catch (dbError) {
+          results.errors++
+          results.errorDetails.push(`Row ${rowIndex}: Database error - ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`)
+        }
 
       } catch (error) {
         results.errors++
@@ -235,6 +279,13 @@ function processFieldValue(fieldName: string, value: any): any {
         r.toLowerCase() === stringValue.toLowerCase()
       )
       return foundRating || 'N/A'
+
+    case 'classification':
+      // Validate classification - allow any value, but prefer known ones
+      const foundClassification = VALID_CLASSIFICATIONS.find(c => 
+        c.toLowerCase() === stringValue.toLowerCase()
+      )
+      return foundClassification || stringValue || 'N/A'
 
     case 'status':
       // Validate status

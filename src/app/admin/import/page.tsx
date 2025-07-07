@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface FieldMapping {
   sourceField: string
@@ -27,6 +27,7 @@ const FORM_FIELDS = [
   { key: 'productInterest', label: 'Product Interest', required: false, note: 'Comma-separated list or JSON array' },
   { key: 'source', label: 'Source (Where did you hear about us)', required: false },
   { key: 'eventSource', label: 'Event Source (Where did enquiry come from)', required: false },
+  { key: 'classification', label: 'Classification', required: false, note: 'Customer classification/rating' },
   { key: 'comments', label: 'Comments', required: false },
   { key: 'submittedBy', label: 'Submitted By (Staff)', required: false },
   { key: 'customerRating', label: 'Customer Rating', required: false },
@@ -36,6 +37,13 @@ const FORM_FIELDS = [
 
 const PRODUCT_OPTIONS = ['steinway', 'boston', 'essex', 'kawai', 'yamaha', 'usedpiano', 'roland', 'ritmuller', 'ronisch', 'kurzweil', 'other']
 
+// Default classifications - these can be extended dynamically
+const DEFAULT_CLASSIFICATIONS = [
+  "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
+  "Very interested but not ready to buy", "Looking for information", 
+  "Just browsing for now", "Cold", "Events"
+]
+
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
@@ -43,6 +51,27 @@ export default function ImportPage() {
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle')
   const [importResults, setImportResults] = useState<any>(null)
   const [errorLog, setErrorLog] = useState<string[]>([])
+  const [customClassifications, setCustomClassifications] = useState<string[]>([])
+  const [newClassification, setNewClassification] = useState<string>('')
+  const [availableClassifications, setAvailableClassifications] = useState<string[]>(DEFAULT_CLASSIFICATIONS)
+
+  // Load available classifications on component mount
+  useEffect(() => {
+    loadClassifications()
+  }, [])
+
+  const loadClassifications = async () => {
+    try {
+      const response = await fetch('/api/admin/classifications')
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableClassifications(data.classifications)
+        setCustomClassifications(data.custom || [])
+      }
+    } catch (error) {
+      console.error('Error loading classifications:', error)
+    }
+  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -97,6 +126,7 @@ export default function ImportPage() {
         else if (normalized.includes('comment') || normalized.includes('note')) targetField = 'comments'
         else if (normalized.includes('status')) targetField = 'status'
         else if (normalized.includes('rating')) targetField = 'customerRating'
+        else if (normalized.includes('classification') || normalized.includes('class')) targetField = 'classification'
         else if (normalized.includes('date') || normalized.includes('created')) targetField = 'createdAt'
         else if (normalized.includes('staff') || normalized.includes('submitt')) targetField = 'submittedBy'
 
@@ -118,6 +148,43 @@ export default function ImportPage() {
     setFieldMappings(prev => prev.map((mapping, i) => 
       i === index ? { ...mapping, targetField } : mapping
     ))
+  }
+
+  const addCustomClassification = async () => {
+    if (newClassification.trim() && !availableClassifications.includes(newClassification.trim())) {
+      try {
+        const response = await fetch('/api/admin/classifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            classification: newClassification.trim()
+          })
+        })
+
+        if (response.ok) {
+          setCustomClassifications(prev => [...prev, newClassification.trim()])
+          setAvailableClassifications(prev => [...prev, newClassification.trim()])
+          setNewClassification('')
+        } else {
+          const errorData = await response.json()
+          alert(`Error adding classification: ${errorData.error}`)
+        }
+      } catch (error) {
+        console.error('Error adding classification:', error)
+        alert('Error adding classification')
+      }
+    }
+  }
+
+  const removeCustomClassification = (classification: string) => {
+    setCustomClassifications(prev => prev.filter(c => c !== classification))
+    setAvailableClassifications(prev => prev.filter(c => c !== classification))
+  }
+
+  const getAllClassifications = () => {
+    return availableClassifications
   }
 
   const handleImport = async () => {
@@ -236,6 +303,27 @@ export default function ImportPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   Map your data fields to the CRM system fields. Required fields are marked with *.
                 </p>
+                
+                {/* Custom Classifications Management */}
+                {customClassifications.length > 0 && (
+                  <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-900 mb-2">Custom Classifications Added:</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {customClassifications.map(classification => (
+                        <span key={classification} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                          {classification}
+                          <button
+                            onClick={() => removeCustomClassification(classification)}
+                            className="ml-1 text-blue-600 hover:text-blue-800"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {fieldMappings.map((mapping, index) => (
                     <div key={index} className="grid grid-cols-3 gap-4 items-center p-3 bg-gray-50 rounded-lg">
@@ -244,18 +332,58 @@ export default function ImportPage() {
                       </div>
                       <div className="text-center text-gray-400">→</div>
                       <div>
-                        <select
-                          value={mapping.targetField}
-                          onChange={(e) => updateFieldMapping(index, e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                        >
-                          <option value="">- Skip this field -</option>
-                          {FORM_FIELDS.map(field => (
-                            <option key={field.key} value={field.key}>
-                              {field.label} {field.required ? '*' : ''} {field.note ? `(${field.note})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                        {mapping.targetField === 'classification' ? (
+                          <div className="space-y-2">
+                            <select
+                              value={mapping.targetField}
+                              onChange={(e) => updateFieldMapping(index, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value="">- Skip this field -</option>
+                              {FORM_FIELDS.map(field => (
+                                <option key={field.key} value={field.key}>
+                                  {field.label} {field.required ? '*' : ''} {field.note ? `(${field.note})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            
+                            {/* Add New Classification */}
+                            <div className="flex space-x-2">
+                              <input
+                                type="text"
+                                value={newClassification}
+                                onChange={(e) => setNewClassification(e.target.value)}
+                                placeholder="Add new classification..."
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                onKeyPress={(e) => e.key === 'Enter' && addCustomClassification()}
+                              />
+                              <button
+                                onClick={addCustomClassification}
+                                className="px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
+                              >
+                                Add
+                              </button>
+                            </div>
+                            
+                            {/* Preview available classifications */}
+                            <div className="text-xs text-gray-500">
+                              Available: {getAllClassifications().join(', ')}
+                            </div>
+                          </div>
+                        ) : (
+                          <select
+                            value={mapping.targetField}
+                            onChange={(e) => updateFieldMapping(index, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          >
+                            <option value="">- Skip this field -</option>
+                            {FORM_FIELDS.map(field => (
+                              <option key={field.key} value={field.key}>
+                                {field.label} {field.required ? '*' : ''} {field.note ? `(${field.note})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
                   ))}

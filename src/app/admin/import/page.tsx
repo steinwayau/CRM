@@ -297,6 +297,9 @@ export default function ImportPage() {
         isCustomField: customFields.some(cf => cf.key === mapping.targetField)
       }))
 
+      console.log('Sending mappings:', enhancedMappings)
+      console.log('Sending custom fields:', customFields)
+
       const formData = new FormData()
       formData.append('file', file)
       formData.append('mappings', JSON.stringify(enhancedMappings))
@@ -307,7 +310,21 @@ export default function ImportPage() {
         body: formData
       })
 
-      const result = await response.json()
+      console.log('Response status:', response.status)
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
+
+      // Get the raw response text first
+      const responseText = await response.text()
+      console.log('Raw response:', responseText)
+
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError)
+        console.error('Response text that failed to parse:', responseText)
+        throw new Error(`Server returned invalid JSON. Response: ${responseText.substring(0, 200)}...`)
+      }
       
       if (response.ok) {
         setImportResults(result)
@@ -317,6 +334,7 @@ export default function ImportPage() {
         setErrorLog(result.errors || [result.error])
       }
     } catch (error) {
+      console.error('Import error:', error)
       setImportStatus('error')
       setErrorLog([`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`])
     }

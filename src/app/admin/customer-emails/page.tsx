@@ -76,6 +76,19 @@ export default function CustomerEmailsPage() {
     scheduledAt: ''
   })
 
+  // Template management state
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false)
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false)
+  const [currentTemplate, setCurrentTemplate] = useState<EmailTemplate | null>(null)
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    subject: '',
+    type: 'newsletter' as EmailTemplate['type'],
+    htmlContent: '',
+    textContent: ''
+  })
+  const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null)
+
   // Sample data - replace with actual API calls
   useEffect(() => {
     // Load customers, templates, and campaigns
@@ -244,6 +257,92 @@ export default function CustomerEmailsPage() {
     } catch (error) {
       console.error('Error sending campaign:', error)
     }
+  }
+
+  // Template management functions
+  const handleCreateTemplate = () => {
+    setCurrentTemplate(null)
+    setTemplateForm({
+      name: '',
+      subject: '',
+      type: 'newsletter',
+      htmlContent: '',
+      textContent: ''
+    })
+    setShowTemplateEditor(true)
+  }
+
+  const handleEditTemplate = (template: EmailTemplate) => {
+    setCurrentTemplate(template)
+    setTemplateForm({
+      name: template.name,
+      subject: template.subject,
+      type: template.type,
+      htmlContent: template.htmlContent,
+      textContent: template.textContent
+    })
+    setShowTemplateEditor(true)
+  }
+
+  const handleDuplicateTemplate = (template: EmailTemplate) => {
+    setCurrentTemplate(null)
+    setTemplateForm({
+      name: `Copy of ${template.name}`,
+      subject: template.subject,
+      type: template.type,
+      htmlContent: template.htmlContent,
+      textContent: template.textContent
+    })
+    setShowTemplateEditor(true)
+  }
+
+  const handlePreviewTemplate = (template: EmailTemplate) => {
+    setPreviewTemplate(template)
+    setShowTemplatePreview(true)
+  }
+
+  const handleSaveTemplate = () => {
+    try {
+      const templateData: EmailTemplate = {
+        id: currentTemplate?.id || Date.now().toString(),
+        name: templateForm.name,
+        subject: templateForm.subject,
+        type: templateForm.type,
+        htmlContent: templateForm.htmlContent,
+        textContent: templateForm.textContent,
+        createdAt: currentTemplate?.createdAt || new Date().toISOString()
+      }
+
+      if (currentTemplate) {
+        // Update existing template
+        setTemplates(templates.map(t => 
+          t.id === currentTemplate.id ? templateData : t
+        ))
+      } else {
+        // Add new template
+        setTemplates([templateData, ...templates])
+      }
+
+      setShowTemplateEditor(false)
+      setCurrentTemplate(null)
+    } catch (error) {
+      console.error('Error saving template:', error)
+    }
+  }
+
+  const handleDeleteTemplate = (templateId: string) => {
+    if (confirm('Are you sure you want to delete this template?')) {
+      setTemplates(templates.filter(t => t.id !== templateId))
+    }
+  }
+
+  // Helper function to personalize template content
+  const personalizeContent = (content: string) => {
+    return content
+      .replace(/\{\{firstName\}\}/g, 'John')
+      .replace(/\{\{lastName\}\}/g, 'Smith')
+      .replace(/\{\{fullName\}\}/g, 'John Smith')
+      .replace(/\{\{email\}\}/g, 'john.smith@example.com')
   }
 
   const renderCampaigns = () => (
@@ -732,7 +831,10 @@ export default function CustomerEmailsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Email Templates</h2>
           <p className="text-gray-600">Create and manage email templates for campaigns</p>
         </div>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <button 
+          onClick={handleCreateTemplate}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
           + New Template
         </button>
       </div>
@@ -759,17 +861,32 @@ export default function CustomerEmailsPage() {
             <p className="text-sm text-gray-700 mb-4">{template.subject}</p>
             
             <div className="space-y-2">
-              <button className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100">
+              <button 
+                onClick={() => handlePreviewTemplate(template)}
+                className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+              >
                 Preview
               </button>
               <div className="flex space-x-2">
-                <button className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                <button 
+                  onClick={() => handleEditTemplate(template)}
+                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                >
                   Edit
                 </button>
-                <button className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                <button 
+                  onClick={() => handleDuplicateTemplate(template)}
+                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                >
                   Duplicate
                 </button>
               </div>
+              <button 
+                onClick={() => handleDeleteTemplate(template.id)}
+                className="w-full px-3 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
+              >
+                Delete
+              </button>
             </div>
           </div>
         ))}
@@ -784,8 +901,11 @@ export default function CustomerEmailsPage() {
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Create Your First Template</h3>
         <p className="text-gray-600 mb-4">Build professional email templates with our drag-and-drop editor</p>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          Open Template Builder
+        <button 
+          onClick={handleCreateTemplate}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Create Your First Template
         </button>
       </div>
     </div>
@@ -877,6 +997,202 @@ export default function CustomerEmailsPage() {
           {activeTab === 'templates' && renderTemplates()}
           {activeTab === 'analytics' && renderAnalytics()}
         </div>
+
+        {/* Template Editor Modal */}
+        {showTemplateEditor && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-semibold mb-4">
+                {currentTemplate ? 'Edit Template' : 'Create New Template'}
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
+                    <input
+                      type="text"
+                      value={templateForm.name}
+                      onChange={(e) => setTemplateForm({...templateForm, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="Enter template name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Template Type</label>
+                    <select
+                      value={templateForm.type}
+                      onChange={(e) => setTemplateForm({...templateForm, type: e.target.value as EmailTemplate['type']})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="newsletter">Newsletter</option>
+                      <option value="promotional">Promotional</option>
+                      <option value="event">Event</option>
+                      <option value="follow-up">Follow-up</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Subject</label>
+                  <input
+                    type="text"
+                    value={templateForm.subject}
+                    onChange={(e) => setTemplateForm({...templateForm, subject: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter email subject line"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    HTML Content
+                    <span className="text-xs text-gray-500 ml-2">
+                      Use {{firstName}}, {{lastName}}, {{fullName}}, {{email}} for personalization
+                    </span>
+                  </label>
+                  <textarea
+                    value={templateForm.htmlContent}
+                    onChange={(e) => setTemplateForm({...templateForm, htmlContent: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md h-64"
+                    placeholder="Enter HTML email content..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Plain Text Content
+                    <span className="text-xs text-gray-500 ml-2">
+                      Fallback for email clients that don't support HTML
+                    </span>
+                  </label>
+                  <textarea
+                    value={templateForm.textContent}
+                    onChange={(e) => setTemplateForm({...templateForm, textContent: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md h-32"
+                    placeholder="Enter plain text version..."
+                  />
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Personalization Variables</h4>
+                  <p className="text-sm text-blue-700 mb-2">You can use these variables in your email content:</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{firstName}}</code> - Customer's first name</div>
+                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{lastName}}</code> - Customer's last name</div>
+                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{fullName}}</code> - Full name</div>
+                    <div><code className="bg-blue-100 px-2 py-1 rounded">{{email}}</code> - Email address</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowTemplateEditor(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (templateForm.htmlContent) {
+                      handlePreviewTemplate({
+                        id: 'preview',
+                        name: templateForm.name || 'Untitled Template',
+                        subject: templateForm.subject || 'No Subject',
+                        type: templateForm.type,
+                        htmlContent: templateForm.htmlContent,
+                        textContent: templateForm.textContent,
+                        createdAt: new Date().toISOString()
+                      })
+                    }
+                  }}
+                  disabled={!templateForm.htmlContent}
+                  className="px-4 py-2 text-blue-600 border border-blue-300 rounded-md hover:bg-blue-50 disabled:opacity-50"
+                >
+                  Preview
+                </button>
+                <button
+                  onClick={handleSaveTemplate}
+                  disabled={!templateForm.name || !templateForm.subject || !templateForm.htmlContent}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {currentTemplate ? 'Update Template' : 'Save Template'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Template Preview Modal */}
+        {showTemplatePreview && previewTemplate && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">{previewTemplate.name}</h3>
+                  <p className="text-sm text-gray-600">Subject: {previewTemplate.subject}</p>
+                </div>
+                <button
+                  onClick={() => setShowTemplatePreview(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="border rounded-lg">
+                <div className="bg-gray-50 px-4 py-2 border-b text-sm font-medium">
+                  Email Preview (with sample personalization)
+                </div>
+                <div className="p-4">
+                  <div 
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: personalizeContent(previewTemplate.htmlContent)
+                    }} 
+                  />
+                </div>
+              </div>
+
+              {previewTemplate.textContent && (
+                <div className="mt-4 border rounded-lg">
+                  <div className="bg-gray-50 px-4 py-2 border-b text-sm font-medium">
+                    Plain Text Version
+                  </div>
+                  <div className="p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-gray-700">
+                      {personalizeContent(previewTemplate.textContent)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowTemplatePreview(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                {previewTemplate.id !== 'preview' && (
+                  <button
+                    onClick={() => {
+                      setShowTemplatePreview(false)
+                      handleEditTemplate(previewTemplate)
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Edit Template
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

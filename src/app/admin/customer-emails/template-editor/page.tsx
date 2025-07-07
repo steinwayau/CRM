@@ -57,6 +57,14 @@ export default function TemplateEditorPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState<{elementId: string, property: string} | null>(null)
+  const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('templateEditorPanelWidth')
+      return saved ? parseInt(saved) : 320
+    }
+    return 320
+  })
+  const [isResizing, setIsResizing] = useState(false)
 
   // Close color picker when clicking outside
   useEffect(() => {
@@ -72,6 +80,46 @@ export default function TemplateEditorPage() {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showColorPicker])
+
+  // Handle panel resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing) {
+        const newWidth = window.innerWidth - e.clientX
+        const clampedWidth = Math.max(280, Math.min(600, newWidth))
+        setPropertiesPanelWidth(clampedWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isResizing])
+
+  // Save panel width to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('templateEditorPanelWidth', propertiesPanelWidth.toString())
+    }
+  }, [propertiesPanelWidth])
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }
+
+  const handleResizeDoubleClick = () => {
+    setPropertiesPanelWidth(320)
+  }
 
   // Load existing template if editing
   useEffect(() => {
@@ -393,7 +441,7 @@ export default function TemplateEditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${isResizing ? 'select-none' : ''}`}>
       {/* Header */}
       <div className="bg-white border-b shadow-sm">
         <div className="px-6 py-4">
@@ -481,7 +529,7 @@ export default function TemplateEditorPage() {
       {/* Main Editor Area */}
       <div className="flex h-[calc(100vh-200px)]">
         {/* Elements Sidebar */}
-        <div className="w-64 bg-white border-r overflow-y-auto">
+        <div className="w-64 bg-white border-r overflow-y-auto flex-shrink-0">
           <div className="p-4">
             <h4 className="font-medium text-gray-900 mb-3">Elements</h4>
             <div className="space-y-2">
@@ -549,7 +597,7 @@ export default function TemplateEditorPage() {
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="p-4 bg-white border-b">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -738,11 +786,39 @@ export default function TemplateEditorPage() {
           </div>
         </div>
 
+        {/* Resize Handle */}
+        {selectedElement && (
+          <div 
+            className={`w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 relative transition-colors ${
+              isResizing ? 'bg-blue-500' : ''
+            }`}
+            onMouseDown={handleResizeStart}
+            onDoubleClick={handleResizeDoubleClick}
+            title="Drag to resize, double-click to reset"
+          >
+            <div className="absolute inset-y-0 left-0 w-1 bg-blue-500 opacity-0 hover:opacity-100 transition-opacity" />
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full shadow-sm opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+              </svg>
+            </div>
+          </div>
+        )}
+
         {/* Properties Panel */}
         {selectedElement && (
-          <div className="w-64 bg-white border-l overflow-y-auto">
-            <div className="p-4">
-              <h4 className="font-medium text-gray-900 mb-3">Element Properties</h4>
+          <div 
+            className="bg-white border-l flex-shrink-0 overflow-hidden"
+            style={{ width: propertiesPanelWidth }}
+          >
+            <div className="h-full overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b p-4 z-10">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-900">Element Properties</h4>
+                  <span className="text-xs text-gray-500">{propertiesPanelWidth}px</span>
+                </div>
+              </div>
+              <div className="p-4">
               {(() => {
                 const element = editorElements.find(el => el.id === selectedElement)
                 if (!element) return null
@@ -1004,6 +1080,7 @@ export default function TemplateEditorPage() {
                   </div>
                 )
               })()}
+              </div>
             </div>
           </div>
         )}

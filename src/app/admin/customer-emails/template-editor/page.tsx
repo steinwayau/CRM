@@ -17,6 +17,13 @@ interface EditorElement {
   id: string
   type: 'text' | 'image' | 'video' | 'button' | 'divider'
   content: string
+  videoData?: {
+    platform: 'youtube' | 'vimeo' | 'facebook' | 'custom'
+    url: string
+    videoId?: string
+    thumbnailUrl?: string
+    title?: string
+  }
   style: {
     position: { x: number; y: number }
     width: number
@@ -121,6 +128,65 @@ export default function TemplateEditorPage() {
     setPropertiesPanelWidth(320)
   }
 
+  // Video utility functions
+  const extractVideoData = (url: string) => {
+    // YouTube patterns
+    const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/
+    const youtubeMatch = url.match(youtubeRegex)
+    if (youtubeMatch) {
+      return {
+        platform: 'youtube' as const,
+        url,
+        videoId: youtubeMatch[1],
+        thumbnailUrl: `https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg`,
+        title: 'YouTube Video'
+      }
+    }
+
+    // Vimeo patterns
+    const vimeoRegex = /vimeo\.com\/(\d+)/
+    const vimeoMatch = url.match(vimeoRegex)
+    if (vimeoMatch) {
+      return {
+        platform: 'vimeo' as const,
+        url,
+        videoId: vimeoMatch[1],
+        thumbnailUrl: `https://vumbnail.com/${vimeoMatch[1]}.jpg`,
+        title: 'Vimeo Video'
+      }
+    }
+
+    // Facebook patterns
+    const facebookRegex = /facebook\.com\/.*\/videos\/(\d+)/
+    const facebookMatch = url.match(facebookRegex)
+    if (facebookMatch) {
+      return {
+        platform: 'facebook' as const,
+        url,
+        videoId: facebookMatch[1],
+        title: 'Facebook Video'
+      }
+    }
+
+    // Default/custom
+    return {
+      platform: 'custom' as const,
+      url,
+      title: 'Custom Video'
+    }
+  }
+
+  const updateVideoElement = (elementId: string, videoUrl: string, platform?: 'youtube' | 'vimeo' | 'facebook' | 'custom') => {
+    const videoData = platform ? 
+      { platform, url: videoUrl, title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video` } :
+      extractVideoData(videoUrl)
+    
+    updateElement(elementId, {
+      content: videoUrl,
+      videoData
+    })
+  }
+
   // Load existing template if editing
   useEffect(() => {
     if (isEditing && templateId) {
@@ -170,7 +236,7 @@ export default function TemplateEditorPage() {
     switch (type) {
       case 'text': return 'Enter your text here...'
       case 'image': return 'https://via.placeholder.com/300x200'
-      case 'video': return 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+      case 'video': return ''
       case 'button': return 'Click Here'
       case 'divider': return ''
       default: return ''
@@ -237,7 +303,59 @@ export default function TemplateEditorPage() {
           html += `<img src="${content}" style="${commonStyles} object-fit: cover;" alt="Email Image" />`
           break
         case 'video':
-          html += `<iframe src="${content}" style="${commonStyles}" frameborder="0" allowfullscreen></iframe>`
+          // Videos in emails need fallback images since most clients don't support video
+          const videoData = element.videoData
+          const thumbnailUrl = videoData?.thumbnailUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE1IDEwTDE5LjU1MyA3LjcyNEExIDEgMCAwIDEgMjEgOC42MThWMTUuMzgyQTEgMSAwIDAgMSAxOS41NTMgMTYuMjc2TDE1IDE0TTE1IDE0VjhBMiAyIDAgMCAwIDEzIDZINUEyIDIgMCAwIDAgMyA4VjE2QTIgMiAwIDAgMCA1IDE4SDEzQTIgMiAwIDAgMCAxNSAxNlYxNFoiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+'
+          
+          html += `
+            <a href="${content}" style="${commonStyles.replace('position: absolute;', 'position: absolute; display: block; text-decoration: none;')}">
+              <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: ${style.borderRadius || 0}px;
+                display: block;
+              ">
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 48px;
+                height: 48px;
+                background-color: rgba(0, 0, 0, 0.7);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
+                <div style="
+                  width: 0;
+                  height: 0;
+                  border-left: 16px solid white;
+                  border-top: 10px solid transparent;
+                  border-bottom: 10px solid transparent;
+                  margin-left: 4px;
+                "></div>
+              </div>
+              ${videoData?.platform ? `
+                <div style="
+                  position: absolute;
+                  bottom: 8px;
+                  left: 8px;
+                  right: 8px;
+                  background-color: rgba(0, 0, 0, 0.8);
+                  color: white;
+                  padding: 4px 8px;
+                  border-radius: 4px;
+                  font-size: 12px;
+                  text-align: center;
+                ">
+                  ${videoData.platform.toUpperCase()} • ${videoData.title}
+                </div>
+              ` : ''}
+            </a>
+          `
           break
         case 'button':
           html += `<a href="#" style="${commonStyles} display: flex; align-items: center; justify-content: center; text-decoration: none; border: none; cursor: pointer;">${content}</a>`
@@ -733,16 +851,45 @@ export default function TemplateEditorPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        border: '2px dashed #d1d5db',
-                        borderRadius: element.style.borderRadius
+                        border: element.videoData?.thumbnailUrl ? 'none' : '2px dashed #d1d5db',
+                        borderRadius: element.style.borderRadius,
+                        overflow: 'hidden'
                       }}
                     >
-                      <div className="text-center">
-                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <p className="text-sm text-gray-500">Video Placeholder</p>
-                      </div>
+                      {element.videoData?.thumbnailUrl ? (
+                        <div className="relative w-full h-full">
+                          <img
+                            src={element.videoData.thumbnailUrl}
+                            alt={element.videoData.title}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              borderRadius: element.style.borderRadius
+                            }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity">
+                            <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-gray-800 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="absolute bottom-2 left-2 right-2">
+                            <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+                              {element.videoData.platform?.toUpperCase()} • {element.videoData.title}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          <p className="text-sm text-gray-500">Add Video URL</p>
+                          <p className="text-xs text-gray-400">YouTube, Vimeo, Facebook</p>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -851,13 +998,66 @@ export default function TemplateEditorPage() {
                           </button>
                         </div>
                       ) : element.type === 'video' ? (
-                        <input
-                          type="url"
-                          value={element.content}
-                          onChange={(e) => updateElement(element.id, { content: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          placeholder="Enter video URL"
-                        />
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Video Platform</label>
+                            <select
+                              value={element.videoData?.platform || 'custom'}
+                              onChange={(e) => {
+                                const platform = e.target.value as 'youtube' | 'vimeo' | 'facebook' | 'custom'
+                                updateVideoElement(element.id, element.content, platform)
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value="custom">Custom URL</option>
+                              <option value="youtube">YouTube</option>
+                              <option value="vimeo">Vimeo</option>
+                              <option value="facebook">Facebook</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
+                            <input
+                              type="url"
+                              value={element.content}
+                              onChange={(e) => updateVideoElement(element.id, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                              placeholder={
+                                element.videoData?.platform === 'youtube' ? 'https://www.youtube.com/watch?v=...' :
+                                element.videoData?.platform === 'vimeo' ? 'https://vimeo.com/...' :
+                                element.videoData?.platform === 'facebook' ? 'https://www.facebook.com/.../videos/...' :
+                                'Enter video URL'
+                              }
+                            />
+                          </div>
+                          
+                          {element.videoData?.platform && element.videoData.platform !== 'custom' && (
+                            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                              <strong>Tips for {element.videoData.platform.charAt(0).toUpperCase() + element.videoData.platform.slice(1)}:</strong>
+                              <br />
+                              {element.videoData.platform === 'youtube' && 'Use full YouTube URL (watch?v= or youtu.be/)'}
+                              {element.videoData.platform === 'vimeo' && 'Use standard Vimeo URL (vimeo.com/video-id)'}
+                              {element.videoData.platform === 'facebook' && 'Use Facebook video URL from the video page'}
+                            </div>
+                          )}
+                          
+                          {element.videoData?.thumbnailUrl && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Video Preview</label>
+                              <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
+                                <img
+                                  src={element.videoData.thumbnailUrl}
+                                  alt="Video thumbnail"
+                                  className="w-full h-20 object-cover rounded"
+                                />
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {element.videoData.platform?.toUpperCase()} • {element.videoData.title}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : null}
                     </div>
                     

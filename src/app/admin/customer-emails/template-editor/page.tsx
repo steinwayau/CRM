@@ -862,15 +862,35 @@ export default function TemplateEditorPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-600">Canvas Size:</span>
-                <select 
-                  value={canvasSize.width}
-                  onChange={(e) => setCanvasSize({...canvasSize, width: parseInt(e.target.value)})}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm"
-                >
-                  <option value="600">600px (Mobile)</option>
-                  <option value="800">800px (Tablet)</option>
-                  <option value="1000">1000px (Desktop)</option>
-                </select>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-gray-500">Width:</span>
+                    <select 
+                      value={canvasSize.width}
+                      onChange={(e) => setCanvasSize({...canvasSize, width: parseInt(e.target.value)})}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm"
+                    >
+                      <option value="600">600px (Mobile)</option>
+                      <option value="800">800px (Tablet)</option>
+                      <option value="1000">1000px (Desktop)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-gray-500">Height:</span>
+                    <select 
+                      value={canvasSize.height}
+                      onChange={(e) => setCanvasSize({...canvasSize, height: parseInt(e.target.value)})}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm"
+                    >
+                      <option value="600">600px (Short)</option>
+                      <option value="800">800px (Medium)</option>
+                      <option value="1000">1000px (Long)</option>
+                      <option value="1200">1200px (Very Long)</option>
+                      <option value="1500">1500px (Extra Long)</option>
+                      <option value="2000">2000px (Newsletter)</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               
               <div className="flex items-center space-x-4">

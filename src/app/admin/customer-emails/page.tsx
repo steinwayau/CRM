@@ -14,6 +14,7 @@ interface Customer {
   nationality?: string
   productInterest?: string[]
   source?: string
+  eventSource?: string
   customerRating?: string
   status?: string
   doNotEmail: boolean
@@ -61,7 +62,8 @@ export default function CustomerEmailsPage() {
     status: 'All',
     productInterest: 'All',
     nationality: 'All',
-    source: 'All'
+    hearAboutUs: 'All',
+    enquirySource: 'All'
   })
 
   // New campaign form
@@ -99,6 +101,7 @@ export default function CustomerEmailsPage() {
         nationality: enquiry.nationality,
         productInterest: enquiry.productInterest,
         source: enquiry.source,
+        eventSource: enquiry.eventSource,
         customerRating: enquiry.customerRating,
         status: enquiry.status,
         doNotEmail: enquiry.doNotEmail || false,
@@ -161,7 +164,8 @@ export default function CustomerEmailsPage() {
     if (filters.rating !== 'All' && customer.customerRating !== filters.rating) return false
     if (filters.status !== 'All' && customer.status !== filters.status) return false
     if (filters.nationality !== 'All' && customer.nationality !== filters.nationality) return false
-    if (filters.source !== 'All' && customer.source !== filters.source) return false
+    if (filters.hearAboutUs !== 'All' && customer.source !== filters.hearAboutUs) return false
+    if (filters.enquirySource !== 'All' && customer.eventSource !== filters.enquirySource) return false
     
     if (filters.productInterest !== 'All') {
       if (!customer.productInterest || !customer.productInterest.includes(filters.productInterest)) {
@@ -505,7 +509,7 @@ export default function CustomerEmailsPage() {
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow border">
         <h3 className="text-lg font-semibold mb-4">Customer Segmentation</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
             <select
@@ -575,18 +579,45 @@ export default function CustomerEmailsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Hear About Us</label>
             <select
-              value={filters.source}
-              onChange={(e) => setFilters({...filters, source: e.target.value})}
+              value={filters.hearAboutUs}
+              onChange={(e) => setFilters({...filters, hearAboutUs: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             >
               <option value="All">All Sources</option>
+              <option value="Teacher">Teacher</option>
               <option value="Google">Google</option>
               <option value="Facebook">Facebook</option>
-              <option value="Teacher">Teacher</option>
+              <option value="Instagram">Instagram</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="WeChat">WeChat</option>
+              <option value="YouTube">YouTube</option>
+              <option value="Steinway Website">Steinway Website</option>
+              <option value="Radio">Radio</option>
+              <option value="Magazine/Newspaper">Magazine/Newspaper</option>
+              <option value="Recommended by a friend">Recommended by a friend</option>
               <option value="Event Follow Up">Event Follow Up</option>
-              <option value="Recommended by a friend">Referral</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry Source</label>
+            <select
+              value={filters.enquirySource}
+              onChange={(e) => setFilters({...filters, enquirySource: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="All">All Sources</option>
+              <option value="Events - Steinway Gallery St Leonards">Events - St Leonards</option>
+              <option value="Events - Steinway Gallery Melbourne">Events - Melbourne</option>
+              <option value="Phone Enquiry - Steinway National Information Line">Phone - National Line</option>
+              <option value="Phone Enquiry - Steinway Gallery St Leonards">Phone - St Leonards</option>
+              <option value="In-store enquiry - Steinway Gallery St Leonards">In-store - St Leonards</option>
+              <option value="Lunar New Year">Lunar New Year</option>
+              <option value="Piano Teacher Calls">Piano Teacher Calls</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 
@@ -598,7 +629,8 @@ export default function CustomerEmailsPage() {
                 status: 'All',
                 productInterest: 'All',
                 nationality: 'All',
-                source: 'All'
+                hearAboutUs: 'All',
+                enquirySource: 'All'
               })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
             >
@@ -643,7 +675,7 @@ export default function CustomerEmailsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Interest</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enquiry Source</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -677,7 +709,7 @@ export default function CustomerEmailsPage() {
                     {customer.productInterest && customer.productInterest.length > 2 && '...'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">{customer.customerRating || 'N/A'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{customer.source || 'N/A'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{customer.eventSource || 'N/A'}</td>
                 </tr>
               ))}
             </tbody>

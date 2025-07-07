@@ -56,6 +56,22 @@ export default function TemplateEditorPage() {
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 800 })
   const [showPreview, setShowPreview] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState<{elementId: string, property: string} | null>(null)
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showColorPicker && !target.closest('.color-picker-container')) {
+        setShowColorPicker(null)
+      }
+    }
+
+    if (showColorPicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showColorPicker])
 
   // Load existing template if editing
   useEffect(() => {
@@ -242,6 +258,138 @@ export default function TemplateEditorPage() {
       .replace(/\{\{lastName\}\}/g, 'Smith')
       .replace(/\{\{fullName\}\}/g, 'John Smith')
       .replace(/\{\{email\}\}/g, 'john.smith@example.com')
+  }
+
+  // Predefined color palettes
+  const colorPalettes = {
+    common: [
+      '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+      '#800000', '#008000', '#000080', '#808000', '#800080', '#008080', '#C0C0C0', '#808080'
+    ],
+    business: [
+      '#1e3a8a', '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe', '#eff6ff',
+      '#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#ecfdf5', '#f0fdf4'
+    ],
+    warm: [
+      '#7c2d12', '#dc2626', '#ea580c', '#f59e0b', '#eab308', '#facc15', '#fde047', '#fef3c7',
+      '#be123c', '#e11d48', '#f43f5e', '#fb7185', '#fda4af', '#fecaca', '#fee2e2', '#fef7f7'
+    ],
+    cool: [
+      '#1e293b', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#f1f5f9',
+      '#0f172a', '#1e293b', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0'
+    ]
+  }
+
+  const ColorPicker = ({ elementId, property, currentColor, onClose }: {
+    elementId: string
+    property: string
+    currentColor: string
+    onClose: () => void
+  }) => {
+    const [hexInput, setHexInput] = useState(currentColor || '#000000')
+    const [selectedPalette, setSelectedPalette] = useState<keyof typeof colorPalettes>('common')
+
+    const applyColor = (color: string) => {
+      const element = editorElements.find(el => el.id === elementId)
+      if (element) {
+        updateElement(elementId, {
+          style: { 
+            ...element.style,
+            [property]: color 
+          }
+        })
+        setHexInput(color)
+      }
+    }
+
+    const handleHexSubmit = () => {
+      let color = hexInput.trim()
+      if (!color.startsWith('#')) {
+        color = '#' + color
+      }
+      if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        applyColor(color)
+      }
+    }
+
+    return (
+      <div className="absolute z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80 color-picker-container">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="font-medium text-gray-900">Color Picker</h4>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Hex Input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Hex Color</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={hexInput}
+              onChange={(e) => setHexInput(e.target.value)}
+              placeholder="#000000"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <button
+              onClick={handleHexSubmit}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+
+        {/* Palette Selector */}
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Color Palettes</label>
+          <div className="flex gap-1 mb-3">
+            {Object.keys(colorPalettes).map((palette) => (
+              <button
+                key={palette}
+                onClick={() => setSelectedPalette(palette as keyof typeof colorPalettes)}
+                className={`px-3 py-1 text-sm rounded ${
+                  selectedPalette === palette
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {palette.charAt(0).toUpperCase() + palette.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Color Swatches */}
+        <div className="grid grid-cols-8 gap-1 mb-4">
+          {colorPalettes[selectedPalette].map((color) => (
+            <button
+              key={color}
+              onClick={() => applyColor(color)}
+              className="w-8 h-8 rounded border-2 border-gray-200 hover:border-gray-400 transition-colors"
+              style={{ backgroundColor: color }}
+              title={color}
+            />
+          ))}
+        </div>
+
+        {/* Current Color Display */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-700">Current:</span>
+          <div
+            className="w-8 h-8 rounded border border-gray-300"
+            style={{ backgroundColor: currentColor }}
+          />
+          <span className="text-sm text-gray-500">{currentColor}</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -744,48 +892,113 @@ export default function TemplateEditorPage() {
                           </select>
                         </div>
                         
-                        <div>
+                        <div className="relative color-picker-container">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
-                          <input
-                            type="color"
-                            value={element.style.color || '#000000'}
-                            onChange={(e) => updateElement(element.id, {
-                              style: { ...element.style, color: e.target.value }
-                            })}
-                            className="w-full h-8 border border-gray-300 rounded-md"
-                          />
+                          <button
+                            onClick={() => setShowColorPicker({elementId: element.id, property: 'color'})}
+                            className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-4 h-4 rounded border border-gray-300"
+                                style={{ backgroundColor: element.style.color || '#000000' }}
+                              />
+                              <span className="text-sm">{element.style.color || '#000000'}</span>
+                            </div>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          {showColorPicker?.elementId === element.id && showColorPicker?.property === 'color' && (
+                            <div className="absolute top-full left-0 mt-1 z-50">
+                              <ColorPicker
+                                elementId={element.id}
+                                property="color"
+                                currentColor={element.style.color || '#000000'}
+                                onClose={() => setShowColorPicker(null)}
+                              />
+                            </div>
+                          )}
                         </div>
-                        
+
                         {element.type === 'text' && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Text Align</label>
-                            <select
-                              value={element.style.textAlign || 'left'}
-                              onChange={(e) => updateElement(element.id, {
-                                style: { ...element.style, textAlign: e.target.value as any }
-                              })}
-                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                            >
-                              <option value="left">Left</option>
-                              <option value="center">Center</option>
-                              <option value="right">Right</option>
-                            </select>
-                          </div>
+                          <>
+                            <div className="relative color-picker-container">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+                              <button
+                                onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
+                                className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-4 h-4 rounded border border-gray-300"
+                                    style={{ backgroundColor: element.style.backgroundColor || '#f9fafb' }}
+                                  />
+                                  <span className="text-sm">{element.style.backgroundColor || '#f9fafb'}</span>
+                                </div>
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                              {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
+                                <div className="absolute top-full left-0 mt-1 z-50">
+                                  <ColorPicker
+                                    elementId={element.id}
+                                    property="backgroundColor"
+                                    currentColor={element.style.backgroundColor || '#f9fafb'}
+                                    onClose={() => setShowColorPicker(null)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Text Align</label>
+                              <select
+                                value={element.style.textAlign || 'left'}
+                                onChange={(e) => updateElement(element.id, {
+                                  style: { ...element.style, textAlign: e.target.value as any }
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                              >
+                                <option value="left">Left</option>
+                                <option value="center">Center</option>
+                                <option value="right">Right</option>
+                              </select>
+                            </div>
+                          </>
                         )}
                       </>
                     )}
                     
                     {(element.type === 'button' || element.type === 'divider') && (
-                      <div>
+                      <div className="relative color-picker-container">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                        <input
-                          type="color"
-                          value={element.style.backgroundColor || '#3b82f6'}
-                          onChange={(e) => updateElement(element.id, {
-                            style: { ...element.style, backgroundColor: e.target.value }
-                          })}
-                          className="w-full h-8 border border-gray-300 rounded-md"
-                        />
+                        <button
+                          onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
+                          className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-4 h-4 rounded border border-gray-300"
+                              style={{ backgroundColor: element.style.backgroundColor || '#3b82f6' }}
+                            />
+                            <span className="text-sm">{element.style.backgroundColor || '#3b82f6'}</span>
+                          </div>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
+                          <div className="absolute top-full left-0 mt-1 z-50">
+                            <ColorPicker
+                              elementId={element.id}
+                              property="backgroundColor"
+                              currentColor={element.style.backgroundColor || '#3b82f6'}
+                              onClose={() => setShowColorPicker(null)}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

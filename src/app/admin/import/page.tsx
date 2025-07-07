@@ -59,7 +59,15 @@ export default function ImportPage() {
   const [unmappedFields, setUnmappedFields] = useState<string[]>([])
   const [newCustomField, setNewCustomField] = useState({ name: '', label: '' })
   const [showCustomFieldModal, setShowCustomFieldModal] = useState(false)
-  const [selectedUnmappedField, setSelectedUnmappedField] = useState<string>('')
+  const [selectedUnmappedField, setSelectedUnmappedField] = useState('')
+
+  // Chunked upload states
+  const [isChunkedUpload, setIsChunkedUpload] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [currentChunk, setCurrentChunk] = useState(0)
+  const [totalChunks, setTotalChunks] = useState(0)
+  const [chunkResults, setChunkResults] = useState<any[]>([])
+  const [overallResults, setOverallResults] = useState<{ imported: number; skipped: number; errors: number; errorDetails: string[] }>({ imported: 0, skipped: 0, errors: 0, errorDetails: [] })
 
   // Load available classifications and custom fields on component mount
   useEffect(() => {
@@ -113,12 +121,22 @@ export default function ImportPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      // Check file size (Vercel limit is 4.5MB, but we'll be conservative at 3MB)
-      const maxSize = 3 * 1024 * 1024 // 3MB in bytes
-      if (selectedFile.size > maxSize) {
-        alert(`File too large! Maximum size is ${maxSize / (1024 * 1024)}MB. Your file is ${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB. Please split your data into smaller files.`)
+      // Check file size for chunked upload
+      const maxSingleUploadSize = 3 * 1024 * 1024 // 3MB
+      const maxChunkedUploadSize = 100 * 1024 * 1024 // 100MB limit for chunked uploads
+      
+      if (selectedFile.size > maxChunkedUploadSize) {
+        alert(`File too large! Maximum size for chunked upload is ${maxChunkedUploadSize / (1024 * 1024)}MB. Your file is ${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB. Please split your data into smaller files.`)
         e.target.value = '' // Clear the input
         return
+      }
+      
+      // Enable chunked upload for large files
+      if (selectedFile.size > maxSingleUploadSize) {
+        setIsChunkedUpload(true)
+        console.log(`Large file detected (${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB). Enabling chunked upload mode.`)
+      } else {
+        setIsChunkedUpload(false)
       }
       
       setFile(selectedFile)
@@ -292,7 +310,149 @@ export default function ImportPage() {
     }
   }
 
+  const handleChunkedImport = async () => {
+    if (!file || !importPreview) return
+
+    setImportStatus('processing')
+    setErrorLog([])
+    setChunkResults([])
+    setOverallResults({ imported: 0, skipped: 0, errors: 0, errorDetails: [] })
+
+    try {
+      // Read the file content
+      const text = await file.text()
+      const lines = text.split('\n')
+      const headers = lines[0]
+      const dataLines = lines.slice(1).filter(line => line.trim() !== '')
+      
+      // Calculate chunks (aim for ~500 rows per chunk to stay under size limits)
+      const rowsPerChunk = 500
+      const chunks = []
+      
+      for (let i = 0; i < dataLines.length; i += rowsPerChunk) {
+        const chunkLines = dataLines.slice(i, i + rowsPerChunk)
+        const chunkContent = headers + '\n' + chunkLines.join('\n')
+        chunks.push({
+          content: chunkContent,
+          startRow: i + 1,
+          endRow: Math.min(i + rowsPerChunk, dataLines.length),
+          rowCount: chunkLines.length
+        })
+      }
+
+      setTotalChunks(chunks.length)
+      console.log(`Splitting file into ${chunks.length} chunks of ~${rowsPerChunk} rows each`)
+
+      // Process each chunk
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        setCurrentChunk(chunkIndex + 1)
+        setUploadProgress(((chunkIndex) / chunks.length) * 100)
+
+        const chunk = chunks[chunkIndex]
+        console.log(`Processing chunk ${chunkIndex + 1}/${chunks.length} (rows ${chunk.startRow}-${chunk.endRow})`)
+
+        try {
+          // Create a blob for this chunk
+          const chunkBlob = new Blob([chunk.content], { type: 'text/csv' })
+          const chunkFile = new File([chunkBlob], `${file.name}_chunk_${chunkIndex + 1}.csv`, { type: 'text/csv' })
+
+          // Prepare mappings with custom field info
+          const enhancedMappings = fieldMappings.map(mapping => ({
+            ...mapping,
+            isCustomField: customFields.some(cf => cf.key === mapping.targetField)
+          }))
+
+          const formData = new FormData()
+          formData.append('file', chunkFile)
+          formData.append('mappings', JSON.stringify(enhancedMappings))
+          formData.append('customFields', JSON.stringify(customFields))
+          formData.append('isChunk', 'true')
+          formData.append('chunkInfo', JSON.stringify({
+            chunkIndex: chunkIndex + 1,
+            totalChunks: chunks.length,
+            startRow: chunk.startRow,
+            endRow: chunk.endRow
+          }))
+
+          const response = await fetch('/api/admin/import', {
+            method: 'POST',
+            body: formData
+          })
+
+          const responseText = await response.text()
+          let result
+
+          try {
+            result = JSON.parse(responseText)
+          } catch (parseError) {
+            console.error(`Chunk ${chunkIndex + 1} JSON Parse Error:`, parseError)
+            throw new Error(`Chunk ${chunkIndex + 1}: Server returned invalid JSON. Response: ${responseText.substring(0, 200)}...`)
+          }
+
+          if (response.ok) {
+            // Update overall results
+            setOverallResults(prev => ({
+              imported: prev.imported + (result.imported || 0),
+              skipped: prev.skipped + (result.skipped || 0),
+              errors: prev.errors + (result.errors || 0),
+              errorDetails: [...prev.errorDetails, ...(result.errorDetails || [])]
+            }))
+
+            // Store chunk result
+            setChunkResults(prev => [...prev, {
+              chunkIndex: chunkIndex + 1,
+              ...result,
+              startRow: chunk.startRow,
+              endRow: chunk.endRow
+            }])
+
+            console.log(`Chunk ${chunkIndex + 1} completed: ${result.imported} imported, ${result.errors} errors`)
+          } else {
+            throw new Error(`Chunk ${chunkIndex + 1}: ${result.error || 'Unknown error'}`)
+          }
+
+        } catch (chunkError) {
+          console.error(`Error processing chunk ${chunkIndex + 1}:`, chunkError)
+          setErrorLog(prev => [...prev, `Chunk ${chunkIndex + 1}: ${chunkError instanceof Error ? chunkError.message : 'Unknown error'}`])
+          
+          // Continue with next chunk even if this one fails
+          setOverallResults(prev => ({
+            ...prev,
+            errors: prev.errors + chunk.rowCount,
+            errorDetails: [...prev.errorDetails, `Chunk ${chunkIndex + 1} failed: ${chunkError instanceof Error ? chunkError.message : 'Unknown error'}`]
+          }))
+        }
+
+        // Small delay between chunks to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      setUploadProgress(100)
+      setImportStatus('complete')
+      console.log('Chunked import completed!')
+
+    } catch (error) {
+      console.error('Chunked import error:', error)
+      setImportStatus('error')
+      setErrorLog([`Chunked import failed: ${error instanceof Error ? error.message : 'Unknown error'}`])
+    }
+  }
+
+  const openCustomFieldModal = (sourceField?: string) => {
+    setSelectedUnmappedField(sourceField || '')
+    setNewCustomField({ 
+      name: sourceField || '', 
+      label: sourceField ? sourceField.charAt(0).toUpperCase() + sourceField.slice(1) : '' 
+    })
+    setShowCustomFieldModal(true)
+  }
+
   const handleImport = async () => {
+    if (isChunkedUpload) {
+      return handleChunkedImport()
+    }
+
+    // Original single-file import logic
     if (!file || !importPreview) return
 
     setImportStatus('processing')
@@ -356,15 +516,6 @@ export default function ImportPage() {
       setImportStatus('error')
       setErrorLog([`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`])
     }
-  }
-
-  const openCustomFieldModal = (sourceField?: string) => {
-    setSelectedUnmappedField(sourceField || '')
-    setNewCustomField({ 
-      name: sourceField || '', 
-      label: sourceField ? sourceField.charAt(0).toUpperCase() + sourceField.slice(1) : '' 
-    })
-    setShowCustomFieldModal(true)
   }
 
   return (
@@ -667,16 +818,46 @@ export default function ImportPage() {
               </div>
             )}
 
-            {/* Import Action */}
+            {/* Import Data Section */}
             {fieldMappings.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">4. Import Data</h2>
+                
+                {/* Chunked Upload Info */}
+                {isChunkedUpload && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <svg className="h-5 w-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm font-medium text-blue-900">Large File Detected - Chunked Upload Mode</span>
+                    </div>
+                    <p className="text-sm text-blue-700">
+                      Your file is {file ? (file.size / (1024 * 1024)).toFixed(2) : '0'}MB and will be processed in smaller chunks to ensure reliable upload.
+                    </p>
+                    {importStatus === 'processing' && totalChunks > 0 && (
+                      <div className="mt-3">
+                        <div className="flex justify-between text-sm text-blue-700 mb-1">
+                          <span>Processing chunk {currentChunk} of {totalChunks}</span>
+                          <span>{uploadProgress.toFixed(0)}%</span>
+                        </div>
+                        <div className="w-full bg-blue-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                  <div className="flex">
+                  <div className="flex items-start">
                     <svg className="h-5 w-5 text-yellow-400 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-sm font-medium text-yellow-800">Before You Import</h3>
                       <div className="mt-2 text-sm text-yellow-700">
                         <ul className="list-disc list-inside space-y-1">
@@ -696,49 +877,136 @@ export default function ImportPage() {
                   disabled={importStatus === 'processing'}
                   className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {importStatus === 'processing' && (
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                  {importStatus === 'processing' ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {isChunkedUpload ? `Processing chunk ${currentChunk}/${totalChunks}...` : 'Processing...'}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Start Import
+                    </>
                   )}
-                  <span>
-                    {importStatus === 'processing' ? 'Importing...' : 'Start Import'}
-                  </span>
                 </button>
               </div>
             )}
 
             {/* Import Results */}
-            {importStatus === 'complete' && importResults && (
-              <div className="mb-8">
+            {importStatus === 'complete' && (
+              <div className="mt-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Complete!</h2>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <svg className="h-8 w-8 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <div>
-                      <h3 className="text-lg font-medium text-green-800">Successfully Imported</h3>
-                      <div className="mt-2 text-sm text-green-700">
-                        <p><strong>Records Imported:</strong> {importResults.imported}</p>
-                        <p><strong>Records Skipped:</strong> {importResults.skipped}</p>
-                        <p><strong>Records with Errors:</strong> {importResults.errors}</p>
+                
+                {isChunkedUpload ? (
+                  // Chunked upload results
+                  <div className="space-y-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center mb-2">
+                        <svg className="h-5 w-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-green-900">Chunked Import Completed Successfully</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-green-700">Records Imported:</span>
+                          <span className="ml-1 text-green-900">{overallResults.imported}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Records Skipped:</span>
+                          <span className="ml-1 text-green-900">{overallResults.skipped}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Records with Errors:</span>
+                          <span className="ml-1 text-green-900">{overallResults.errors}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Total Chunks:</span>
+                          <span className="ml-1 text-green-900">{totalChunks}</span>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Chunk Details */}
+                    {chunkResults.length > 0 && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-gray-900 mb-3">Chunk Processing Details</h3>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {chunkResults.map((chunk, index) => (
+                            <div key={index} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded text-sm">
+                              <span className="font-medium">Chunk {chunk.chunkIndex} (rows {chunk.startRow}-{chunk.endRow})</span>
+                              <div className="flex space-x-4 text-xs">
+                                <span className="text-green-600">✓ {chunk.imported || 0} imported</span>
+                                {chunk.skipped > 0 && <span className="text-yellow-600">⚠ {chunk.skipped} skipped</span>}
+                                {chunk.errors > 0 && <span className="text-red-600">✗ {chunk.errors} errors</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Single upload results
+                  importResults && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center mb-2">
+                        <svg className="h-5 w-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-green-900">Successfully Imported</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-green-700">Records Imported:</span>
+                          <span className="ml-1 text-green-900">{importResults.imported}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Records Skipped:</span>
+                          <span className="ml-1 text-green-900">{importResults.skipped}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Records with Errors:</span>
+                          <span className="ml-1 text-green-900">{importResults.errors}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* Import Errors */}
+            {importStatus === 'error' && errorLog.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Errors</h2>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="space-y-2">
+                    {errorLog.map((error, index) => (
+                      <div key={index} className="text-sm text-red-700">
+                        {error}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Error Log */}
-            {importStatus === 'error' && errorLog.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Errors</h2>
+            {/* Error Details for Chunked Upload */}
+            {isChunkedUpload && overallResults.errorDetails.length > 0 && (
+              <div className="mt-4">
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="text-red-700">
-                    {errorLog.map((error, index) => (
-                      <p key={index} className="mb-2">{error}</p>
+                  <h3 className="text-sm font-medium text-red-900 mb-2">Error Details</h3>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {overallResults.errorDetails.map((error, index) => (
+                      <div key={index} className="text-sm text-red-700">
+                        {error}
+                      </div>
                     ))}
                   </div>
                 </div>

@@ -20,6 +20,13 @@ export default function AdminDashboard() {
       color: 'bg-blue-500'
     },
     {
+      title: 'Customer Email Marketing',
+      description: 'Create campaigns, manage templates, and track email performance',
+      href: '/admin/customer-emails',
+      icon: '📧',
+      color: 'bg-cyan-500'
+    },
+    {
       title: 'Data Import',
       description: 'Import customer data from CSV/Excel files',
       href: '/admin/import',
@@ -188,6 +195,13 @@ export default function AdminDashboard() {
             >
               <span className="mr-2">👥</span>
               Manage Staff
+            </Link>
+            <Link
+              href="/admin/customer-emails"
+              className="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
+            >
+              <span className="mr-2">📧</span>
+              Email Marketing
             </Link>
             <Link
               href="/submitted-forms/enquiry-data"

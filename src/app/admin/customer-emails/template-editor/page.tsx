@@ -23,6 +23,9 @@ interface EditorElement {
     height: number
     fontSize?: number
     fontWeight?: string
+    fontFamily?: string
+    fontStyle?: 'normal' | 'italic'
+    textDecoration?: 'none' | 'underline' | 'line-through'
     color?: string
     backgroundColor?: string
     padding?: number
@@ -86,6 +89,9 @@ export default function TemplateEditorPage() {
         height: type === 'text' ? 120 : type === 'divider' ? 2 : type === 'button' ? 40 : 200,
         fontSize: type === 'text' ? 16 : undefined,
         fontWeight: type === 'text' ? 'normal' : undefined,
+        fontFamily: type === 'text' ? 'Arial, sans-serif' : undefined,
+        fontStyle: type === 'text' ? 'normal' : undefined,
+        textDecoration: type === 'text' ? 'none' : undefined,
         color: type === 'text' ? '#000000' : type === 'button' ? '#ffffff' : undefined,
         backgroundColor: type === 'button' ? '#3b82f6' : type === 'divider' ? '#e5e7eb' : type === 'text' ? '#f9fafb' : undefined,
         padding: type === 'text' || type === 'button' ? 10 : undefined,
@@ -149,6 +155,9 @@ export default function TemplateEditorPage() {
         height: ${style.height}px;
         ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
         ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+        ${style.fontFamily ? `font-family: ${style.fontFamily};` : ''}
+        ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
+        ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
         ${style.color ? `color: ${style.color};` : ''}
         ${style.backgroundColor ? `background-color: ${style.backgroundColor};` : ''}
         ${style.padding ? `padding: ${style.padding}px;` : ''}
@@ -466,6 +475,9 @@ export default function TemplateEditorPage() {
                       style={{
                         fontSize: element.style.fontSize,
                         fontWeight: element.style.fontWeight,
+                        fontFamily: element.style.fontFamily,
+                        fontStyle: element.style.fontStyle,
+                        textDecoration: element.style.textDecoration,
                         color: element.style.color,
                         backgroundColor: element.style.backgroundColor,
                         padding: element.style.padding,
@@ -653,6 +665,28 @@ export default function TemplateEditorPage() {
                     {(element.type === 'text' || element.type === 'button') && (
                       <>
                         <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
+                          <select
+                            value={element.style.fontFamily || 'Arial, sans-serif'}
+                            onChange={(e) => updateElement(element.id, {
+                              style: { ...element.style, fontFamily: e.target.value }
+                            })}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                          >
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="Helvetica, sans-serif">Helvetica</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                            <option value="Verdana, sans-serif">Verdana</option>
+                            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                            <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                            <option value="Impact, sans-serif">Impact</option>
+                            <option value="'Lucida Sans', sans-serif">Lucida Sans</option>
+                          </select>
+                        </div>
+
+                        <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Font Size</label>
                           <input
                             type="number"
@@ -662,6 +696,52 @@ export default function TemplateEditorPage() {
                             })}
                             className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                           />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Font Weight</label>
+                            <select
+                              value={element.style.fontWeight || 'normal'}
+                              onChange={(e) => updateElement(element.id, {
+                                style: { ...element.style, fontWeight: e.target.value }
+                              })}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="bold">Bold</option>
+                              <option value="lighter">Lighter</option>
+                              <option value="bolder">Bolder</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Font Style</label>
+                            <select
+                              value={element.style.fontStyle || 'normal'}
+                              onChange={(e) => updateElement(element.id, {
+                                style: { ...element.style, fontStyle: e.target.value as 'normal' | 'italic' }
+                              })}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="italic">Italic</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Text Decoration</label>
+                          <select
+                            value={element.style.textDecoration || 'none'}
+                            onChange={(e) => updateElement(element.id, {
+                              style: { ...element.style, textDecoration: e.target.value as 'none' | 'underline' | 'line-through' }
+                            })}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                          >
+                            <option value="none">None</option>
+                            <option value="underline">Underline</option>
+                            <option value="line-through">Strike-through</option>
+                          </select>
                         </div>
                         
                         <div>

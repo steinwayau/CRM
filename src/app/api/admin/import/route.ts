@@ -169,15 +169,17 @@ export async function POST(request: NextRequest) {
             originalId: mappedData.originalId || row.id || row.ID || `import_${Date.now()}_${i}`,
           }
 
-          // Add mapped fields only if they exist
+          // Add required fields (must be present)
+          prismaData.firstName = mappedData.firstName
+          prismaData.lastName = mappedData.lastName
+          prismaData.email = mappedData.email
+          prismaData.state = mappedData.state
+          
+          // Add optional fields only if they exist
           if (mappedData.status) prismaData.status = mappedData.status
           if (mappedData.institutionName) prismaData.institutionName = mappedData.institutionName
-          if (mappedData.firstName) prismaData.firstName = mappedData.firstName
-          if (mappedData.lastName) prismaData.lastName = mappedData.lastName
-          if (mappedData.email) prismaData.email = mappedData.email
           if (mappedData.phone) prismaData.phone = mappedData.phone
           if (mappedData.nationality) prismaData.nationality = mappedData.nationality
-          if (mappedData.state) prismaData.state = mappedData.state
           if (mappedData.suburb) prismaData.suburb = mappedData.suburb
           if (mappedData.productInterest) prismaData.productInterest = mappedData.productInterest
           if (mappedData.source) prismaData.source = mappedData.source
@@ -301,7 +303,7 @@ function parseCSVLine(line: string): string[] {
 }
 
 function processFieldValue(fieldName: string, value: any): any {
-  if (!value || value === '') return null
+  if (!value || value === '' || String(value).trim() === '' || String(value).toUpperCase() === 'NULL') return null
 
   const stringValue = String(value).trim()
 

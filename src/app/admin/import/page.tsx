@@ -27,12 +27,24 @@ const FORM_FIELDS = [
   { key: 'productInterest', label: 'Product Interest', required: false, note: 'Comma-separated list or JSON array' },
   { key: 'source', label: 'Source (Where did you hear about us)', required: false },
   { key: 'eventSource', label: 'Event Source (Where did enquiry come from)', required: false },
-  { key: 'classification', label: 'Classification', required: false, note: 'Customer classification/rating' },
   { key: 'comments', label: 'Comments', required: false },
   { key: 'submittedBy', label: 'Submitted By (Staff)', required: false },
   { key: 'customerRating', label: 'Customer Rating', required: false },
   { key: 'doNotEmail', label: 'Do Not Email', required: false, note: 'true/false or 1/0' },
-  { key: 'createdAt', label: 'Original Date Created', required: false, note: 'Date format: YYYY-MM-DD or DD/MM/YYYY' }
+  { key: 'createdAt', label: 'Original Date Created', required: false, note: 'Date format: YYYY-MM-DD or DD/MM/YYYY' },
+  
+  // Additional fields from old database
+  { key: 'others', label: 'Others', required: false, note: 'Additional interests/comments' },
+  { key: 'followUpNotes', label: 'Follow Up Notes', required: false },
+  { key: 'inputDate', label: 'Input Date', required: false },
+  { key: 'lastUpdate', label: 'Last Update', required: false },
+  { key: 'fupDate', label: 'Follow Up Date', required: false },
+  { key: 'fupStatus', label: 'Follow Up Status', required: false },
+  { key: 'originalFupDate', label: 'Original Follow Up Date', required: false },
+  { key: 'stepProgram', label: 'Step Program', required: false },
+  { key: 'involving', label: 'Sales Manager Involved', required: false },
+  { key: 'notInvolvingReason', label: 'Not Involving Reason', required: false },
+  { key: 'enquiryUpdatedBy', label: 'Enquiry Updated By', required: false }
 ]
 
 const PRODUCT_OPTIONS = ['steinway', 'boston', 'essex', 'kawai', 'yamaha', 'usedpiano', 'roland', 'ritmuller', 'ronisch', 'kurzweil', 'other']
@@ -43,6 +55,44 @@ const DEFAULT_CLASSIFICATIONS = [
   "Very interested but not ready to buy", "Looking for information", 
   "Just browsing for now", "Cold", "Events"
 ]
+
+// Proper CSV line parser that respects quoting rules
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  let i = 0
+  
+  while (i < line.length) {
+    const char = line[i]
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // Escaped quote within quoted field
+        current += '"'
+        i += 2
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes
+        i++
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator (only when not in quotes)
+      result.push(current.trim())
+      current = ''
+      i++
+    } else {
+      // Regular character
+      current += char
+      i++
+    }
+  }
+  
+  // Add the last field
+  result.push(current.trim())
+  
+  return result
+}
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null)
@@ -152,8 +202,8 @@ export default function ImportPage() {
 
       if (file.name.endsWith('.csv')) {
         const lines = text.split('\n')
-        headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-        rows = lines.slice(1, 6).map(line => line.split(',').map(cell => cell.trim().replace(/"/g, '')))
+        headers = parseCSVLine(lines[0])
+        rows = lines.slice(1, 6).map(line => parseCSVLine(line))
       } else if (file.name.endsWith('.json')) {
         const data = JSON.parse(text)
         const array = Array.isArray(data) ? data : [data]
@@ -173,13 +223,36 @@ export default function ImportPage() {
       const autoMappings = headers.map(sourceField => {
         const normalized = sourceField.toLowerCase().replace(/\s+/g, '').replace(/[_-]/g, '')
         
-        // Smart field mapping based on common variations
+        // Smart field mapping based on exact matches first, then common variations
         let targetField = ''
-        if (normalized.includes('first') && normalized.includes('name')) targetField = 'firstName'
+        
+        // EXACT MATCHES for your old database fields
+        if (normalized === 'firstname') targetField = 'firstName'
+        else if (normalized === 'surname') targetField = 'lastName'
+        else if (normalized === 'email') targetField = 'email'
+        else if (normalized === 'phone') targetField = 'phone'
+        else if (normalized === 'state') targetField = 'state'
+        else if (normalized === 'suburb') targetField = 'suburb'
+        else if (normalized === 'source') targetField = 'source'
+        else if (normalized === 'interest') targetField = 'productInterest'
+        else if (normalized === 'others') targetField = 'others' // Need to add this as a custom field
+        else if (normalized === 'comment') targetField = 'comments'
+        else if (normalized === 'fup') targetField = 'followUpNotes'
+        else if (normalized === 'calltakenby') targetField = 'submittedBy'
+        else if (normalized === 'enquirysource') targetField = 'eventSource'
+        else if (normalized === 'inputdate') targetField = 'createdAt'
+        else if (normalized === 'status') targetField = 'status'
+        else if (normalized === 'classification') targetField = 'customerRating'
+        else if (normalized === 'newsletter') targetField = 'doNotEmail'
+        else if (normalized === 'institutionname') targetField = 'institutionName'
+        else if (normalized === 'nationality') targetField = 'nationality'
+        
+        // PARTIAL MATCHES for variations
+        else if (normalized.includes('first') && normalized.includes('name')) targetField = 'firstName'
         else if (normalized.includes('last') && normalized.includes('name')) targetField = 'lastName'
-        else if (normalized.includes('surname') || normalized === 'lastname') targetField = 'lastName'
-        else if (normalized === 'email' || normalized.includes('email')) targetField = 'email'
-        else if (normalized === 'phone' || normalized.includes('phone') || normalized.includes('mobile')) targetField = 'phone'
+        else if (normalized === 'lastname') targetField = 'lastName'
+        else if (normalized.includes('email')) targetField = 'email'
+        else if (normalized.includes('phone') || normalized.includes('mobile')) targetField = 'phone'
         else if (normalized.includes('state')) targetField = 'state'
         else if (normalized.includes('suburb') || normalized.includes('city')) targetField = 'suburb'
         else if (normalized.includes('nationality') || normalized.includes('country')) targetField = 'nationality'
@@ -189,7 +262,7 @@ export default function ImportPage() {
         else if (normalized.includes('comment') || normalized.includes('note')) targetField = 'comments'
         else if (normalized.includes('status')) targetField = 'status'
         else if (normalized.includes('rating')) targetField = 'customerRating'
-        else if (normalized.includes('classification') || normalized.includes('class')) targetField = 'classification'
+        else if (normalized.includes('classification') || normalized.includes('class')) targetField = 'customerRating'
         else if (normalized.includes('date') || normalized.includes('created')) targetField = 'createdAt'
         else if (normalized.includes('staff') || normalized.includes('submitt')) targetField = 'submittedBy'
 
@@ -585,7 +658,7 @@ export default function ImportPage() {
                         <tr key={rowIndex} className="border-b">
                           {row.map((cell, cellIndex) => (
                             <td key={cellIndex} className="px-4 py-2 text-sm text-gray-900 border-r">
-                              {cell || '-'}
+                              {cell ? cell.replace(/<[^>]*>/g, '') : '-'}
                             </td>
                           ))}
                         </tr>

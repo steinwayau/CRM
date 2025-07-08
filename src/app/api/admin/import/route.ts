@@ -21,18 +21,30 @@ const VALID_STATES = [
   "Queensland", "South Australia", "Tasmania", "Victoria", "Western Australia"
 ]
 
+// State abbreviation mapping for legacy data
+const STATE_ABBREVIATIONS: { [key: string]: string } = {
+  'ACT': 'Australian Capital Territory',
+  'NSW': 'New South Wales', 
+  'NT': 'Northern Territory',
+  'QLD': 'Queensland',
+  'SA': 'South Australia',
+  'TAS': 'Tasmania',
+  'VIC': 'Victoria',
+  'WA': 'Western Australia'
+}
+
 // Valid customer ratings from your form
 const VALID_RATINGS = [
   "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
   "Very interested but not ready to buy", "Looking for information", 
-  "Just browsing for now", "Cold", "Events"
+  "Just browsing for now", "Cold", "Events", "Unknown"
 ]
 
 // Valid classifications (same as ratings for now, but separate for flexibility)
 const VALID_CLASSIFICATIONS = [
   "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
   "Very interested but not ready to buy", "Looking for information", 
-  "Just browsing for now", "Cold", "Events"
+  "Just browsing for now", "Cold", "Events", "Unknown"
 ]
 
 // Temporary in-memory storage (replace with database in production)
@@ -171,6 +183,7 @@ export async function POST(request: NextRequest) {
           if (mappedData.source) prismaData.source = mappedData.source
           if (mappedData.eventSource) prismaData.eventSource = mappedData.eventSource
           if (mappedData.comments) prismaData.comments = mappedData.comments
+          if (mappedData.others) prismaData.others = mappedData.others
           if (mappedData.submittedBy) prismaData.submittedBy = mappedData.submittedBy
           if (mappedData.customerRating) prismaData.customerRating = mappedData.customerRating
           if (mappedData.stepProgram) prismaData.stepProgram = mappedData.stepProgram
@@ -179,6 +192,13 @@ export async function POST(request: NextRequest) {
           if (mappedData.followUpNotes) prismaData.followUpNotes = mappedData.followUpNotes
           if (mappedData.bestTimeToFollowUp) prismaData.bestTimeToFollowUp = new Date(mappedData.bestTimeToFollowUp)
           if (mappedData.doNotEmail !== undefined) prismaData.doNotEmail = mappedData.doNotEmail
+          
+          // Additional old database fields
+          if (mappedData.inputDate) prismaData.inputDate = new Date(mappedData.inputDate)
+          if (mappedData.lastUpdate) prismaData.lastUpdate = new Date(mappedData.lastUpdate)
+          if (mappedData.fupStatus) prismaData.fupStatus = mappedData.fupStatus
+          if (mappedData.originalFupDate) prismaData.originalFupDate = new Date(mappedData.originalFupDate)
+          if (mappedData.enquiryUpdatedBy) prismaData.enquiryUpdatedBy = mappedData.enquiryUpdatedBy
 
           // Store custom fields as JSON in followUpInfo field
           if (Object.keys(customFieldData).length > 0) {
@@ -223,11 +243,13 @@ function parseCSV(text: string): any[] {
   const lines = text.split('\n').filter(line => line.trim() !== '')
   if (lines.length < 2) return []
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+  // Parse CSV header with proper quote handling
+  const headers = parseCSVLine(lines[0])
   const data = []
 
+  // Parse each data row with proper quote handling
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+    const values = parseCSVLine(lines[i])
     const row: any = {}
     
     headers.forEach((header, index) => {
@@ -238,6 +260,44 @@ function parseCSV(text: string): any[] {
   }
 
   return data
+}
+
+// Proper CSV line parser that respects quoting rules
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  let i = 0
+  
+  while (i < line.length) {
+    const char = line[i]
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // Escaped quote within quoted field
+        current += '"'
+        i += 2
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes
+        i++
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator (only when not in quotes)
+      result.push(current.trim())
+      current = ''
+      i++
+    } else {
+      // Regular character
+      current += char
+      i++
+    }
+  }
+  
+  // Add the last field
+  result.push(current.trim())
+  
+  return result
 }
 
 function processFieldValue(fieldName: string, value: any): any {
@@ -251,14 +311,16 @@ function processFieldValue(fieldName: string, value: any): any {
       if (stringValue.startsWith('[') && stringValue.endsWith(']')) {
         try {
           const parsed = JSON.parse(stringValue)
-          return Array.isArray(parsed) ? parsed.filter(p => VALID_PRODUCTS.includes(p)) : []
+          return Array.isArray(parsed) ? parsed.filter(p => VALID_PRODUCTS.includes(p.toLowerCase())) : []
         } catch {
           return []
         }
       } else {
-        // Comma-separated string
+        // Comma-separated string - handle legacy format
         const products = stringValue.split(',').map(p => p.trim().toLowerCase())
-        return products.filter(p => VALID_PRODUCTS.includes(p))
+        const validProducts = products.filter(p => VALID_PRODUCTS.includes(p))
+        // If no valid products found, return the original value as a fallback
+        return validProducts.length > 0 ? validProducts : [stringValue.toLowerCase()]
       }
 
     case 'doNotEmail':
@@ -268,8 +330,16 @@ function processFieldValue(fieldName: string, value: any): any {
 
     case 'createdAt':
     case 'bestTimeToFollowUp':
+    case 'inputDate':
+    case 'lastUpdate':
+    case 'originalFupDate':
       // Handle date formats
       if (!stringValue) return null
+      
+      // Skip invalid legacy dates
+      if (stringValue.includes('0000-00-00') || stringValue.includes('1000-01-01')) {
+        return null
+      }
       
       let date: Date | null = null
       
@@ -280,6 +350,10 @@ function processFieldValue(fieldName: string, value: any): any {
       }
       // Try YYYY-MM-DD format
       else if (stringValue.match(/^\d{4}-\d{1,2}-\d{1,2}/)) {
+        date = new Date(stringValue)
+      }
+      // Try YYYY-MM-DD HH:mm:ss format (common in database exports)
+      else if (stringValue.match(/^\d{4}-\d{1,2}-\d{1,2} \d{1,2}:\d{1,2}:\d{1,2}/)) {
         date = new Date(stringValue)
       }
       // Try to parse as general date
@@ -297,6 +371,12 @@ function processFieldValue(fieldName: string, value: any): any {
       return foundNationality || stringValue
 
     case 'state':
+      // Handle state abbreviations first
+      const upperValue = stringValue.toUpperCase()
+      if (STATE_ABBREVIATIONS[upperValue]) {
+        return STATE_ABBREVIATIONS[upperValue]
+      }
+      
       // Validate Australian state
       const foundState = VALID_STATES.find(s => 
         s.toLowerCase() === stringValue.toLowerCase() ||
@@ -319,11 +399,13 @@ function processFieldValue(fieldName: string, value: any): any {
       return foundClassification || stringValue || 'N/A'
 
     case 'status':
-      // Validate status
-      const validStatuses = ['New', 'Sold', 'Finalised']
+      // Validate status - handle legacy spellings
+      const validStatuses = ['New', 'Sold', 'Finalised', 'Finalized']
       const foundStatus = validStatuses.find(s => 
         s.toLowerCase() === stringValue.toLowerCase()
       )
+      // Normalize "Finalized" to "Finalised"
+      if (foundStatus === 'Finalized') return 'Finalised'
       return foundStatus || 'New'
 
     default:

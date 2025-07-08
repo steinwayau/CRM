@@ -242,42 +242,20 @@ export async function POST(request: NextRequest) {
 }
 
 function parseCSV(text: string): any[] {
-  const lines = text.split('\n').filter(line => line.trim() !== '')
-  if (lines.length < 2) return []
-
-  // Parse CSV header with proper quote handling
-  const headers = parseCSVLine(lines[0])
-  const data = []
-
-  // Parse each data row with proper quote handling
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i])
-    const row: any = {}
-    
-    headers.forEach((header, index) => {
-      row[header] = values[index] || ''
-    })
-    
-    data.push(row)
-  }
-
-  return data
-}
-
-// Proper CSV line parser that respects quoting rules
-function parseCSVLine(line: string): string[] {
-  const result: string[] = []
-  let current = ''
+  // Parse the entire CSV text character by character to handle multi-line quoted fields
+  const rows: string[][] = []
+  let currentRow: string[] = []
+  let currentField = ''
   let inQuotes = false
   let i = 0
   
-  while (i < line.length) {
-    const char = line[i]
+  while (i < text.length) {
+    const char = text[i]
     
     if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
+      if (inQuotes && i + 1 < text.length && text[i + 1] === '"') {
         // Escaped quote within quoted field
-        current += '"'
+        currentField += '"'
         i += 2
       } else {
         // Toggle quote state
@@ -286,20 +264,56 @@ function parseCSVLine(line: string): string[] {
       }
     } else if (char === ',' && !inQuotes) {
       // Field separator (only when not in quotes)
-      result.push(current.trim())
-      current = ''
+      currentRow.push(currentField.trim())
+      currentField = ''
       i++
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      // End of row (only when not in quotes)
+      currentRow.push(currentField.trim())
+      if (currentRow.some(field => field !== '')) { // Only add non-empty rows
+        rows.push(currentRow)
+      }
+      currentRow = []
+      currentField = ''
+      // Handle \r\n
+      if (char === '\r' && i + 1 < text.length && text[i + 1] === '\n') {
+        i += 2
+      } else {
+        i++
+      }
     } else {
-      // Regular character
-      current += char
+      // Regular character (including newlines within quotes)
+      currentField += char
       i++
     }
   }
   
-  // Add the last field
-  result.push(current.trim())
+  // Add the last field and row if not empty
+  if (currentField !== '' || currentRow.length > 0) {
+    currentRow.push(currentField.trim())
+    if (currentRow.some(field => field !== '')) {
+      rows.push(currentRow)
+    }
+  }
   
-  return result
+  if (rows.length < 2) return []
+  
+  const headers = rows[0]
+  const data = []
+  
+  // Convert remaining rows to objects
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i]
+    const row: any = {}
+    
+    headers.forEach((header, index) => {
+      row[header] = values[index] || ''
+    })
+    
+    data.push(row)
+  }
+  
+  return data
 }
 
 function processFieldValue(fieldName: string, value: any): any {

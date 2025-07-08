@@ -15,56 +15,56 @@ model Enquiry {
   id          Int      @id @default(autoincrement())
   
   // Basic Information (exactly matching your form)
-  status      String   @default("New") // New, Sold, Finalised
-  institutionName String?
-  firstName   String
-  lastName    String
+  status      String   @default("New") @map("status") // New, Sold, Finalised
+  institutionName String? @map("institutionname")
+  firstName   String   @map("firstname")
+  lastName    String   @map("surname")
   
   // Contact Information
-  email       String
-  phone       String?
-  nationality String?  // English, Chinese, Korean, Japanese, Indian, Other
+  email       String   @map("email")
+  phone       String?  @map("phone")
+  nationality String?  @map("nationality") // English, Chinese, Korean, Japanese, Indian, Other
   
   // Location Information
-  state       String   // Australian states and territories
-  suburb      String?
+  state       String   @map("state") // Australian states and territories
+  suburb      String?  @map("suburb")
   
-  // Product Interest (stored as JSON array of IDs)
-  productInterest Json?   // ["steinway", "boston", "essex", "kawai", "yamaha", "usedpiano", "roland", "ritmuller", "ronisch", "kurzweil", "other"]
+  // Product Interest (stored as string to match old database)
+  productInterest String? @map("interest") // Store as comma-separated string to match old DB
   
   // Source Information
-  source         String?  // Teacher, Google, Facebook, Instagram, LinkedIn, WeChat, YouTube, Steinway Website, Radio, Magazine/Newspaper, Recommended by a friend, Event Follow Up, Other
-  eventSource    String?  // Events - Steinway Gallery St Leonards, Events - Steinway Gallery Melbourne, Phone Enquiry, In-store enquiry, etc.
+  source         String?  @map("source") // Teacher, Google, Facebook, Instagram, LinkedIn, WeChat, YouTube, Steinway Website, Radio, Magazine/Newspaper, Recommended by a friend, Event Follow Up, Other
+  eventSource    String?  @map("enquirysource") // Events - Steinway Gallery St Leonards, Events - Steinway Gallery Melbourne, Phone Enquiry, In-store enquiry, etc.
   
   // Comments and Additional Information
-  comments       String?  // Other Comments from form
+  comments       String?  @map("comment") // Other Comments from form
+  others         String?  @map("others") // Additional field from old database
   
   // Staff and Rating Information (from form)
-  submittedBy    String?  // Enquiry Submitted By
-  customerRating String?  @default("N/A") // N/A, Ready to buy, High Priority, After Sale Follow Up, Very interested but not ready to buy, Looking for information, Just browsing for now, Cold, Events
+  submittedBy    String?  @map("calltakenby") // Enquiry Submitted By
+  customerRating String?  @default("N/A") @map("classification") // N/A, Ready to buy, High Priority, After Sale Follow Up, Very interested but not ready to buy, Looking for information, Just browsing for now, Cold, Events
   
   // Email Preferences
-  doNotEmail     Boolean  @default(false) // Do Not Email This Customer checkbox
+  doNotEmail     Boolean  @default(false) @map("newsletter") // Do Not Email This Customer checkbox (inverted logic)
   
   // Follow-up System (additional fields used in follow-up form)
-  followUpInfo   String?
-  bestTimeToFollowUp DateTime?
-  stepProgram    String?  @default("N/A") // N/A, Interested, Not interested
-  enquiryUpdatedBy String? // Staff member who updated in follow-up
-  salesManagerInvolved String? @default("No") // Yes/No
-  salesManagerExplanation String?
-  followUpNotes  String?
+  followUpInfo   String?  @map("followupinfo")
+  bestTimeToFollowUp DateTime? @map("fupdate")
+  stepProgram    String?  @default("N/A") @map("stepprogram") // N/A, Interested, Not interested
+  enquiryUpdatedBy String? @map("enqupdatedby") // Staff member who updated in follow-up
+  salesManagerInvolved String? @default("No") @map("involving") // Yes/No
+  salesManagerExplanation String? @map("notinvolvingreason")
+  followUpNotes  String?  @map("fup")
   
-  // Backward compatibility fields
-  surname        String?  // For data migration
-  callTakenBy    String?  // Legacy field
-  enquirySource  String?  // Legacy field
-  newsletter     String?  // Legacy field
-  inputDate      DateTime? // Legacy field
+  // Additional fields from old database
+  inputDate      DateTime? @map("inputdate") // Legacy field
+  lastUpdate     DateTime? @map("lastupdate")
+  fupStatus      String?   @map("fupstatus")
+  originalFupDate DateTime? @map("originalfupdate")
   
   // System Fields
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
   importSource   String?  // Track if imported from old system
   originalId     String?  // Original ID from old system
   

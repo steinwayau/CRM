@@ -1,48 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await sql`
-      SELECT id, status, institution_name, first_name, surname, email, phone, 
-             nationality, state, suburb, products, source, enquiry_source, 
-             comment, call_taken_by, follow_up_date, classification, step_program,
-             involving, not_involving_reason, follow_up_info, newsletter,
-             created_at, updated_at
-      FROM enquiries 
-      ORDER BY created_at DESC
-    `
+    const enquiries = await prisma.enquiry.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
     
-    // Convert database rows to expected format
-    const enquiries = result.rows.map((row: any) => ({
-      id: row.id,
-      status: row.status,
-      firstName: row.first_name,
-      lastName: row.surname,
-      email: row.email,
-      phone: row.phone,
-      nationality: row.nationality,
-      state: row.state,
-      suburb: row.suburb,
-      institutionName: row.institution_name,
-      productInterest: row.products || [],
-      source: row.source,
-      eventSource: row.enquiry_source,
-      comments: row.comment,
-      submittedBy: row.call_taken_by,
-      bestTimeToFollowUp: row.follow_up_date,
-      customerRating: row.classification,
-      stepProgram: row.step_program,
-      salesManagerInvolved: row.involving,
-      salesManagerExplanation: row.not_involving_reason,
-      followUpNotes: row.follow_up_info,
-      doNotEmail: row.newsletter === 'No',
-      hasFollowUp: !!(row.follow_up_date || row.follow_up_info),
-      createdAt: row.created_at,
-      created_at: row.created_at
+    // Convert to expected format for the frontend
+    const formattedEnquiries = enquiries.map((enquiry) => ({
+      id: enquiry.id,
+      status: enquiry.status,
+      firstName: enquiry.firstName,
+      lastName: enquiry.lastName,
+      email: enquiry.email,
+      phone: enquiry.phone,
+      nationality: enquiry.nationality,
+      state: enquiry.state,
+      suburb: enquiry.suburb,
+      institutionName: enquiry.institutionName,
+      productInterest: enquiry.productInterest || '',
+      source: enquiry.source,
+      eventSource: enquiry.eventSource,
+      comments: enquiry.comments,
+      submittedBy: enquiry.submittedBy,
+      bestTimeToFollowUp: enquiry.bestTimeToFollowUp,
+      customerRating: enquiry.customerRating,
+      stepProgram: enquiry.stepProgram,
+      salesManagerInvolved: enquiry.salesManagerInvolved,
+      salesManagerExplanation: enquiry.salesManagerExplanation,
+      followUpNotes: enquiry.followUpNotes,
+      followUpInfo: enquiry.followUpInfo,
+      doNotEmail: enquiry.doNotEmail,
+      hasFollowUp: !!(enquiry.bestTimeToFollowUp || enquiry.followUpInfo),
+      createdAt: enquiry.createdAt,
+      created_at: enquiry.createdAt,
+      inputDate: enquiry.inputDate
     }))
     
-    return NextResponse.json(enquiries)
+    return NextResponse.json(formattedEnquiries)
   } catch (error) {
     console.error('Error fetching enquiries:', error)
     return NextResponse.json(
@@ -71,62 +71,57 @@ export async function POST(request: NextRequest) {
       ? `Other: ${data.eventSourceOther}` 
       : data.eventSource
 
-    // Insert new enquiry into database using correct database column names
-    const result = await sql`
-      INSERT INTO enquiries (
-        status, institution_name, first_name, surname, email, phone, 
-        nationality, state, suburb, products, source, enquiry_source, 
-        comment, call_taken_by, input_date, created_at, updated_at, 
-        classification, step_program, involving, newsletter
-      ) VALUES (
-        ${data.status || 'New'},
-        ${data.institutionName || null},
-        ${data.firstName},
-        ${data.lastName || data.surname || ''},
-        ${data.email},
-        ${data.phone || null},
-        ${data.nationality || 'English'},
-        ${data.state},
-        ${data.suburb || null},
-        ${Array.isArray(data.productInterest) ? data.productInterest : (data.productInterest ? [data.productInterest] : null)},
-        ${data.source || null},
-        ${finalEventSource || null},
-        ${data.comments || null},
-        ${data.submittedBy || 'Online Form'},
-        NOW(),
-        NOW(),
-        NOW(),
-        ${data.customerRating || 'N/A'},
-        ${data.stepProgram || 'N/A'},
-        ${data.salesManagerInvolved || 'No'},
-        ${data.doNotEmail ? 'No' : 'Yes'}
-      )
-      RETURNING id, status, institution_name, first_name, surname, email, phone, 
-                nationality, state, suburb, products, source, enquiry_source, 
-                comment, call_taken_by, created_at, updated_at
-    `
-    
-    const newEnquiry = result.rows[0]
+    // Convert product interest array to string for the interest field
+    const productInterestString = Array.isArray(data.productInterest) 
+      ? data.productInterest.join(', ') 
+      : (data.productInterest || '')
+
+    // Create new enquiry using Prisma
+    const newEnquiry = await prisma.enquiry.create({
+      data: {
+        status: data.status || 'New',
+        institutionName: data.institutionName || null,
+        firstName: data.firstName,
+        lastName: data.lastName || data.surname || '',
+        email: data.email,
+        phone: data.phone || null,
+        nationality: data.nationality || 'English',
+        state: data.state,
+        suburb: data.suburb || null,
+        productInterest: productInterestString,
+        source: data.source || null,
+        eventSource: finalEventSource || null,
+        comments: data.comments || null,
+        submittedBy: data.submittedBy || 'Online Form',
+        customerRating: data.customerRating || 'N/A',
+        stepProgram: data.stepProgram || 'N/A',
+        salesManagerInvolved: data.salesManagerInvolved || 'No',
+        doNotEmail: data.doNotEmail || false,
+        inputDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    })
     
     // Convert to expected format
     const formattedEnquiry = {
       id: newEnquiry.id,
       status: newEnquiry.status,
-      firstName: newEnquiry.first_name,
-      lastName: newEnquiry.surname,
+      firstName: newEnquiry.firstName,
+      lastName: newEnquiry.lastName,
       email: newEnquiry.email,
       phone: newEnquiry.phone,
       nationality: newEnquiry.nationality,
       state: newEnquiry.state,
       suburb: newEnquiry.suburb,
-      institutionName: newEnquiry.institution_name,
-      productInterest: newEnquiry.products || [],
+      institutionName: newEnquiry.institutionName,
+      productInterest: newEnquiry.productInterest || '',
       source: newEnquiry.source,
-      eventSource: newEnquiry.enquiry_source,
-      comments: newEnquiry.comment,
-      submittedBy: newEnquiry.call_taken_by,
-      createdAt: newEnquiry.created_at,
-      created_at: newEnquiry.created_at
+      eventSource: newEnquiry.eventSource,
+      comments: newEnquiry.comments,
+      submittedBy: newEnquiry.submittedBy,
+      createdAt: newEnquiry.createdAt,
+      created_at: newEnquiry.createdAt
     }
     
     console.log('Successfully created enquiry:', formattedEnquiry)
@@ -137,5 +132,7 @@ export async function POST(request: NextRequest) {
       { error: `Failed to create enquiry: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 } 

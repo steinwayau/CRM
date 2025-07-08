@@ -10,46 +10,46 @@ export async function GET(request: NextRequest) {
     await sql`DROP TABLE IF EXISTS system_settings CASCADE`
     await sql`DROP TABLE IF EXISTS import_logs CASCADE`
 
-    // Create enquiries table with camelCase column names matching Prisma schema
+    // Create enquiries table with lowercase column names matching Prisma @map directives
     await sql`
       CREATE TABLE enquiries (
         id SERIAL PRIMARY KEY,
         status VARCHAR(50) DEFAULT 'New',
-        "institutionName" VARCHAR(255),
-        "firstName" VARCHAR(100) NOT NULL,
-        "lastName" VARCHAR(100),
+        institutionname VARCHAR(255),
+        firstname VARCHAR(100) NOT NULL,
+        surname VARCHAR(100),
         email VARCHAR(255) NOT NULL,
         phone VARCHAR(50),
         nationality VARCHAR(100) DEFAULT 'English',
         state VARCHAR(100) NOT NULL,
         suburb VARCHAR(100),
-        "productInterest" JSONB DEFAULT '[]',
+        interest TEXT,
         source VARCHAR(255),
-        "eventSource" VARCHAR(255),
-        comments TEXT,
-        "submittedBy" VARCHAR(100) DEFAULT 'Online Form',
-        "customerRating" VARCHAR(100) DEFAULT 'N/A',
-        "doNotEmail" BOOLEAN DEFAULT false,
-        "followUpInfo" TEXT,
-        "bestTimeToFollowUp" TIMESTAMP,
-        "stepProgram" VARCHAR(100) DEFAULT 'N/A',
-        "enquiryUpdatedBy" VARCHAR(100),
-        "salesManagerInvolved" VARCHAR(50) DEFAULT 'No',
-        "salesManagerExplanation" TEXT,
-        "followUpNotes" TEXT,
-        surname VARCHAR(100),
-        "callTakenBy" VARCHAR(100),
-        "enquirySource" VARCHAR(255),
-        newsletter VARCHAR(10),
-        "inputDate" TIMESTAMP,
+        enquirysource VARCHAR(255),
+        comment TEXT,
+        others TEXT,
+        calltakenby VARCHAR(100) DEFAULT 'Online Form',
+        classification VARCHAR(100) DEFAULT 'N/A',
+        newsletter BOOLEAN DEFAULT false,
+        followupinfo TEXT,
+        fupdate TIMESTAMP,
+        stepprogram VARCHAR(100) DEFAULT 'N/A',
+        enqupdatedby VARCHAR(100),
+        involving VARCHAR(50) DEFAULT 'No',
+        notinvolvingreason TEXT,
+        fup TEXT,
+        inputdate TIMESTAMP,
+        lastupdate TIMESTAMP,
+        fupstatus VARCHAR(50),
+        originalfupdate TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
         "importSource" VARCHAR(255),
-        "originalId" VARCHAR(255),
-        "createdAt" TIMESTAMP DEFAULT NOW(),
-        "updatedAt" TIMESTAMP DEFAULT NOW()
+        "originalId" VARCHAR(255)
       )
     `
 
-    // Create staff table with camelCase column names
+    // Create staff table matching Prisma schema
     await sql`
       CREATE TABLE staff (
         id SERIAL PRIMARY KEY,
@@ -130,12 +130,12 @@ export async function GET(request: NextRequest) {
         ('Louie', 'louie@epgpianos.com.au', NOW(), NOW())
     `
 
-    // Insert sample enquiries with camelCase column names
+    // Insert sample enquiries with correct column names matching Prisma @map directives
     await sql`
       INSERT INTO enquiries (
-        status, "firstName", "lastName", email, phone, 
-        nationality, state, suburb, source, "eventSource", 
-        "submittedBy", "createdAt", "updatedAt"
+        status, firstname, surname, email, phone, 
+        nationality, state, suburb, source, enquirysource, 
+        calltakenby, created_at, updated_at
       ) VALUES 
         (
           'New',
@@ -185,11 +185,11 @@ export async function GET(request: NextRequest) {
     `
 
     return NextResponse.json({ 
-      message: 'Database completely rebuilt with camelCase schema',
+      message: 'Database completely rebuilt with correct Prisma schema mapping',
       tables: ['enquiries', 'staff', 'users', 'system_settings', 'import_logs'],
-      staff_added: 'All staff members added with camelCase columns',
-      enquiries_added: 'Sample enquiries with camelCase columns',
-      schema_update: 'Tables dropped and recreated with correct Prisma schema'
+      staff_added: 'All staff members added',
+      enquiries_added: 'Sample enquiries with correct column mappings',
+      schema_update: 'Tables dropped and recreated with lowercase column names matching Prisma @map directives'
     })
   } catch (error) {
     console.error('Error initializing database:', error)

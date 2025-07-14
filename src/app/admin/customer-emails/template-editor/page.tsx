@@ -61,6 +61,7 @@ export default function TemplateEditorPage() {
   const [editorElements, setEditorElements] = useState<EditorElement[]>([])
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 800 })
+  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#ffffff')
   const [showPreview, setShowPreview] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState<{elementId: string, property: string} | null>(null)
@@ -77,6 +78,7 @@ export default function TemplateEditorPage() {
   const [gridSize, setGridSize] = useState(10)
   const [showAlignmentGuides, setShowAlignmentGuides] = useState<{type: string, position: number, label: string}[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [isResizingElement, setIsResizingElement] = useState<{elementId: string, handle: string} | null>(null)
 
   // Close color picker when clicking outside
   useEffect(() => {
@@ -321,6 +323,76 @@ export default function TemplateEditorPage() {
     return { x: snappedX, y: snappedY, guides }
   }
 
+  // Handle element resizing
+  const handleElementResize = (elementId: string, handle: string, deltaX: number, deltaY: number) => {
+    const element = editorElements.find(el => el.id === elementId)
+    if (!element) return
+
+    let newWidth = element.style.width
+    let newHeight = element.style.height
+    let newX = element.style.position.x
+    let newY = element.style.position.y
+
+    // Calculate new dimensions based on handle
+    switch (handle) {
+      case 'nw': // Northwest corner
+        newWidth = Math.max(50, element.style.width - deltaX)
+        newHeight = Math.max(50, element.style.height - deltaY)
+        newX = element.style.position.x + (element.style.width - newWidth)
+        newY = element.style.position.y + (element.style.height - newHeight)
+        break
+      case 'ne': // Northeast corner
+        newWidth = Math.max(50, element.style.width + deltaX)
+        newHeight = Math.max(50, element.style.height - deltaY)
+        newY = element.style.position.y + (element.style.height - newHeight)
+        break
+      case 'sw': // Southwest corner
+        newWidth = Math.max(50, element.style.width - deltaX)
+        newHeight = Math.max(50, element.style.height + deltaY)
+        newX = element.style.position.x + (element.style.width - newWidth)
+        break
+      case 'se': // Southeast corner
+        newWidth = Math.max(50, element.style.width + deltaX)
+        newHeight = Math.max(50, element.style.height + deltaY)
+        break
+      case 'n': // North edge
+        newHeight = Math.max(50, element.style.height - deltaY)
+        newY = element.style.position.y + (element.style.height - newHeight)
+        break
+      case 's': // South edge
+        newHeight = Math.max(50, element.style.height + deltaY)
+        break
+      case 'w': // West edge
+        newWidth = Math.max(50, element.style.width - deltaX)
+        newX = element.style.position.x + (element.style.width - newWidth)
+        break
+      case 'e': // East edge
+        newWidth = Math.max(50, element.style.width + deltaX)
+        break
+    }
+
+    // Apply snapping to grid
+    newWidth = snapToGridValue(newWidth)
+    newHeight = snapToGridValue(newHeight)
+    newX = snapToGridValue(newX)
+    newY = snapToGridValue(newY)
+
+    // Keep within canvas bounds
+    newX = Math.max(0, Math.min(canvasSize.width - newWidth, newX))
+    newY = Math.max(0, Math.min(canvasSize.height - newHeight, newY))
+    newWidth = Math.min(newWidth, canvasSize.width - newX)
+    newHeight = Math.min(newHeight, canvasSize.height - newY)
+
+    updateElement(elementId, {
+      style: {
+        ...element.style,
+        width: newWidth,
+        height: newHeight,
+        position: { x: newX, y: newY }
+      }
+    })
+  }
+
   // Load existing template if editing
   useEffect(() => {
     if (isEditing && templateId) {
@@ -407,7 +479,7 @@ export default function TemplateEditorPage() {
   }
 
   const generateHtmlFromElements = () => {
-    let html = `<div style="position: relative; width: ${canvasSize.width}px; min-height: ${canvasSize.height}px; background: #ffffff; font-family: Arial, sans-serif;">`
+    let html = `<div style="position: relative; width: ${canvasSize.width}px; min-height: ${canvasSize.height}px; background: ${canvasBackgroundColor}; font-family: Arial, sans-serif;">`
     
     editorElements.forEach(element => {
       const { style, content, type } = element
@@ -594,15 +666,20 @@ export default function TemplateEditorPage() {
     })
 
     const applyColor = (color: string) => {
-      const element = editorElements.find(el => el.id === elementId)
-      if (element) {
-        updateElement(elementId, {
-          style: { 
-            ...element.style,
-            [property]: color 
-          }
-        })
+      if (elementId === 'canvas' && property === 'backgroundColor') {
+        setCanvasBackgroundColor(color)
         setHexInput(color)
+      } else {
+        const element = editorElements.find(el => el.id === elementId)
+        if (element) {
+          updateElement(elementId, {
+            style: { 
+              ...element.style,
+              [property]: color 
+            }
+          })
+          setHexInput(color)
+        }
       }
     }
 
@@ -895,6 +972,30 @@ export default function TemplateEditorPage() {
               
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Background:</span>
+                  <button
+                    onClick={() => setShowColorPicker({elementId: 'canvas', property: 'backgroundColor'})}
+                    className="h-8 px-3 border border-gray-300 rounded-md flex items-center gap-2 hover:bg-gray-50"
+                  >
+                    <div
+                      className="w-4 h-4 rounded border border-gray-300"
+                      style={{ backgroundColor: canvasBackgroundColor }}
+                    />
+                    <span className="text-sm">{canvasBackgroundColor}</span>
+                  </button>
+                  {showColorPicker?.elementId === 'canvas' && showColorPicker?.property === 'backgroundColor' && (
+                    <div className="absolute top-full left-0 mt-1 z-50">
+                      <ColorPicker
+                        elementId="canvas"
+                        property="backgroundColor"
+                        currentColor={canvasBackgroundColor}
+                        onClose={() => setShowColorPicker(null)}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-2">
                   <label className="flex items-center space-x-1 text-sm">
                     <input
                       type="checkbox"
@@ -938,10 +1039,11 @@ export default function TemplateEditorPage() {
           {/* Visual Canvas */}
           <div className="flex-1 bg-gray-100 overflow-auto p-8">
             <div 
-              className="bg-white shadow-lg mx-auto relative"
+              className="shadow-lg mx-auto relative"
               style={{ 
                 width: `${canvasSize.width}px`, 
                 minHeight: `${canvasSize.height}px`,
+                backgroundColor: canvasBackgroundColor,
                 border: '1px solid #e5e7eb',
                 backgroundImage: showGrid ? 
                   `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
@@ -1018,6 +1120,9 @@ export default function TemplateEditorPage() {
                     setSelectedElement(element.id)
                   }}
                   onMouseDown={(e) => {
+                    // Don't start dragging if we're resizing
+                    if (isResizingElement) return
+                    
                     const startX = e.clientX - element.style.position.x
                     const startY = e.clientY - element.style.position.y
                     setIsDragging(true)
@@ -1173,15 +1278,224 @@ export default function TemplateEditorPage() {
                   )}
                   
                   {selectedElement === element.id && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteElement(element.id)
-                      }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 text-xs"
-                    >
-                      ×
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteElement(element.id)
+                        }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 text-xs z-20"
+                      >
+                        ×
+                      </button>
+                      
+                      {/* Resize handles for images */}
+                      {element.type === 'image' && (
+                        <>
+                          {/* Corner handles */}
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-nw-resize z-10"
+                            style={{ top: -6, left: -6 }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startX = e.clientX
+                              const startY = e.clientY
+                              setIsResizingElement({ elementId: element.id, handle: 'nw' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaX = e.clientX - startX
+                                const deltaY = e.clientY - startY
+                                handleElementResize(element.id, 'nw', deltaX, deltaY)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-ne-resize z-10"
+                            style={{ top: -6, right: -6 }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startX = e.clientX
+                              const startY = e.clientY
+                              setIsResizingElement({ elementId: element.id, handle: 'ne' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaX = e.clientX - startX
+                                const deltaY = e.clientY - startY
+                                handleElementResize(element.id, 'ne', deltaX, deltaY)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-sw-resize z-10"
+                            style={{ bottom: -6, left: -6 }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startX = e.clientX
+                              const startY = e.clientY
+                              setIsResizingElement({ elementId: element.id, handle: 'sw' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaX = e.clientX - startX
+                                const deltaY = e.clientY - startY
+                                handleElementResize(element.id, 'sw', deltaX, deltaY)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-se-resize z-10"
+                            style={{ bottom: -6, right: -6 }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startX = e.clientX
+                              const startY = e.clientY
+                              setIsResizingElement({ elementId: element.id, handle: 'se' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaX = e.clientX - startX
+                                const deltaY = e.clientY - startY
+                                handleElementResize(element.id, 'se', deltaX, deltaY)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          {/* Edge handles */}
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-n-resize z-10"
+                            style={{ top: -6, left: '50%', transform: 'translateX(-50%)' }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startY = e.clientY
+                              setIsResizingElement({ elementId: element.id, handle: 'n' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaY = e.clientY - startY
+                                handleElementResize(element.id, 'n', 0, deltaY)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-s-resize z-10"
+                            style={{ bottom: -6, left: '50%', transform: 'translateX(-50%)' }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startY = e.clientY
+                              setIsResizingElement({ elementId: element.id, handle: 's' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaY = e.clientY - startY
+                                handleElementResize(element.id, 's', 0, deltaY)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-w-resize z-10"
+                            style={{ top: '50%', left: -6, transform: 'translateY(-50%)' }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startX = e.clientX
+                              setIsResizingElement({ elementId: element.id, handle: 'w' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaX = e.clientX - startX
+                                handleElementResize(element.id, 'w', deltaX, 0)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-e-resize z-10"
+                            style={{ top: '50%', right: -6, transform: 'translateY(-50%)' }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const startX = e.clientX
+                              setIsResizingElement({ elementId: element.id, handle: 'e' })
+                              
+                              const handleMouseMove = (e: MouseEvent) => {
+                                const deltaX = e.clientX - startX
+                                handleElementResize(element.id, 'e', deltaX, 0)
+                              }
+                              
+                              const handleMouseUp = () => {
+                                setIsResizingElement(null)
+                                document.removeEventListener('mousemove', handleMouseMove)
+                                document.removeEventListener('mouseup', handleMouseUp)
+                              }
+                              
+                              document.addEventListener('mousemove', handleMouseMove)
+                              document.addEventListener('mouseup', handleMouseUp)
+                            }}
+                          />
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

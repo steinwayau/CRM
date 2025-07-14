@@ -593,7 +593,7 @@ export default function ImportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6">
@@ -751,10 +751,10 @@ export default function ImportPage() {
 
                 <div className="space-y-3">
                   {fieldMappings.map((mapping, index) => (
-                    <div key={index} className={`grid grid-cols-3 gap-4 items-center p-3 rounded-lg ${
+                    <div key={index} className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:items-center p-3 rounded-lg ${
                       !mapping.targetField ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
                     }`}>
-                      <div className="flex items-center">
+                      <div className="col-span-1 md:col-span-4 flex items-center">
                         <span className="text-sm font-medium text-gray-700">{mapping.sourceField}</span>
                         {!mapping.targetField && (
                           <span className="ml-2 text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
@@ -762,14 +762,14 @@ export default function ImportPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-center text-gray-400">→</div>
-                      <div>
+                      <div className="hidden md:block md:col-span-1 text-center text-gray-400">→</div>
+                      <div className="col-span-1 md:col-span-7">
                         {mapping.targetField === 'classification' ? (
                           <div className="space-y-2">
                             <select
                               value={mapping.targetField}
                               onChange={(e) => updateFieldMapping(index, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm min-w-0"
                             >
                               <option value="">- Skip this field -</option>
                               {allFormFields.map(field => (
@@ -807,7 +807,7 @@ export default function ImportPage() {
                             <select
                               value={mapping.targetField}
                               onChange={(e) => updateFieldMapping(index, e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm min-w-0"
                             >
                               <option value="">- Skip this field -</option>
                               {allFormFields.map(field => (

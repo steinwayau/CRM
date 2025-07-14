@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { createAutoBackup } from '@/lib/backup-utils'
 
 const prisma = new PrismaClient()
 
@@ -125,6 +126,15 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('Successfully created enquiry:', formattedEnquiry)
+    
+    // Create automatic backup after successful enquiry creation
+    try {
+      await createAutoBackup('New enquiry form submission')
+    } catch (backupError) {
+      console.error('Warning: Auto backup failed after enquiry creation:', backupError)
+      // Don't fail the enquiry creation if backup fails
+    }
+    
     return NextResponse.json(formattedEnquiry, { status: 201 })
   } catch (error) {
     console.error('Error creating enquiry:', error)

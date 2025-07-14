@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { createAutoBackup } from '@/lib/backup-utils'
 
 const prisma = new PrismaClient()
 
@@ -226,6 +227,16 @@ export async function POST(request: NextRequest) {
     console.log(`Import completed: ${results.imported} imported, ${results.skipped} skipped, ${results.errors} errors`)
     console.log(`Custom fields processed: ${JSON.stringify(customFields)}`)
 
+    // Create automatic backup after successful import (if any records were imported)
+    if (results.imported > 0) {
+      try {
+        await createAutoBackup(`CSV import: ${results.imported} records from ${file.name}`)
+      } catch (backupError) {
+        console.error('Warning: Auto backup failed after import:', backupError)
+        // Don't fail the import if backup fails
+      }
+    }
+
     return NextResponse.json({
       ...results,
       message: `Import completed. ${results.imported} records imported successfully.${customFields.length > 0 ? ` Custom fields: ${customFields.map((f: any) => f.label).join(', ')}` : ''}`,
@@ -324,20 +335,25 @@ function processFieldValue(fieldName: string, value: any): any {
   switch (fieldName) {
     case 'productInterest':
       // Handle comma-separated products or JSON array
+      let products: string[] = []
+      
       if (stringValue.startsWith('[') && stringValue.endsWith(']')) {
         try {
           const parsed = JSON.parse(stringValue)
-          return Array.isArray(parsed) ? parsed.filter(p => VALID_PRODUCTS.includes(p.toLowerCase())) : []
+          products = Array.isArray(parsed) ? parsed.filter(p => VALID_PRODUCTS.includes(p.toLowerCase())) : []
         } catch {
-          return []
+          products = []
         }
       } else {
         // Comma-separated string - handle legacy format
-        const products = stringValue.split(',').map(p => p.trim().toLowerCase())
-        const validProducts = products.filter(p => VALID_PRODUCTS.includes(p))
-        // If no valid products found, return the original value as a fallback
-        return validProducts.length > 0 ? validProducts : [stringValue.toLowerCase()]
+        const splitProducts = stringValue.split(',').map(p => p.trim().toLowerCase())
+        const validProducts = splitProducts.filter(p => VALID_PRODUCTS.includes(p))
+        // If no valid products found, use the original value as a fallback
+        products = validProducts.length > 0 ? validProducts : [stringValue.toLowerCase()]
       }
+      
+      // Convert array back to comma-separated string for database storage
+      return products.length > 0 ? products.join(', ') : null
 
     case 'doNotEmail':
       // Convert various boolean representations

@@ -14,13 +14,51 @@ interface Backup {
 export default function DatabasePage() {
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [isMaintaining, setIsMaintaining] = useState(false)
   const [message, setMessage] = useState('')
   const [backupHistory, setBackupHistory] = useState<Backup[]>([])
   const [loading, setLoading] = useState(true)
+  const [dbStats, setDbStats] = useState({
+    totalEnquiries: 0,
+    databaseSize: 'Loading...',
+    lastBackup: 'Loading...',
+    status: 'Loading...'
+  })
 
   useEffect(() => {
     fetchBackups()
+    fetchDatabaseStats()
   }, [])
+
+  const fetchDatabaseStats = async () => {
+    try {
+      // Fetch enquiry count
+      const enquiriesResponse = await fetch('/api/enquiries')
+      const enquiries = await enquiriesResponse.json()
+      const totalEnquiries = enquiries.length
+
+      // Calculate database size estimate (rough calculation)
+      const estimatedSizeKB = totalEnquiries * 2 // ~2KB per enquiry
+      const sizeDisplay = estimatedSizeKB > 1024 
+        ? `${(estimatedSizeKB / 1024).toFixed(1)} MB`
+        : `${estimatedSizeKB} KB`
+
+      setDbStats({
+        totalEnquiries,
+        databaseSize: sizeDisplay,
+        lastBackup: backupHistory.length > 0 ? backupHistory[0].date : 'Never',
+        status: 'Healthy'
+      })
+    } catch (error) {
+      console.error('Error fetching database stats:', error)
+      setDbStats({
+        totalEnquiries: 0,
+        databaseSize: 'Error',
+        lastBackup: 'Error',
+        status: 'Error'
+      })
+    }
+  }
 
   const fetchBackups = async () => {
     try {
@@ -29,6 +67,11 @@ export default function DatabasePage() {
       
       if (data.success) {
         setBackupHistory(data.backups)
+        // Update last backup date in stats
+        setDbStats(prev => ({
+          ...prev,
+          lastBackup: data.backups.length > 0 ? data.backups[0].date : 'Never'
+        }))
       }
     } catch (error) {
       console.error('Error fetching backups:', error)
@@ -55,6 +98,7 @@ export default function DatabasePage() {
       if (response.ok) {
         setMessage('Database backup completed successfully!')
         await fetchBackups() // Refresh backup list
+        await fetchDatabaseStats() // Refresh database stats
       } else {
         setMessage(`Backup failed: ${data.error}`)
       }
@@ -67,9 +111,23 @@ export default function DatabasePage() {
   }
 
   const handleRestore = async (backupId: number) => {
-    if (!confirm('Are you sure you want to restore from this backup? This will overwrite current data.')) {
+    const confirmed = confirm(`⚠️ DANGER: Are you sure you want to restore from backup #${backupId}?
+
+This will:
+- DELETE ALL current data
+- Replace it with backup data
+- Create a pre-restore backup
+
+Type "RESTORE" to confirm this action.`)
+    
+    if (!confirmed) return
+    
+    const doubleConfirm = prompt(`Please type "RESTORE" to confirm you want to restore from backup #${backupId}:`)
+    if (doubleConfirm !== 'RESTORE') {
+      alert('Restore cancelled. You must type "RESTORE" exactly.')
       return
     }
+    
     setIsRestoring(true)
     setMessage('')
     
@@ -85,15 +143,17 @@ export default function DatabasePage() {
       const data = await response.json()
 
       if (response.ok) {
-        setMessage(`Database restored from backup #${backupId} successfully!`)
+        setMessage(`✅ ${data.message}`)
+        await fetchBackups() // Refresh backup list
+        await fetchDatabaseStats() // Refresh database stats
       } else {
-        setMessage(`Restore failed: ${data.error}`)
+        setMessage(`❌ Restore failed: ${data.error}`)
       }
     } catch (error) {
-      setMessage('Network error during restore')
+      setMessage('❌ Network error during restore')
     } finally {
       setIsRestoring(false)
-      setTimeout(() => setMessage(''), 5000)
+      setTimeout(() => setMessage(''), 8000)
     }
   }
 
@@ -117,6 +177,79 @@ export default function DatabasePage() {
       }
     } catch (error) {
       setMessage('Network error during delete')
+    } finally {
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+
+  const handleMaintenance = async (action: string) => {
+    // Add confirmation for potentially destructive operations
+    if (action === 'clean') {
+      const confirmed = confirm(`⚠️ Are you sure you want to clean the database?
+
+This will:
+- Remove empty records
+- Delete invalid email addresses  
+- Remove duplicate entries
+- Create a backup before cleaning
+
+Click OK to proceed.`)
+      
+      if (!confirmed) return
+    }
+    
+    setIsMaintaining(true)
+    setMessage('')
+    
+    try {
+      const response = await fetch('/api/admin/maintenance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage(`✅ ${data.message}`)
+        if (data.details) {
+          console.log('Maintenance details:', data.details)
+        }
+        await fetchBackups() // Refresh backup list in case backups were created
+        await fetchDatabaseStats() // Refresh database stats
+      } else {
+        setMessage(`❌ ${data.error}`)
+      }
+    } catch (error) {
+      setMessage('❌ Network error during maintenance')
+    } finally {
+      setIsMaintaining(false)
+      setTimeout(() => setMessage(''), 8000)
+    }
+  }
+
+  const handleDownloadBackup = async (backupId: number) => {
+    try {
+      const response = await fetch(`/api/admin/backup?id=${backupId}&action=download`)
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `backup_${backupId}_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        setMessage('✅ Backup downloaded successfully')
+      } else {
+        setMessage('❌ Download failed')
+      }
+    } catch (error) {
+      setMessage('❌ Network error during download')
     } finally {
       setTimeout(() => setMessage(''), 3000)
     }
@@ -158,7 +291,7 @@ export default function DatabasePage() {
         )}
 
         {/* Database Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center mb-4">
               <div className="p-3 bg-red-100 rounded-lg mr-4">
@@ -201,25 +334,46 @@ export default function DatabasePage() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Total Enquiries:</span>
-                <span className="text-sm font-medium text-gray-900">245</span>
+                <span className="text-sm font-medium text-gray-900">{dbStats.totalEnquiries}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Database Size:</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {backupHistory.length > 0 ? backupHistory[0].size : '2.4 MB'}
-                </span>
+                <span className="text-sm font-medium text-gray-900">{dbStats.databaseSize}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Last Backup:</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {backupHistory.length > 0 ? backupHistory[0].date : 'Never'}
-                </span>
+                <span className="text-sm font-medium text-gray-900">{dbStats.lastBackup}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Status:</span>
-                <span className="text-sm font-medium text-green-600">Healthy</span>
+                <span className={`text-sm font-medium ${dbStats.status === 'Healthy' ? 'text-green-600' : 'text-red-600'}`}>
+                  {dbStats.status}
+                </span>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center mb-4">
+              <div className="p-3 bg-orange-100 rounded-lg mr-4">
+                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Find Duplicates</h3>
+                <p className="text-sm text-gray-600">Detect and remove duplicate customer entries</p>
+              </div>
+            </div>
+            <Link
+              href="/admin/duplicates"
+              className="w-full px-4 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 flex items-center justify-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>Scan for Duplicates</span>
+            </Link>
           </div>
         </div>
 
@@ -285,7 +439,10 @@ export default function DatabasePage() {
                       >
                         Restore
                       </button>
-                      <button className="text-green-600 hover:text-green-800">
+                      <button 
+                        onClick={() => handleDownloadBackup(backup.id)}
+                        className="text-green-600 hover:text-green-800"
+                      >
                         Download
                       </button>
                       <button 
@@ -306,19 +463,64 @@ export default function DatabasePage() {
         <div className="mt-8 bg-white rounded-xl shadow-sm border p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Database Maintenance</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-center">
+            <button 
+              onClick={() => handleMaintenance('clean')}
+              disabled={isMaintaining}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-center disabled:opacity-50 disabled:cursor-not-allowed relative group"
+            >
               <div className="text-2xl mb-2">🧹</div>
-              <div className="text-sm font-medium text-gray-900">Clean Database</div>
+              <div className="text-sm font-medium text-gray-900 flex items-center justify-center gap-1">
+                Clean Database
+                <div className="relative">
+                  <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                    Removes empty records, invalid emails, and duplicate entries. Creates backup before cleaning.
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+              </div>
               <div className="text-xs text-gray-600">Remove unused data</div>
             </button>
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-center">
+            <button 
+              onClick={() => handleMaintenance('optimize')}
+              disabled={isMaintaining}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-center disabled:opacity-50 disabled:cursor-not-allowed relative group"
+            >
               <div className="text-2xl mb-2">⚡</div>
-              <div className="text-sm font-medium text-gray-900">Optimize Tables</div>
+              <div className="text-sm font-medium text-gray-900 flex items-center justify-center gap-1">
+                Optimize Tables
+                <div className="relative">
+                  <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                    Runs database optimization to improve query performance and update table statistics.
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+              </div>
               <div className="text-xs text-gray-600">Improve performance</div>
             </button>
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-center">
+            <button 
+              onClick={() => handleMaintenance('integrity')}
+              disabled={isMaintaining}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-center disabled:opacity-50 disabled:cursor-not-allowed relative group"
+            >
               <div className="text-2xl mb-2">🔍</div>
-              <div className="text-sm font-medium text-gray-900">Check Integrity</div>
+              <div className="text-sm font-medium text-gray-900 flex items-center justify-center gap-1">
+                Check Integrity
+                <div className="relative">
+                  <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                    Scans database for data integrity issues, missing fields, and invalid formats.
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+              </div>
               <div className="text-xs text-gray-600">Verify data consistency</div>
             </button>
           </div>

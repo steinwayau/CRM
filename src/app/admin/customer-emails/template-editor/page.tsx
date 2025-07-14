@@ -78,6 +78,7 @@ export default function TemplateEditorPage() {
   const [gridSize, setGridSize] = useState(10)
   const [showAlignmentGuides, setShowAlignmentGuides] = useState<{type: string, position: number, label: string}[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [draggedElement, setDraggedElement] = useState<string | null>(null)
   const [isResizingElement, setIsResizingElement] = useState<{elementId: string, handle: string} | null>(null)
 
   // Close color picker when clicking outside
@@ -324,7 +325,7 @@ export default function TemplateEditorPage() {
   }
 
   // Handle element resizing
-  const handleElementResize = (elementId: string, handle: string, deltaX: number, deltaY: number) => {
+  const handleElementResize = (elementId: string, handle: string, deltaX: number, deltaY: number, shiftKey: boolean = false) => {
     const element = editorElements.find(el => el.id === elementId)
     if (!element) return
 
@@ -333,41 +334,106 @@ export default function TemplateEditorPage() {
     let newX = element.style.position.x
     let newY = element.style.position.y
 
+    // Calculate aspect ratio for proportional resizing
+    const aspectRatio = element.style.width / element.style.height
+
     // Calculate new dimensions based on handle
     switch (handle) {
       case 'nw': // Northwest corner
-        newWidth = Math.max(50, element.style.width - deltaX)
-        newHeight = Math.max(50, element.style.height - deltaY)
+        if (shiftKey) {
+          // Proportional resize - use the larger delta to maintain aspect ratio
+          const scaleFactor = Math.max(
+            Math.abs(deltaX) / element.style.width,
+            Math.abs(deltaY) / element.style.height
+          )
+          newWidth = Math.max(50, element.style.width - (deltaX < 0 ? scaleFactor * element.style.width : deltaX))
+          newHeight = Math.max(50, newWidth / aspectRatio)
+        } else {
+          newWidth = Math.max(50, element.style.width - deltaX)
+          newHeight = Math.max(50, element.style.height - deltaY)
+        }
         newX = element.style.position.x + (element.style.width - newWidth)
         newY = element.style.position.y + (element.style.height - newHeight)
         break
       case 'ne': // Northeast corner
-        newWidth = Math.max(50, element.style.width + deltaX)
-        newHeight = Math.max(50, element.style.height - deltaY)
+        if (shiftKey) {
+          const scaleFactor = Math.max(
+            Math.abs(deltaX) / element.style.width,
+            Math.abs(deltaY) / element.style.height
+          )
+          newWidth = Math.max(50, element.style.width + (deltaX > 0 ? scaleFactor * element.style.width : deltaX))
+          newHeight = Math.max(50, newWidth / aspectRatio)
+        } else {
+          newWidth = Math.max(50, element.style.width + deltaX)
+          newHeight = Math.max(50, element.style.height - deltaY)
+        }
         newY = element.style.position.y + (element.style.height - newHeight)
         break
       case 'sw': // Southwest corner
-        newWidth = Math.max(50, element.style.width - deltaX)
-        newHeight = Math.max(50, element.style.height + deltaY)
+        if (shiftKey) {
+          const scaleFactor = Math.max(
+            Math.abs(deltaX) / element.style.width,
+            Math.abs(deltaY) / element.style.height
+          )
+          newWidth = Math.max(50, element.style.width - (deltaX < 0 ? scaleFactor * element.style.width : deltaX))
+          newHeight = Math.max(50, newWidth / aspectRatio)
+        } else {
+          newWidth = Math.max(50, element.style.width - deltaX)
+          newHeight = Math.max(50, element.style.height + deltaY)
+        }
         newX = element.style.position.x + (element.style.width - newWidth)
         break
       case 'se': // Southeast corner
-        newWidth = Math.max(50, element.style.width + deltaX)
-        newHeight = Math.max(50, element.style.height + deltaY)
+        if (shiftKey) {
+          const scaleFactor = Math.max(
+            Math.abs(deltaX) / element.style.width,
+            Math.abs(deltaY) / element.style.height
+          )
+          newWidth = Math.max(50, element.style.width + (deltaX > 0 ? scaleFactor * element.style.width : deltaX))
+          newHeight = Math.max(50, newWidth / aspectRatio)
+        } else {
+          newWidth = Math.max(50, element.style.width + deltaX)
+          newHeight = Math.max(50, element.style.height + deltaY)
+        }
         break
       case 'n': // North edge
-        newHeight = Math.max(50, element.style.height - deltaY)
+        if (shiftKey) {
+          // For edge handles with shift, maintain aspect ratio by adjusting width
+          newHeight = Math.max(50, element.style.height - deltaY)
+          newWidth = Math.max(50, newHeight * aspectRatio)
+          newX = element.style.position.x - (newWidth - element.style.width) / 2
+        } else {
+          newHeight = Math.max(50, element.style.height - deltaY)
+        }
         newY = element.style.position.y + (element.style.height - newHeight)
         break
       case 's': // South edge
-        newHeight = Math.max(50, element.style.height + deltaY)
+        if (shiftKey) {
+          newHeight = Math.max(50, element.style.height + deltaY)
+          newWidth = Math.max(50, newHeight * aspectRatio)
+          newX = element.style.position.x - (newWidth - element.style.width) / 2
+        } else {
+          newHeight = Math.max(50, element.style.height + deltaY)
+        }
         break
       case 'w': // West edge
-        newWidth = Math.max(50, element.style.width - deltaX)
+        if (shiftKey) {
+          newWidth = Math.max(50, element.style.width - deltaX)
+          newHeight = Math.max(50, newWidth / aspectRatio)
+          newY = element.style.position.y - (newHeight - element.style.height) / 2
+        } else {
+          newWidth = Math.max(50, element.style.width - deltaX)
+        }
         newX = element.style.position.x + (element.style.width - newWidth)
         break
       case 'e': // East edge
-        newWidth = Math.max(50, element.style.width + deltaX)
+        if (shiftKey) {
+          newWidth = Math.max(50, element.style.width + deltaX)
+          newHeight = Math.max(50, newWidth / aspectRatio)
+          newY = element.style.position.y - (newHeight - element.style.height) / 2
+        } else {
+          newWidth = Math.max(50, element.style.width + deltaX)
+        }
         break
     }
 
@@ -460,7 +526,7 @@ export default function TemplateEditorPage() {
     setSelectedElement(null)
   }
 
-  const handleImageUpload = (elementId: string) => {
+  const handleImageUpload = (elementId?: string) => {
     if (fileInputRef.current) {
       fileInputRef.current.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0]
@@ -469,7 +535,41 @@ export default function TemplateEditorPage() {
           const reader = new FileReader()
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string
-            updateElement(elementId, { content: imageUrl })
+            
+            // Create a temporary image to get actual dimensions
+            const img = new Image()
+            img.onload = () => {
+              const aspectRatio = img.width / img.height
+              
+              // Calculate dimensions maintaining aspect ratio
+              let width = 300 // default width
+              let height = width / aspectRatio
+              
+              // If height is too large, constrain by height instead
+              if (height > 400) {
+                height = 400
+                width = height * aspectRatio
+              }
+              
+              if (elementId) {
+                // Update existing element
+                updateElement(elementId, { content: imageUrl })
+              } else {
+                // Create new element with proper dimensions
+                const newElement: EditorElement = {
+                  id: Date.now().toString(),
+                  type: 'image',
+                  content: imageUrl,
+                  style: {
+                    position: { x: 50, y: 50 },
+                    width: Math.round(width),
+                    height: Math.round(height)
+                  }
+                }
+                setEditorElements([...editorElements, newElement])
+              }
+            }
+            img.src = imageUrl
           }
           reader.readAsDataURL(file)
         }
@@ -883,7 +983,7 @@ export default function TemplateEditorPage() {
               </button>
 
               <button
-                onClick={() => addElement('image')}
+                onClick={() => handleImageUpload()}
                 className="w-full p-3 text-left border border-gray-200 rounded-md hover:bg-gray-50 hover:shadow-sm transition-all"
               >
                 <div className="flex items-center space-x-2">
@@ -971,7 +1071,7 @@ export default function TemplateEditorPage() {
               </div>
               
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 relative">
                   <span className="text-sm text-gray-600">Background:</span>
                   <button
                     onClick={() => setShowColorPicker({elementId: 'canvas', property: 'backgroundColor'})}
@@ -1107,13 +1207,18 @@ export default function TemplateEditorPage() {
               {editorElements.map((element) => (
                 <div
                   key={element.id}
-                  className={`absolute cursor-move ${selectedElement === element.id ? 'ring-2 ring-blue-500' : ''}`}
+                  className={`absolute cursor-move transition-shadow ${
+                    selectedElement === element.id ? 'ring-2 ring-blue-500' : ''
+                  } ${
+                    draggedElement === element.id ? 'shadow-lg opacity-80' : ''
+                  }`}
                   style={{
                     left: element.style.position.x,
                     top: element.style.position.y,
                     width: element.style.width,
                     height: element.style.height,
-                    zIndex: selectedElement === element.id ? 10 : 1
+                    zIndex: selectedElement === element.id ? 10 : 1,
+                    userSelect: 'none'
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -1123,28 +1228,51 @@ export default function TemplateEditorPage() {
                     // Don't start dragging if we're resizing
                     if (isResizingElement) return
                     
+                    e.preventDefault()
+                    setSelectedElement(element.id)
+                    setIsDragging(true)
+                    setDraggedElement(element.id)
+                    
                     const startX = e.clientX - element.style.position.x
                     const startY = e.clientY - element.style.position.y
-                    setIsDragging(true)
+                    
+                    let animationFrameId: number
                     
                     const handleMouseMove = (e: MouseEvent) => {
-                      const rawX = e.clientX - startX
-                      const rawY = e.clientY - startY
+                      e.preventDefault()
                       
-                      const { x: newX, y: newY, guides } = snapPosition(element, rawX, rawY)
+                      // Use requestAnimationFrame for smoother performance
+                      if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId)
+                      }
                       
-                      setShowAlignmentGuides(guides)
-                      
-                      updateElement(element.id, {
-                        style: {
-                          ...element.style,
-                          position: { x: newX, y: newY }
-                        }
+                      animationFrameId = requestAnimationFrame(() => {
+                        const rawX = e.clientX - startX
+                        const rawY = e.clientY - startY
+                        
+                        // Constrain to canvas bounds
+                        const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - element.style.width))
+                        const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - element.style.height))
+                        
+                        const { x: newX, y: newY, guides } = snapPosition(element, constrainedX, constrainedY)
+                        
+                        setShowAlignmentGuides(guides)
+                        
+                        updateElement(element.id, {
+                          style: {
+                            ...element.style,
+                            position: { x: newX, y: newY }
+                          }
+                        })
                       })
                     }
                     
                     const handleMouseUp = () => {
+                      if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId)
+                      }
                       setIsDragging(false)
+                      setDraggedElement(null)
                       setShowAlignmentGuides([])
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
@@ -1305,7 +1433,7 @@ export default function TemplateEditorPage() {
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaX = e.clientX - startX
                                 const deltaY = e.clientY - startY
-                                handleElementResize(element.id, 'nw', deltaX, deltaY)
+                                handleElementResize(element.id, 'nw', deltaX, deltaY, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1331,7 +1459,7 @@ export default function TemplateEditorPage() {
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaX = e.clientX - startX
                                 const deltaY = e.clientY - startY
-                                handleElementResize(element.id, 'ne', deltaX, deltaY)
+                                handleElementResize(element.id, 'ne', deltaX, deltaY, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1357,7 +1485,7 @@ export default function TemplateEditorPage() {
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaX = e.clientX - startX
                                 const deltaY = e.clientY - startY
-                                handleElementResize(element.id, 'sw', deltaX, deltaY)
+                                handleElementResize(element.id, 'sw', deltaX, deltaY, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1383,7 +1511,7 @@ export default function TemplateEditorPage() {
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaX = e.clientX - startX
                                 const deltaY = e.clientY - startY
-                                handleElementResize(element.id, 'se', deltaX, deltaY)
+                                handleElementResize(element.id, 'se', deltaX, deltaY, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1408,7 +1536,7 @@ export default function TemplateEditorPage() {
                               
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaY = e.clientY - startY
-                                handleElementResize(element.id, 'n', 0, deltaY)
+                                handleElementResize(element.id, 'n', 0, deltaY, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1432,7 +1560,7 @@ export default function TemplateEditorPage() {
                               
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaY = e.clientY - startY
-                                handleElementResize(element.id, 's', 0, deltaY)
+                                handleElementResize(element.id, 's', 0, deltaY, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1456,7 +1584,7 @@ export default function TemplateEditorPage() {
                               
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaX = e.clientX - startX
-                                handleElementResize(element.id, 'w', deltaX, 0)
+                                handleElementResize(element.id, 'w', deltaX, 0, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {
@@ -1480,7 +1608,7 @@ export default function TemplateEditorPage() {
                               
                               const handleMouseMove = (e: MouseEvent) => {
                                 const deltaX = e.clientX - startX
-                                handleElementResize(element.id, 'e', deltaX, 0)
+                                handleElementResize(element.id, 'e', deltaX, 0, e.shiftKey)
                               }
                               
                               const handleMouseUp = () => {

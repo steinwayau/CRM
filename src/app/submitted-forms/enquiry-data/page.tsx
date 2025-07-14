@@ -528,23 +528,23 @@ export default function EnquiryData() {
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        {/* Data Table - Desktop */}
+        <div className="hidden lg:block bg-white rounded-lg shadow-sm border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-max">
               <thead className="bg-orange-500 text-white">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">ACT</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">STAT</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">FIRST NAME</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">SURNAME</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">EMAIL</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">PHONE</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">STATE</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">SUBURB</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">PRODUCT INTEREST</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">DATE</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">CALL TAKEN BY</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[100px]">ACT</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[60px]">STAT</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[100px]">FIRST NAME</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[100px]">SURNAME</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[200px]">EMAIL</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[120px]">PHONE</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[80px]">STATE</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[100px]">SUBURB</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[150px]">PRODUCT INTEREST</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[100px]">DATE</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold min-w-[120px]">CALL TAKEN BY</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -563,7 +563,7 @@ export default function EnquiryData() {
                 ) : (
                   currentEnquiries.map((enquiry: any, index) => (
                     <tr key={enquiry.id || index} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <div className="flex items-center space-x-1">
                           {enquiry.hasFollowUp && (
                             <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded" title="Has follow-up data">📋</span>
@@ -578,36 +578,38 @@ export default function EnquiryData() {
                           <button className="text-green-500 hover:text-green-700" title="Email" onClick={() => window.location.href = `mailto:${enquiry.email}`}>📧</button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-lg">
+                      <td className="px-3 py-3 text-center text-lg">
                         {getStatusIcon(enquiry.status)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {enquiry.firstName || enquiry.first_name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {enquiry.surname || enquiry.lastName}
                       </td>
-                      <td className="px-4 py-3 text-sm text-blue-600">
-                        <a href={`mailto:${enquiry.email}`} className="hover:underline">
+                      <td className="px-3 py-3 text-sm text-blue-600">
+                        <a href={`mailto:${enquiry.email}`} className="hover:underline break-all">
                           {enquiry.email}
                         </a>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {enquiry.phone}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {enquiry.state}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {enquiry.suburb}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {formatProductInterest(enquiry.productInterest || enquiry.products)}
+                      <td className="px-3 py-3 text-sm text-gray-900">
+                        <div className="max-w-[150px] truncate" title={formatProductInterest(enquiry.productInterest || enquiry.products)}>
+                          {formatProductInterest(enquiry.productInterest || enquiry.products)}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {formatDate(enquiry.createdAt || enquiry.created_at)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-3 py-3 text-sm text-gray-900">
                         {enquiry.callTakenBy || enquiry.call_taken_by || enquiry.submittedBy}
                       </td>
                     </tr>
@@ -616,6 +618,101 @@ export default function EnquiryData() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Mobile Cards - Tablet and Mobile */}
+        <div className="lg:hidden space-y-4">
+          {loading ? (
+            <div className="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-500">
+              Loading enquiries...
+            </div>
+          ) : currentEnquiries.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-500">
+              No enquiries found matching your criteria.
+            </div>
+          ) : (
+            currentEnquiries.map((enquiry: any, index) => (
+              <div key={enquiry.id || index} className="bg-white rounded-lg shadow-sm border p-4">
+                {/* Header Row */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="text-lg">
+                      {getStatusIcon(enquiry.status)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        {enquiry.firstName || enquiry.first_name} {enquiry.surname || enquiry.lastName}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {formatDate(enquiry.createdAt || enquiry.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    {enquiry.hasFollowUp && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded" title="Has follow-up data">📋</span>
+                    )}
+                    <button className="text-orange-500 hover:text-orange-700 p-1" title="View" onClick={() => handleViewEnquiry(enquiry)}>👁️</button>
+                    {userRole === 'admin' && (
+                      <>
+                        <button className="text-blue-500 hover:text-blue-700 p-1" title="Edit" onClick={() => handleEditEnquiry(enquiry)}>📝</button>
+                        <button className="text-red-500 hover:text-red-700 p-1" title="Delete" onClick={() => handleDeleteEnquiry(enquiry)}>🗑️</button>
+                      </>
+                    )}
+                    <button className="text-green-500 hover:text-green-700 p-1" title="Email" onClick={() => window.location.href = `mailto:${enquiry.email}`}>📧</button>
+                  </div>
+                </div>
+
+                {/* Contact Info */}
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-500 text-sm">📧</span>
+                    <a href={`mailto:${enquiry.email}`} className="text-blue-600 hover:underline text-sm">
+                      {enquiry.email}
+                    </a>
+                  </div>
+                  {enquiry.phone && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-500 text-sm">📞</span>
+                      <span className="text-gray-900 text-sm">{enquiry.phone}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Location */}
+                <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">State:</span>
+                    <span className="ml-1 text-gray-900">{enquiry.state}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Suburb:</span>
+                    <span className="ml-1 text-gray-900">{enquiry.suburb}</span>
+                  </div>
+                </div>
+
+                {/* Product Interest */}
+                {(enquiry.productInterest || enquiry.products) && (
+                  <div className="mb-3">
+                    <span className="text-gray-500 text-sm">Product Interest:</span>
+                    <div className="mt-1 text-sm text-gray-900">
+                      {formatProductInterest(enquiry.productInterest || enquiry.products)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Call Taken By */}
+                {(enquiry.callTakenBy || enquiry.call_taken_by || enquiry.submittedBy) && (
+                  <div className="text-sm">
+                    <span className="text-gray-500">Call taken by:</span>
+                    <span className="ml-1 text-gray-900">
+                      {enquiry.callTakenBy || enquiry.call_taken_by || enquiry.submittedBy}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Pagination */}

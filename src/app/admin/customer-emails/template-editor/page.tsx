@@ -547,6 +547,8 @@ export default function TemplateEditorPage() {
       }
     }
     setEditorElements([...editorElements, newElement])
+    // Automatically select the new element to show properties panel
+    setSelectedElement(newElement.id)
   }
 
   const getDefaultContent = (type: string) => {
@@ -612,6 +614,8 @@ export default function TemplateEditorPage() {
                   }
                 }
                 setEditorElements([...editorElements, newElement])
+                // Automatically select the new image to show properties panel
+                setSelectedElement(newElement.id)
               }
             }
             img.src = imageUrl

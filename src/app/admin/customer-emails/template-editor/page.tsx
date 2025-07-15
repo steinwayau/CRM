@@ -235,6 +235,34 @@ export default function TemplateEditorPage() {
     })
   }
 
+  // Auto-stacking function to position new elements
+  const getNextElementPosition = (elementType: 'text' | 'image' | 'video' | 'button' | 'divider') => {
+    if (editorElements.length === 0) {
+      // First element - center horizontally, start at top with margin
+      const defaultWidth = elementType === 'divider' ? 500 : elementType === 'button' ? 200 : 300
+      return {
+        x: (canvasSize.width - defaultWidth) / 2,
+        y: 30
+      }
+    }
+
+    // Find the lowest element (highest y + height value)
+    let lowestY = 0
+    editorElements.forEach(element => {
+      const elementBottom = element.style.position.y + element.style.height
+      if (elementBottom > lowestY) {
+        lowestY = elementBottom
+      }
+    })
+
+    // Position new element 20px below the lowest element, centered horizontally
+    const defaultWidth = elementType === 'divider' ? 500 : elementType === 'button' ? 200 : 300
+    return {
+      x: (canvasSize.width - defaultWidth) / 2,
+      y: lowestY + 20
+    }
+  }
+
   // Snap and alignment functions
   const snapToGridValue = (value: number) => {
     if (!snapToGrid) return value
@@ -386,56 +414,83 @@ export default function TemplateEditorPage() {
     switch (handle) {
       case 'nw': // Northwest corner
         if (shiftKey) {
-          // Proportional resize - use the larger delta to maintain aspect ratio
-          const scaleFactor = Math.max(
-            Math.abs(deltaX) / element.style.width,
-            Math.abs(deltaY) / element.style.height
-          )
-          newWidth = Math.max(50, element.style.width - (deltaX < 0 ? scaleFactor * element.style.width : deltaX))
+          // Proportional resize from center - maintain aspect ratio
+          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
+          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
+          const scaleDirection = (deltaX < 0 && deltaY < 0) ? 1 : -1
+          
+          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
           newHeight = Math.max(50, newWidth / aspectRatio)
+          
+          // Resize from center by adjusting position
+          const widthDiff = newWidth - element.style.width
+          const heightDiff = newHeight - element.style.height
+          newX = element.style.position.x - widthDiff / 2
+          newY = element.style.position.y - heightDiff / 2
         } else {
           newWidth = Math.max(50, element.style.width - deltaX)
           newHeight = Math.max(50, element.style.height - deltaY)
+          newX = element.style.position.x + (element.style.width - newWidth)
+          newY = element.style.position.y + (element.style.height - newHeight)
         }
-        newX = element.style.position.x + (element.style.width - newWidth)
-        newY = element.style.position.y + (element.style.height - newHeight)
         break
       case 'ne': // Northeast corner
         if (shiftKey) {
-          const scaleFactor = Math.max(
-            Math.abs(deltaX) / element.style.width,
-            Math.abs(deltaY) / element.style.height
-          )
-          newWidth = Math.max(50, element.style.width + (deltaX > 0 ? scaleFactor * element.style.width : deltaX))
+          // Proportional resize from center - maintain aspect ratio
+          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
+          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
+          const scaleDirection = (deltaX > 0 && deltaY < 0) ? 1 : -1
+          
+          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
           newHeight = Math.max(50, newWidth / aspectRatio)
+          
+          // Resize from center by adjusting position
+          const widthDiff = newWidth - element.style.width
+          const heightDiff = newHeight - element.style.height
+          newX = element.style.position.x - widthDiff / 2
+          newY = element.style.position.y - heightDiff / 2
         } else {
           newWidth = Math.max(50, element.style.width + deltaX)
           newHeight = Math.max(50, element.style.height - deltaY)
+          newY = element.style.position.y + (element.style.height - newHeight)
         }
-        newY = element.style.position.y + (element.style.height - newHeight)
         break
       case 'sw': // Southwest corner
         if (shiftKey) {
-          const scaleFactor = Math.max(
-            Math.abs(deltaX) / element.style.width,
-            Math.abs(deltaY) / element.style.height
-          )
-          newWidth = Math.max(50, element.style.width - (deltaX < 0 ? scaleFactor * element.style.width : deltaX))
+          // Proportional resize from center - maintain aspect ratio
+          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
+          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
+          const scaleDirection = (deltaX < 0 && deltaY > 0) ? 1 : -1
+          
+          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
           newHeight = Math.max(50, newWidth / aspectRatio)
+          
+          // Resize from center by adjusting position
+          const widthDiff = newWidth - element.style.width
+          const heightDiff = newHeight - element.style.height
+          newX = element.style.position.x - widthDiff / 2
+          newY = element.style.position.y - heightDiff / 2
         } else {
           newWidth = Math.max(50, element.style.width - deltaX)
           newHeight = Math.max(50, element.style.height + deltaY)
+          newX = element.style.position.x + (element.style.width - newWidth)
         }
-        newX = element.style.position.x + (element.style.width - newWidth)
         break
       case 'se': // Southeast corner
         if (shiftKey) {
-          const scaleFactor = Math.max(
-            Math.abs(deltaX) / element.style.width,
-            Math.abs(deltaY) / element.style.height
-          )
-          newWidth = Math.max(50, element.style.width + (deltaX > 0 ? scaleFactor * element.style.width : deltaX))
+          // Proportional resize from center - maintain aspect ratio
+          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
+          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
+          const scaleDirection = (deltaX > 0 && deltaY > 0) ? 1 : -1
+          
+          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
           newHeight = Math.max(50, newWidth / aspectRatio)
+          
+          // Resize from center by adjusting position
+          const widthDiff = newWidth - element.style.width
+          const heightDiff = newHeight - element.style.height
+          newX = element.style.position.x - widthDiff / 2
+          newY = element.style.position.y - heightDiff / 2
         } else {
           newWidth = Math.max(50, element.style.width + deltaX)
           newHeight = Math.max(50, element.style.height + deltaY)
@@ -526,12 +581,14 @@ export default function TemplateEditorPage() {
 
   // Visual editor functions
   const addElement = (type: 'text' | 'image' | 'video' | 'button' | 'divider') => {
+    const position = getNextElementPosition(type)
+    
     const newElement: EditorElement = {
       id: Date.now().toString(),
       type,
       content: getDefaultContent(type),
       style: {
-        position: { x: 50, y: 50 },
+        position: position,
         width: type === 'divider' ? 500 : type === 'button' ? 200 : 300,
         height: type === 'text' ? 120 : type === 'divider' ? 2 : type === 'button' ? 40 : 200,
         fontSize: type === 'text' ? 16 : undefined,
@@ -602,13 +659,14 @@ export default function TemplateEditorPage() {
                 // Update existing element
                 updateElement(elementId, { content: imageUrl })
               } else {
-                // Create new element with proper dimensions
+                // Create new element with proper dimensions and auto-stacking position
+                const position = getNextElementPosition('image')
                 const newElement: EditorElement = {
                   id: Date.now().toString(),
                   type: 'image',
                   content: imageUrl,
                   style: {
-                    position: { x: 50, y: 50 },
+                    position: position,
                     width: Math.round(width),
                     height: Math.round(height)
                   }
@@ -1505,60 +1563,58 @@ export default function TemplateEditorPage() {
                         ×
                       </button>
                       
-                      {/* Resize handles for images */}
-                      {element.type === 'image' && (
-                        <>
-                          {/* Corner handles */}
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-nw-resize z-10"
-                            style={{ top: -6, left: -6 }}
-                            onMouseDown={createResizeHandler(element.id, 'nw')}
-                          />
-                          
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-ne-resize z-10"
-                            style={{ top: -6, right: -6 }}
-                            onMouseDown={createResizeHandler(element.id, 'ne')}
-                          />
-                          
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-sw-resize z-10"
-                            style={{ bottom: -6, left: -6 }}
-                            onMouseDown={createResizeHandler(element.id, 'sw')}
-                          />
-                          
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-se-resize z-10"
-                            style={{ bottom: -6, right: -6 }}
-                            onMouseDown={createResizeHandler(element.id, 'se')}
-                          />
-                          
-                          {/* Edge handles */}
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-n-resize z-10"
-                            style={{ top: -6, left: '50%', transform: 'translateX(-50%)' }}
-                            onMouseDown={createResizeHandler(element.id, 'n')}
-                          />
-                          
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-s-resize z-10"
-                            style={{ bottom: -6, left: '50%', transform: 'translateX(-50%)' }}
-                            onMouseDown={createResizeHandler(element.id, 's')}
-                          />
-                          
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-w-resize z-10"
-                            style={{ top: '50%', left: -6, transform: 'translateY(-50%)' }}
-                            onMouseDown={createResizeHandler(element.id, 'w')}
-                          />
-                          
-                          <div
-                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-e-resize z-10"
-                            style={{ top: '50%', right: -6, transform: 'translateY(-50%)' }}
-                            onMouseDown={createResizeHandler(element.id, 'e')}
-                          />
-                        </>
-                      )}
+                      {/* Resize handles for all elements */}
+                      <>
+                        {/* Corner handles */}
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-nw-resize z-10"
+                          style={{ top: -6, left: -6 }}
+                          onMouseDown={createResizeHandler(element.id, 'nw')}
+                        />
+                        
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-ne-resize z-10"
+                          style={{ top: -6, right: -6 }}
+                          onMouseDown={createResizeHandler(element.id, 'ne')}
+                        />
+                        
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-sw-resize z-10"
+                          style={{ bottom: -6, left: -6 }}
+                          onMouseDown={createResizeHandler(element.id, 'sw')}
+                        />
+                        
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-se-resize z-10"
+                          style={{ bottom: -6, right: -6 }}
+                          onMouseDown={createResizeHandler(element.id, 'se')}
+                        />
+                        
+                        {/* Edge handles */}
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-n-resize z-10"
+                          style={{ top: -6, left: '50%', transform: 'translateX(-50%)' }}
+                          onMouseDown={createResizeHandler(element.id, 'n')}
+                        />
+                        
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-s-resize z-10"
+                          style={{ bottom: -6, left: '50%', transform: 'translateX(-50%)' }}
+                          onMouseDown={createResizeHandler(element.id, 's')}
+                        />
+                        
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-w-resize z-10"
+                          style={{ top: '50%', left: -6, transform: 'translateY(-50%)' }}
+                          onMouseDown={createResizeHandler(element.id, 'w')}
+                        />
+                        
+                        <div
+                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-e-resize z-10"
+                          style={{ top: '50%', right: -6, transform: 'translateY(-50%)' }}
+                          onMouseDown={createResizeHandler(element.id, 'e')}
+                        />
+                      </>
                     </>
                   )}
                 </div>

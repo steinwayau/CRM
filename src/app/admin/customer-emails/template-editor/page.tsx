@@ -80,7 +80,14 @@ export default function TemplateEditorPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [draggedElement, setDraggedElement] = useState<string | null>(null)
   const [isResizingElement, setIsResizingElement] = useState<{elementId: string, handle: string} | null>(null)
-  const [hasDragged, setHasDragged] = useState(false)
+  
+  // Use refs for drag state to avoid timing issues with state updates
+  const dragStateRef = useRef({
+    isDragging: false,
+    dragStarted: false,
+    elementId: null as string | null
+  })
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Close color picker when clicking outside
   useEffect(() => {
@@ -1261,7 +1268,7 @@ export default function TemplateEditorPage() {
                   onClick={(e) => {
                     e.stopPropagation()
                     // Only handle click if we haven't dragged
-                    if (!hasDragged) {
+                    if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
                       setSelectedElement(element.id)
                     }
                   }}
@@ -1272,7 +1279,18 @@ export default function TemplateEditorPage() {
                     e.preventDefault()
                     e.stopPropagation()
                     setSelectedElement(element.id)
-                    setHasDragged(false)
+                    
+                    // Reset drag state
+                    dragStateRef.current = {
+                      isDragging: false,
+                      dragStarted: false,
+                      elementId: element.id
+                    }
+                    
+                    // Clear any existing timeout
+                    if (dragTimeoutRef.current) {
+                      clearTimeout(dragTimeoutRef.current)
+                    }
                     
                     const startX = e.clientX - element.style.position.x
                     const startY = e.clientY - element.style.position.y
@@ -1280,7 +1298,6 @@ export default function TemplateEditorPage() {
                     const startMouseY = e.clientY
                     
                     let animationFrameId: number
-                    let dragStarted = false
                     
                     const handleMouseMove = (e: MouseEvent) => {
                       e.preventDefault()
@@ -1290,14 +1307,14 @@ export default function TemplateEditorPage() {
                       const deltaY = Math.abs(e.clientY - startMouseY)
                       
                       // Only start dragging if mouse has moved more than 3 pixels
-                      if (!dragStarted && (deltaX > 3 || deltaY > 3)) {
-                        dragStarted = true
+                      if (!dragStateRef.current.dragStarted && (deltaX > 3 || deltaY > 3)) {
+                        dragStateRef.current.dragStarted = true
+                        dragStateRef.current.isDragging = true
                         setIsDragging(true)
                         setDraggedElement(element.id)
-                        setHasDragged(true)
                       }
                       
-                      if (dragStarted) {
+                      if (dragStateRef.current.dragStarted) {
                         // Use requestAnimationFrame for smoother performance
                         if (animationFrameId) {
                           cancelAnimationFrame(animationFrameId)
@@ -1335,8 +1352,14 @@ export default function TemplateEditorPage() {
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
                       
-                      // Reset drag flag after a short delay to allow click handler to check it
-                      setTimeout(() => setHasDragged(false), 10)
+                      // Reset drag state after a delay to allow click handler to check it
+                      dragTimeoutRef.current = setTimeout(() => {
+                        dragStateRef.current = {
+                          isDragging: false,
+                          dragStarted: false,
+                          elementId: null
+                        }
+                      }, 50)
                     }
                     
                     document.addEventListener('mousemove', handleMouseMove)

@@ -17,8 +17,9 @@ interface CampaignRequest {
   subject: string
   htmlContent: string
   textContent: string
-  recipientType: 'all' | 'filtered' | 'selected'
+  recipientType: 'all' | 'filtered' | 'selected' | 'custom'
   customerIds?: number[]
+  customEmails?: string
   filters?: {
     state?: string
     rating?: string
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       textContent, 
       recipientType, 
       customerIds, 
+      customEmails,
       filters 
     } = body
 
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get customers from database based on recipient type
-    const customers = await getCustomersForCampaign(recipientType, customerIds, filters)
+    const customers = await getCustomersForCampaign(recipientType, customerIds, filters, customEmails)
     
     // Filter out customers who opted out of emails
     const eligibleCustomers = customers.filter(customer => !customer.doNotEmail)
@@ -156,12 +158,28 @@ export async function POST(request: NextRequest) {
 async function getCustomersForCampaign(
   recipientType: string,
   customerIds?: number[],
-  filters?: any
+  filters?: any,
+  customEmails?: string
 ): Promise<EmailRecipient[]> {
-  // In a real implementation, this would query your database
-  // For now, we'll simulate with a mock response
-  
-  // This should integrate with your existing customer database
+  // Handle custom email list
+  if (recipientType === 'custom' && customEmails) {
+    const emailList = customEmails
+      .split(/[,\n]/) // Split by comma or newline
+      .map(email => email.trim()) // Remove whitespace
+      .filter(email => email && email.includes('@')) // Filter valid emails
+      .filter((email, index, arr) => arr.indexOf(email) === index) // Remove duplicates
+
+    // Convert emails to customer format
+    return emailList.map((email, index) => ({
+      id: -(index + 1), // Use negative IDs for custom emails
+      firstName: email.split('@')[0], // Use email prefix as first name
+      lastName: '',
+      email: email,
+      doNotEmail: false
+    }))
+  }
+
+  // For database customers, query the existing customer database
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/enquiries`)
     const enquiries = await response.json()

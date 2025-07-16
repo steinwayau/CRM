@@ -43,6 +43,7 @@ interface Campaign {
   clickRate?: number
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused'
   recipientType: 'all' | 'filtered' | 'selected' | 'custom'
+  customEmails?: string
   scheduledAt?: string
   sentAt?: string
   createdAt: string
@@ -260,6 +261,7 @@ export default function CustomerEmailsPage() {
         recipientCount: recipients,
         sentCount: 0,
         recipientType: campaignForm.recipientType as 'all' | 'filtered' | 'selected' | 'custom',
+        customEmails: campaignForm.recipientType === 'custom' ? campaignForm.customEmails : undefined,
         status: campaignForm.scheduledAt ? 'scheduled' : 'draft',
         scheduledAt: campaignForm.scheduledAt || undefined,
         createdAt: new Date().toISOString()
@@ -325,8 +327,9 @@ export default function CustomerEmailsPage() {
           subject: campaign.subject,
           htmlContent: template.htmlContent,
           textContent: template.textContent,
-          recipientType: campaign.recipientType === 'custom' ? 'selected' : campaign.recipientType,
+          recipientType: campaign.recipientType,
           customerIds: customerIds.length > 0 ? customerIds : undefined,
+          customEmails: campaign.recipientType === 'custom' ? campaign.customEmails : undefined,
           filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined
         })
       })

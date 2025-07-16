@@ -180,6 +180,7 @@ export default function TemplateEditorPage() {
 
   const finishEditingText = () => {
     if (editingTextElement) {
+      // Only update content - all style properties including textAlign should already be persisted
       updateElement(editingTextElement, { content: tempTextContent })
       setEditingTextElement(null)
       setTempTextContent('')
@@ -471,7 +472,13 @@ export default function TemplateEditorPage() {
     switch (handle) {
       case 'nw': // Northwest corner
         if (shiftKey) {
-          // Proportional resize from center - maintain aspect ratio
+          // Shift key allows free resizing (non-proportional)
+          newWidth = Math.max(50, element.style.width - deltaX)
+          newHeight = Math.max(50, element.style.height - deltaY)
+          newX = element.style.position.x + (element.style.width - newWidth)
+          newY = element.style.position.y + (element.style.height - newHeight)
+        } else {
+          // Default: Proportional resize from center - maintain aspect ratio
           const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
           const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
           const scaleDirection = (deltaX < 0 && deltaY < 0) ? 1 : -1
@@ -484,16 +491,16 @@ export default function TemplateEditorPage() {
           const heightDiff = newHeight - element.style.height
           newX = element.style.position.x - widthDiff / 2
           newY = element.style.position.y - heightDiff / 2
-        } else {
-          newWidth = Math.max(50, element.style.width - deltaX)
-          newHeight = Math.max(50, element.style.height - deltaY)
-          newX = element.style.position.x + (element.style.width - newWidth)
-          newY = element.style.position.y + (element.style.height - newHeight)
         }
         break
       case 'ne': // Northeast corner
         if (shiftKey) {
-          // Proportional resize from center - maintain aspect ratio
+          // Shift key allows free resizing (non-proportional)
+          newWidth = Math.max(50, element.style.width + deltaX)
+          newHeight = Math.max(50, element.style.height - deltaY)
+          newY = element.style.position.y + (element.style.height - newHeight)
+        } else {
+          // Default: Proportional resize from center - maintain aspect ratio
           const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
           const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
           const scaleDirection = (deltaX > 0 && deltaY < 0) ? 1 : -1
@@ -506,15 +513,16 @@ export default function TemplateEditorPage() {
           const heightDiff = newHeight - element.style.height
           newX = element.style.position.x - widthDiff / 2
           newY = element.style.position.y - heightDiff / 2
-        } else {
-          newWidth = Math.max(50, element.style.width + deltaX)
-          newHeight = Math.max(50, element.style.height - deltaY)
-          newY = element.style.position.y + (element.style.height - newHeight)
         }
         break
       case 'sw': // Southwest corner
         if (shiftKey) {
-          // Proportional resize from center - maintain aspect ratio
+          // Shift key allows free resizing (non-proportional)
+          newWidth = Math.max(50, element.style.width - deltaX)
+          newHeight = Math.max(50, element.style.height + deltaY)
+          newX = element.style.position.x + (element.style.width - newWidth)
+        } else {
+          // Default: Proportional resize from center - maintain aspect ratio
           const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
           const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
           const scaleDirection = (deltaX < 0 && deltaY > 0) ? 1 : -1
@@ -527,15 +535,15 @@ export default function TemplateEditorPage() {
           const heightDiff = newHeight - element.style.height
           newX = element.style.position.x - widthDiff / 2
           newY = element.style.position.y - heightDiff / 2
-        } else {
-          newWidth = Math.max(50, element.style.width - deltaX)
-          newHeight = Math.max(50, element.style.height + deltaY)
-          newX = element.style.position.x + (element.style.width - newWidth)
         }
         break
       case 'se': // Southeast corner
         if (shiftKey) {
-          // Proportional resize from center - maintain aspect ratio
+          // Shift key allows free resizing (non-proportional)
+          newWidth = Math.max(50, element.style.width + deltaX)
+          newHeight = Math.max(50, element.style.height + deltaY)
+        } else {
+          // Default: Proportional resize from center - maintain aspect ratio
           const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
           const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
           const scaleDirection = (deltaX > 0 && deltaY > 0) ? 1 : -1
@@ -548,9 +556,6 @@ export default function TemplateEditorPage() {
           const heightDiff = newHeight - element.style.height
           newX = element.style.position.x - widthDiff / 2
           newY = element.style.position.y - heightDiff / 2
-        } else {
-          newWidth = Math.max(50, element.style.width + deltaX)
-          newHeight = Math.max(50, element.style.height + deltaY)
         }
         break
       case 'n': // North edge
@@ -663,6 +668,14 @@ export default function TemplateEditorPage() {
     setEditorElements([...editorElements, newElement])
     // Automatically select the new element to show properties panel
     setSelectedElement(newElement.id)
+    
+    // For text and button elements, automatically enter edit mode for immediate typing
+    if (type === 'text' || type === 'button') {
+      // Use setTimeout to ensure element is rendered before starting edit mode
+      setTimeout(() => {
+        startEditingText(newElement.id)
+      }, 10)
+    }
   }
 
   const getDefaultContent = (type: string) => {
@@ -677,7 +690,7 @@ export default function TemplateEditorPage() {
   }
 
   const updateElement = (id: string, updates: Partial<EditorElement>) => {
-    setEditorElements(editorElements.map(el => 
+    setEditorElements(prevElements => prevElements.map(el => 
       el.id === id ? { ...el, ...updates } : el
     ))
     

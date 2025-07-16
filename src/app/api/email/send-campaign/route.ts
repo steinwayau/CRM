@@ -53,6 +53,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate email configuration
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY environment variable is not configured')
+      return NextResponse.json(
+        { error: 'Email service not configured: Missing RESEND_API_KEY' },
+        { status: 500 }
+      )
+    }
+
+    if (!process.env.FROM_EMAIL) {
+      console.error('FROM_EMAIL environment variable is not configured')
+      return NextResponse.json(
+        { error: 'Email service not configured: Missing FROM_EMAIL' },
+        { status: 500 }
+      )
+    }
+
     // Get customers from database based on recipient type
     const customers = await getCustomersForCampaign(recipientType, customerIds, filters, customEmails)
     
@@ -97,8 +114,8 @@ export async function POST(request: NextRequest) {
           subject: subject,
           html: personalizeContent(htmlContent, customer),
           text: personalizeContent(textContent, customer),
-          from: process.env.RESEND_FROM_EMAIL || 'noreply@epgpianos.com.au',
-          replyTo: process.env.RESEND_REPLY_TO || 'info@epgpianos.com.au'
+          from: process.env.FROM_EMAIL || 'noreply@epgpianos.com.au',
+          replyTo: process.env.REPLY_TO_EMAIL || 'info@epgpianos.com.au'
         }))
 
         // Send batch using Resend
@@ -106,11 +123,23 @@ export async function POST(request: NextRequest) {
           batchEmails.map(email => resend.emails.send(email))
         )
 
-        // Process results
+            // Process results
         batchResults.forEach((result, index) => {
           if (result.status === 'fulfilled') {
-            results.successCount++
+            const response = result.value
+            if (response.error) {
+              console.error(`Email failed for ${batch[index].email}:`, response.error)
+              results.failureCount++
+              results.failures.push({
+                email: batch[index].email,
+                error: response.error.message || response.error
+              })
+            } else {
+              console.log(`Email sent successfully to ${batch[index].email}, ID: ${response.data?.id}`)
+              results.successCount++
+            }
           } else {
+            console.error(`Email failed for ${batch[index].email}:`, result.reason)
             results.failureCount++
             results.failures.push({
               email: batch[index].email,
@@ -225,7 +254,7 @@ export async function GET() {
   try {
     // Test Resend configuration
     const testResult = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'noreply@epgpianos.com.au',
+      from: process.env.FROM_EMAIL || 'noreply@epgpianos.com.au',
       to: 'test@example.com',
       subject: 'Test Email Configuration',
       html: '<p>This is a test email to verify Resend configuration.</p>',

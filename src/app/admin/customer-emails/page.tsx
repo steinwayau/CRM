@@ -346,9 +346,9 @@ export default function CustomerEmailsPage() {
                 sentCount: result.results.successCount,
                 recipientCount: result.results.totalRecipients,
                 sentAt: new Date().toISOString(),
-                // Add some mock performance data
-                openRate: Math.random() * 30 + 15, // 15-45% open rate
-                clickRate: Math.random() * 8 + 2   // 2-10% click rate
+                // Real performance data will be added when tracking is implemented
+                openRate: undefined,
+                clickRate: undefined
               }
             : c
         ))

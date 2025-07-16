@@ -142,6 +142,15 @@ export default function TemplateEditorPage() {
     }
   }, [propertiesPanelWidth])
 
+  // Auto-focus textarea when entering edit mode
+  useEffect(() => {
+    if (editingTextElement && textEditRef.current) {
+      // Immediate focus for better user experience
+      textEditRef.current.focus()
+      textEditRef.current.setSelectionRange(textEditRef.current.value.length, textEditRef.current.value.length)
+    }
+  }, [editingTextElement])
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault()
     setIsResizing(true)
@@ -157,13 +166,15 @@ export default function TemplateEditorPage() {
     if (element && (element.type === 'text' || element.type === 'button')) {
       setEditingTextElement(elementId)
       setTempTextContent(element.content)
-      // Focus the textarea after a brief delay to ensure it's rendered
+      // Focus the textarea immediately and select all text for instant typing
       setTimeout(() => {
         if (textEditRef.current) {
           textEditRef.current.focus()
           textEditRef.current.select()
+          // Ensure cursor is at the end for immediate typing without selection
+          textEditRef.current.setSelectionRange(textEditRef.current.value.length, textEditRef.current.value.length)
         }
-      }, 10)
+      }, 5) // Reduced delay for more immediate response
     }
   }
 
@@ -669,6 +680,11 @@ export default function TemplateEditorPage() {
     setEditorElements(editorElements.map(el => 
       el.id === id ? { ...el, ...updates } : el
     ))
+    
+    // If we're currently editing this element's text content, update the temp content too
+    if (editingTextElement === id && updates.content !== undefined) {
+      setTempTextContent(updates.content)
+    }
   }
 
   const deleteElement = (id: string) => {

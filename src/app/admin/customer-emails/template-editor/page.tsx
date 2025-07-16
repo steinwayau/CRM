@@ -81,6 +81,10 @@ export default function TemplateEditorPage() {
   const [draggedElement, setDraggedElement] = useState<string | null>(null)
   const [isResizingElement, setIsResizingElement] = useState<{elementId: string, handle: string} | null>(null)
   
+  // Add state for in-line text editing
+  const [editingTextElement, setEditingTextElement] = useState<string | null>(null)
+  const [tempTextContent, setTempTextContent] = useState<string>('')
+  
   // Use refs for drag state to avoid timing issues with state updates
   const dragStateRef = useRef({
     isDragging: false,
@@ -88,6 +92,9 @@ export default function TemplateEditorPage() {
     elementId: null as string | null
   })
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Ref for the text editing textarea
+  const textEditRef = useRef<HTMLTextAreaElement>(null)
 
   // Close color picker when clicking outside
   useEffect(() => {
@@ -142,6 +149,45 @@ export default function TemplateEditorPage() {
 
   const handleResizeDoubleClick = () => {
     setPropertiesPanelWidth(320)
+  }
+
+  // Text editing functions
+  const startEditingText = (elementId: string) => {
+    const element = editorElements.find(el => el.id === elementId)
+    if (element && (element.type === 'text' || element.type === 'button')) {
+      setEditingTextElement(elementId)
+      setTempTextContent(element.content)
+      // Focus the textarea after a brief delay to ensure it's rendered
+      setTimeout(() => {
+        if (textEditRef.current) {
+          textEditRef.current.focus()
+          textEditRef.current.select()
+        }
+      }, 10)
+    }
+  }
+
+  const finishEditingText = () => {
+    if (editingTextElement) {
+      updateElement(editingTextElement, { content: tempTextContent })
+      setEditingTextElement(null)
+      setTempTextContent('')
+    }
+  }
+
+  const cancelEditingText = () => {
+    setEditingTextElement(null)
+    setTempTextContent('')
+  }
+
+  const handleTextEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      finishEditingText()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancelEditingText()
+    }
   }
 
   // Quick alignment actions
@@ -1256,7 +1302,12 @@ export default function TemplateEditorPage() {
                   `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
                 backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
               }}
-              onClick={() => setSelectedElement(null)}
+              onClick={() => {
+                setSelectedElement(null)
+                if (editingTextElement) {
+                  finishEditingText()
+                }
+              }}
             >
               {/* Grid overlay */}
               {showGrid && (
@@ -1429,27 +1480,64 @@ export default function TemplateEditorPage() {
                   }}
                 >
                   {element.type === 'text' && (
-                    <div
-                      style={{
-                        fontSize: element.style.fontSize,
-                        fontWeight: element.style.fontWeight,
-                        fontFamily: element.style.fontFamily,
-                        fontStyle: element.style.fontStyle,
-                        textDecoration: element.style.textDecoration,
-                        color: element.style.color,
-                        backgroundColor: element.style.backgroundColor,
-                        padding: element.style.padding,
-                        borderRadius: element.style.borderRadius,
-                        textAlign: element.style.textAlign,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        border: '1px solid #e5e7eb'
-                      }}
-                    >
-                      {element.content}
-                    </div>
+                    <>
+                      {editingTextElement === element.id ? (
+                        <textarea
+                          ref={textEditRef}
+                          value={tempTextContent}
+                          onChange={(e) => setTempTextContent(e.target.value)}
+                          onKeyDown={handleTextEditKeyDown}
+                          onBlur={finishEditingText}
+                          style={{
+                            fontSize: element.style.fontSize,
+                            fontWeight: element.style.fontWeight,
+                            fontFamily: element.style.fontFamily,
+                            fontStyle: element.style.fontStyle,
+                            textDecoration: element.style.textDecoration,
+                            color: element.style.color,
+                            backgroundColor: element.style.backgroundColor,
+                            padding: element.style.padding,
+                            borderRadius: element.style.borderRadius,
+                            textAlign: element.style.textAlign,
+                            width: '100%',
+                            height: '100%',
+                            border: '2px solid #3b82f6',
+                            outline: 'none',
+                            resize: 'none',
+                            overflow: 'hidden'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: element.style.fontSize,
+                            fontWeight: element.style.fontWeight,
+                            fontFamily: element.style.fontFamily,
+                            fontStyle: element.style.fontStyle,
+                            textDecoration: element.style.textDecoration,
+                            color: element.style.color,
+                            backgroundColor: element.style.backgroundColor,
+                            padding: element.style.padding,
+                            borderRadius: element.style.borderRadius,
+                            textAlign: element.style.textAlign,
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            border: '1px solid #e5e7eb',
+                            cursor: 'text'
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            startEditingText(element.id)
+                          }}
+                        >
+                          {element.content}
+                        </div>
+                      )}
+                    </>
                   )}
                   
                   {element.type === 'image' && (
@@ -1466,27 +1554,63 @@ export default function TemplateEditorPage() {
                   )}
                   
                   {element.type === 'button' && (
-                    <div
-                      style={{
-                        backgroundColor: element.style.backgroundColor,
-                        color: element.style.color,
-                        padding: element.style.padding,
-                        borderRadius: element.style.borderRadius,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        fontSize: element.style.fontSize || 14,
-                        fontWeight: element.style.fontWeight || 'medium',
-                        fontFamily: element.style.fontFamily,
-                        fontStyle: element.style.fontStyle,
-                        textDecoration: element.style.textDecoration
-                      }}
-                    >
-                      {element.content}
-                    </div>
+                    <>
+                      {editingTextElement === element.id ? (
+                        <textarea
+                          ref={textEditRef}
+                          value={tempTextContent}
+                          onChange={(e) => setTempTextContent(e.target.value)}
+                          onKeyDown={handleTextEditKeyDown}
+                          onBlur={finishEditingText}
+                          style={{
+                            backgroundColor: element.style.backgroundColor,
+                            color: element.style.color,
+                            padding: element.style.padding,
+                            borderRadius: element.style.borderRadius,
+                            width: '100%',
+                            height: '100%',
+                            fontSize: element.style.fontSize || 14,
+                            fontWeight: element.style.fontWeight || 'medium',
+                            fontFamily: element.style.fontFamily,
+                            fontStyle: element.style.fontStyle,
+                            textDecoration: element.style.textDecoration,
+                            border: '2px solid #3b82f6',
+                            outline: 'none',
+                            resize: 'none',
+                            overflow: 'hidden',
+                            textAlign: 'center'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            backgroundColor: element.style.backgroundColor,
+                            color: element.style.color,
+                            padding: element.style.padding,
+                            borderRadius: element.style.borderRadius,
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'text',
+                            fontSize: element.style.fontSize || 14,
+                            fontWeight: element.style.fontWeight || 'medium',
+                            fontFamily: element.style.fontFamily,
+                            fontStyle: element.style.fontStyle,
+                            textDecoration: element.style.textDecoration
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            startEditingText(element.id)
+                          }}
+                        >
+                          {element.content}
+                        </div>
+                      )}
+                    </>
                   )}
                   
                   {element.type === 'video' && (

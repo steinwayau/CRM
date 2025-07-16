@@ -471,130 +471,144 @@ export default function TemplateEditorPage() {
 
     // Calculate new dimensions based on handle
     switch (handle) {
-      case 'nw': // Northwest corner
+      case 'nw': // Northwest corner - resize from northwest corner
         if (shiftKey) {
-          // Shift key allows free resizing (non-proportional)
+          // Shift key allows free resizing (distortion allowed)
           newWidth = Math.max(50, element.style.width - deltaX)
           newHeight = Math.max(50, element.style.height - deltaY)
-          newX = element.style.position.x + (element.style.width - newWidth)
-          newY = element.style.position.y + (element.style.height - newHeight)
+          newX = element.style.position.x + deltaX
+          newY = element.style.position.y + deltaY
         } else {
-          // Default: Proportional resize from center - maintain aspect ratio
-          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
-          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
-          const scaleDirection = (deltaX < 0 && deltaY < 0) ? 1 : -1
+          // Default: Proportional resize from northwest corner
+          // Use the delta that gives the larger change to determine scale
+          const scaleFactorX = Math.abs(deltaX) / element.style.width
+          const scaleFactorY = Math.abs(deltaY) / element.style.height
+          const scaleFactor = Math.max(scaleFactorX, scaleFactorY)
           
-          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
+          // Determine if we're making it bigger or smaller
+          const isGrowing = (deltaX < 0 && deltaY < 0)
+          const scaleDirection = isGrowing ? 1 + scaleFactor : 1 - scaleFactor
+          
+          newWidth = Math.max(50, element.style.width * scaleDirection)
           newHeight = Math.max(50, newWidth / aspectRatio)
           
-          // Resize from center by adjusting position
-          const widthDiff = newWidth - element.style.width
-          const heightDiff = newHeight - element.style.height
-          newX = element.style.position.x - widthDiff / 2
-          newY = element.style.position.y - heightDiff / 2
+          // Position stays anchored to the southeast corner (opposite of northwest)
+          const seX = element.style.position.x + element.style.width
+          const seY = element.style.position.y + element.style.height
+          newX = seX - newWidth
+          newY = seY - newHeight
         }
         break
-      case 'ne': // Northeast corner
+      case 'ne': // Northeast corner - resize from northeast corner
         if (shiftKey) {
-          // Shift key allows free resizing (non-proportional)
+          // Shift key allows free resizing (distortion allowed)
           newWidth = Math.max(50, element.style.width + deltaX)
           newHeight = Math.max(50, element.style.height - deltaY)
-          newY = element.style.position.y + (element.style.height - newHeight)
+          newY = element.style.position.y + deltaY
         } else {
-          // Default: Proportional resize from center - maintain aspect ratio
-          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
-          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
-          const scaleDirection = (deltaX > 0 && deltaY < 0) ? 1 : -1
+          // Default: Proportional resize from northeast corner
+          const scaleFactorX = Math.abs(deltaX) / element.style.width
+          const scaleFactorY = Math.abs(deltaY) / element.style.height
+          const scaleFactor = Math.max(scaleFactorX, scaleFactorY)
           
-          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
+          const isGrowing = (deltaX > 0 && deltaY < 0)
+          const scaleDirection = isGrowing ? 1 + scaleFactor : 1 - scaleFactor
+          
+          newWidth = Math.max(50, element.style.width * scaleDirection)
           newHeight = Math.max(50, newWidth / aspectRatio)
           
-          // Resize from center by adjusting position
-          const widthDiff = newWidth - element.style.width
-          const heightDiff = newHeight - element.style.height
-          newX = element.style.position.x - widthDiff / 2
-          newY = element.style.position.y - heightDiff / 2
+          // Position stays anchored to the southwest corner (opposite of northeast)
+          const swY = element.style.position.y + element.style.height
+          newY = swY - newHeight
         }
         break
-      case 'sw': // Southwest corner
+      case 'sw': // Southwest corner - resize from southwest corner
         if (shiftKey) {
-          // Shift key allows free resizing (non-proportional)
+          // Shift key allows free resizing (distortion allowed)
           newWidth = Math.max(50, element.style.width - deltaX)
           newHeight = Math.max(50, element.style.height + deltaY)
-          newX = element.style.position.x + (element.style.width - newWidth)
+          newX = element.style.position.x + deltaX
         } else {
-          // Default: Proportional resize from center - maintain aspect ratio
-          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
-          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
-          const scaleDirection = (deltaX < 0 && deltaY > 0) ? 1 : -1
+          // Default: Proportional resize from southwest corner
+          const scaleFactorX = Math.abs(deltaX) / element.style.width
+          const scaleFactorY = Math.abs(deltaY) / element.style.height
+          const scaleFactor = Math.max(scaleFactorX, scaleFactorY)
           
-          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
+          const isGrowing = (deltaX < 0 && deltaY > 0)
+          const scaleDirection = isGrowing ? 1 + scaleFactor : 1 - scaleFactor
+          
+          newWidth = Math.max(50, element.style.width * scaleDirection)
           newHeight = Math.max(50, newWidth / aspectRatio)
           
-          // Resize from center by adjusting position
-          const widthDiff = newWidth - element.style.width
-          const heightDiff = newHeight - element.style.height
-          newX = element.style.position.x - widthDiff / 2
-          newY = element.style.position.y - heightDiff / 2
+          // Position stays anchored to the northeast corner (opposite of southwest)
+          const neX = element.style.position.x + element.style.width
+          newX = neX - newWidth
         }
         break
-      case 'se': // Southeast corner
+      case 'se': // Southeast corner - resize from southeast corner
         if (shiftKey) {
-          // Shift key allows free resizing (non-proportional)
+          // Shift key allows free resizing (distortion allowed)
           newWidth = Math.max(50, element.style.width + deltaX)
           newHeight = Math.max(50, element.style.height + deltaY)
         } else {
-          // Default: Proportional resize from center - maintain aspect ratio
-          const avgDelta = (Math.abs(deltaX) + Math.abs(deltaY)) / 2
-          const scaleFactor = avgDelta / Math.min(element.style.width, element.style.height)
-          const scaleDirection = (deltaX > 0 && deltaY > 0) ? 1 : -1
+          // Default: Proportional resize from southeast corner
+          const scaleFactorX = Math.abs(deltaX) / element.style.width
+          const scaleFactorY = Math.abs(deltaY) / element.style.height
+          const scaleFactor = Math.max(scaleFactorX, scaleFactorY)
           
-          newWidth = Math.max(50, element.style.width + (scaleDirection * scaleFactor * element.style.width))
+          const isGrowing = (deltaX > 0 && deltaY > 0)
+          const scaleDirection = isGrowing ? 1 + scaleFactor : 1 - scaleFactor
+          
+          newWidth = Math.max(50, element.style.width * scaleDirection)
           newHeight = Math.max(50, newWidth / aspectRatio)
           
-          // Resize from center by adjusting position
-          const widthDiff = newWidth - element.style.width
-          const heightDiff = newHeight - element.style.height
-          newX = element.style.position.x - widthDiff / 2
-          newY = element.style.position.y - heightDiff / 2
+          // Position stays anchored to the northwest corner (position doesn't change)
+          // newX and newY remain the same
         }
         break
       case 'n': // North edge
         if (shiftKey) {
-          // For edge handles with shift, maintain aspect ratio by adjusting width
+          // Shift+drag maintains aspect ratio
           newHeight = Math.max(50, element.style.height - deltaY)
           newWidth = Math.max(50, newHeight * aspectRatio)
           newX = element.style.position.x - (newWidth - element.style.width) / 2
         } else {
+          // Normal drag allows distortion
           newHeight = Math.max(50, element.style.height - deltaY)
         }
-        newY = element.style.position.y + (element.style.height - newHeight)
+        newY = element.style.position.y + deltaY
         break
       case 's': // South edge
         if (shiftKey) {
+          // Shift+drag maintains aspect ratio
           newHeight = Math.max(50, element.style.height + deltaY)
           newWidth = Math.max(50, newHeight * aspectRatio)
           newX = element.style.position.x - (newWidth - element.style.width) / 2
         } else {
+          // Normal drag allows distortion
           newHeight = Math.max(50, element.style.height + deltaY)
         }
         break
       case 'w': // West edge
         if (shiftKey) {
+          // Shift+drag maintains aspect ratio
           newWidth = Math.max(50, element.style.width - deltaX)
           newHeight = Math.max(50, newWidth / aspectRatio)
           newY = element.style.position.y - (newHeight - element.style.height) / 2
         } else {
+          // Normal drag allows distortion
           newWidth = Math.max(50, element.style.width - deltaX)
         }
-        newX = element.style.position.x + (element.style.width - newWidth)
+        newX = element.style.position.x + deltaX
         break
       case 'e': // East edge
         if (shiftKey) {
+          // Shift+drag maintains aspect ratio
           newWidth = Math.max(50, element.style.width + deltaX)
           newHeight = Math.max(50, newWidth / aspectRatio)
           newY = element.style.position.y - (newHeight - element.style.height) / 2
         } else {
+          // Normal drag allows distortion
           newWidth = Math.max(50, element.style.width + deltaX)
         }
         break

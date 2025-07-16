@@ -72,7 +72,8 @@ export default function CustomerEmailsPage() {
     name: '',
     templateId: '',
     subject: '',
-    recipientType: 'all', // 'all', 'filtered', 'selected'
+    recipientType: 'all', // 'all', 'filtered', 'selected', 'custom'
+    customEmails: '', // For custom email list
     scheduledAt: ''
   })
 
@@ -101,8 +102,25 @@ export default function CustomerEmailsPage() {
     setLoading(true)
     try {
       // Load customer data from your existing enquiries API
+      console.log('Fetching customers from /api/enquiries...')
       const customersResponse = await fetch('/api/enquiries')
+      
+      if (!customersResponse.ok) {
+        throw new Error(`HTTP ${customersResponse.status}: ${customersResponse.statusText}`)
+      }
+      
       const customersData = await customersResponse.json()
+      console.log('Customers API response:', customersData)
+      
+      // Check if API returned an error
+      if (customersData.error) {
+        throw new Error(customersData.error)
+      }
+      
+      // Ensure we have an array
+      if (!Array.isArray(customersData)) {
+        throw new Error('API did not return an array of customers')
+      }
       
       // Transform enquiry data to customer format
       const transformedCustomers = customersData.map((enquiry: any) => ({
@@ -123,6 +141,7 @@ export default function CustomerEmailsPage() {
         createdAt: enquiry.createdAt
       }))
       
+      console.log('Transformed customers:', transformedCustomers.length, 'customers')
       setCustomers(transformedCustomers)
       
       // Load templates from localStorage
@@ -176,6 +195,12 @@ export default function CustomerEmailsPage() {
       
     } catch (error) {
       console.error('Error loading data:', error)
+      // Show user-friendly error message
+      alert(`Failed to load customer data: ${error instanceof Error ? error.message : 'Unknown error'}. Please check the browser console for details.`)
+      // Set empty arrays as fallback
+      setCustomers([])
+      setTemplates([])
+      setCampaigns([])
     } finally {
       setLoading(false)
     }
@@ -203,11 +228,22 @@ export default function CustomerEmailsPage() {
 
   const handleCreateCampaign = async () => {
     try {
-      const recipients = campaignForm.recipientType === 'all' 
-        ? filteredCustomers.length
-        : campaignForm.recipientType === 'filtered'
-        ? filteredCustomers.length
-        : selectedCustomers.length
+      let recipients = 0
+      
+      if (campaignForm.recipientType === 'all') {
+        recipients = filteredCustomers.length
+      } else if (campaignForm.recipientType === 'filtered') {
+        recipients = filteredCustomers.length
+      } else if (campaignForm.recipientType === 'selected') {
+        recipients = selectedCustomers.length
+      } else if (campaignForm.recipientType === 'custom') {
+        // Parse custom email list
+        const emailList = campaignForm.customEmails
+          .split(/[,\n\r]+/)
+          .map(email => email.trim())
+          .filter(email => email && /\S+@\S+\.\S+/.test(email))
+        recipients = emailList.length
+      }
 
       const newCampaign: Campaign = {
         id: Date.now().toString(),
@@ -229,6 +265,7 @@ export default function CustomerEmailsPage() {
         templateId: '',
         subject: '',
         recipientType: 'all',
+        customEmails: '',
         scheduledAt: ''
       })
     } catch (error) {
@@ -523,14 +560,40 @@ export default function CustomerEmailsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
                 <select
                   value={campaignForm.recipientType}
-                  onChange={(e) => setCampaignForm({...campaignForm, recipientType: e.target.value})}
+                  onChange={(e) => setCampaignForm({...campaignForm, recipientType: e.target.value, customEmails: ''})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="all">All customers ({filteredCustomers.length})</option>
                   <option value="filtered">Filtered customers ({filteredCustomers.length})</option>
                   <option value="selected">Selected customers ({selectedCustomers.length})</option>
+                  <option value="custom">Custom email list</option>
                 </select>
               </div>
+
+              {campaignForm.recipientType === 'custom' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Custom Email List
+                    <span className="text-xs text-gray-500 ml-2">(Paste emails separated by commas or new lines)</span>
+                  </label>
+                  <textarea
+                    value={campaignForm.customEmails}
+                    onChange={(e) => setCampaignForm({...campaignForm, customEmails: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    rows={6}
+                    placeholder="Enter email addresses separated by commas or new lines:&#10;john@example.com, jane@example.com&#10;bob@company.com&#10;alice@business.com"
+                  />
+                  <div className="mt-1 text-xs text-gray-500">
+                    {(() => {
+                      const emailList = campaignForm.customEmails
+                        .split(/[,\n\r]+/)
+                        .map(email => email.trim())
+                        .filter(email => email && /\S+@\S+\.\S+/.test(email))
+                      return `${emailList.length} valid email${emailList.length !== 1 ? 's' : ''} detected`
+                    })()}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Schedule (Optional)</label>
@@ -552,7 +615,12 @@ export default function CustomerEmailsPage() {
               </button>
               <button
                 onClick={handleCreateCampaign}
-                disabled={!campaignForm.name || !campaignForm.templateId || !campaignForm.subject}
+                disabled={
+                  !campaignForm.name || 
+                  !campaignForm.templateId || 
+                  !campaignForm.subject ||
+                  (campaignForm.recipientType === 'custom' && !campaignForm.customEmails.trim())
+                }
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 Create Campaign

@@ -15,8 +15,9 @@ interface EmailTemplate {
 
 interface EditorElement {
   id: string
-  type: 'text' | 'image' | 'video' | 'button' | 'divider'
+  type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading'
   content: string
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6
   videoData?: {
     platform: 'youtube' | 'vimeo' | 'facebook' | 'custom'
     url: string
@@ -295,7 +296,7 @@ export default function TemplateEditorPage() {
   }
 
   // Auto-stacking function to position new elements
-  const getNextElementPosition = (elementType: 'text' | 'image' | 'video' | 'button' | 'divider') => {
+  const getNextElementPosition = (elementType: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading') => {
     if (editorElements.length === 0) {
       // First element - center horizontally, start at top with margin
       const defaultWidth = elementType === 'divider' ? 500 : elementType === 'button' ? 200 : 300
@@ -657,35 +658,36 @@ export default function TemplateEditorPage() {
   }, [isEditing, templateId])
 
   // Visual editor functions
-  const addElement = (type: 'text' | 'image' | 'video' | 'button' | 'divider') => {
+  const addElement = (type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading') => {
     const position = getNextElementPosition(type)
     
     const newElement: EditorElement = {
       id: Date.now().toString(),
       type,
       content: getDefaultContent(type),
+      headingLevel: type === 'heading' ? 1 : undefined,
       style: {
         position: position,
         width: type === 'divider' ? 500 : type === 'button' ? 200 : 300,
-        height: type === 'text' ? 120 : type === 'divider' ? 2 : type === 'button' ? 40 : 200,
-        fontSize: type === 'text' ? 16 : undefined,
-        fontWeight: type === 'text' ? 'normal' : undefined,
-        fontFamily: type === 'text' ? 'Arial, sans-serif' : undefined,
-        fontStyle: type === 'text' ? 'normal' : undefined,
-        textDecoration: type === 'text' ? 'none' : undefined,
-        color: type === 'text' ? '#000000' : type === 'button' ? '#ffffff' : undefined,
+        height: type === 'text' ? 120 : type === 'heading' ? 80 : type === 'divider' ? 2 : type === 'button' ? 40 : 200,
+        fontSize: type === 'text' ? 16 : type === 'heading' ? 32 : undefined,
+        fontWeight: type === 'text' ? 'normal' : type === 'heading' ? 'bold' : undefined,
+        fontFamily: type === 'text' || type === 'heading' ? 'Arial, sans-serif' : undefined,
+        fontStyle: type === 'text' || type === 'heading' ? 'normal' : undefined,
+        textDecoration: type === 'text' || type === 'heading' ? 'none' : undefined,
+        color: type === 'text' || type === 'heading' ? '#000000' : type === 'button' ? '#ffffff' : undefined,
         backgroundColor: type === 'button' ? '#3b82f6' : type === 'divider' ? '#e5e7eb' : type === 'text' ? '#f9fafb' : undefined,
-        padding: type === 'text' || type === 'button' ? 10 : undefined,
+        padding: type === 'text' || type === 'button' || type === 'heading' ? 10 : undefined,
         borderRadius: type === 'button' ? 6 : undefined,
-        textAlign: type === 'text' ? 'left' as const : undefined
+        textAlign: type === 'text' || type === 'heading' ? 'left' as const : undefined
       }
     }
     setEditorElements([...editorElements, newElement])
     // Automatically select the new element to show properties panel
     setSelectedElement(newElement.id)
     
-    // For text and button elements, automatically enter edit mode for immediate typing
-    if (type === 'text' || type === 'button') {
+    // For text, heading and button elements, automatically enter edit mode for immediate typing
+    if (type === 'text' || type === 'heading' || type === 'button') {
       // Use setTimeout to ensure element is rendered before starting edit mode
       setTimeout(() => {
         startEditingText(newElement.id)
@@ -696,6 +698,7 @@ export default function TemplateEditorPage() {
   const getDefaultContent = (type: string) => {
     switch (type) {
       case 'text': return 'Enter your text here...'
+      case 'heading': return 'Your Heading Here'
       case 'image': return 'https://via.placeholder.com/300x200'
       case 'video': return ''
       case 'button': return 'Click Here'
@@ -801,6 +804,10 @@ export default function TemplateEditorPage() {
       switch (type) {
         case 'text':
           html += `<div style="${commonStyles}">${content}</div>`
+          break
+        case 'heading':
+          const headingTag = `h${element.headingLevel || 1}`
+          html += `<${headingTag} style="${commonStyles}">${content}</${headingTag}>`
           break
         case 'image':
           html += `<img src="${content}" style="${commonStyles} object-fit: cover;" alt="Email Image" />`
@@ -1176,6 +1183,18 @@ export default function TemplateEditorPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                   <span className="text-sm font-medium">Text Block</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => addElement('heading')}
+                className="w-full p-3 text-left border border-gray-200 rounded-md hover:bg-gray-50 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V6a2 2 0 012-2h12a2 2 0 012 2v2m-6 12V8m0 0L8 8m4 0l4 0" />
+                  </svg>
+                  <span className="text-sm font-medium">Heading</span>
                 </div>
               </button>
 
@@ -1598,6 +1617,67 @@ export default function TemplateEditorPage() {
                     </>
                   )}
                   
+                  {element.type === 'heading' && (
+                    <>
+                      {editingTextElement === element.id ? (
+                        <textarea
+                          ref={textEditRef}
+                          value={tempTextContent}
+                          onChange={(e) => setTempTextContent(e.target.value)}
+                          onKeyDown={handleTextEditKeyDown}
+                          onBlur={finishEditingText}
+                          style={{
+                            fontSize: element.style.fontSize,
+                            fontWeight: element.style.fontWeight,
+                            fontFamily: element.style.fontFamily,
+                            fontStyle: element.style.fontStyle,
+                            textDecoration: element.style.textDecoration,
+                            color: element.style.color,
+                            backgroundColor: element.style.backgroundColor,
+                            padding: element.style.padding,
+                            borderRadius: element.style.borderRadius,
+                            textAlign: element.style.textAlign,
+                            width: '100%',
+                            height: '100%',
+                            border: '2px solid #3b82f6',
+                            outline: 'none',
+                            resize: 'none',
+                            overflow: 'hidden'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: element.style.fontSize,
+                            fontWeight: element.style.fontWeight,
+                            fontFamily: element.style.fontFamily,
+                            fontStyle: element.style.fontStyle,
+                            textDecoration: element.style.textDecoration,
+                            color: element.style.color,
+                            backgroundColor: element.style.backgroundColor,
+                            padding: element.style.padding,
+                            borderRadius: element.style.borderRadius,
+                            textAlign: element.style.textAlign,
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            border: '1px solid #e5e7eb',
+                            cursor: 'text'
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            startEditingText(element.id)
+                          }}
+                        >
+                          {element.content}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
                   {element.type === 'image' && (
                     <img 
                       src={element.content} 
@@ -1858,7 +1938,7 @@ export default function TemplateEditorPage() {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                      {element.type === 'text' || element.type === 'button' ? (
+                      {element.type === 'text' || element.type === 'heading' || element.type === 'button' ? (
                         <textarea
                           value={element.content}
                           onChange={(e) => updateElement(element.id, { content: e.target.value })}
@@ -1998,7 +2078,27 @@ export default function TemplateEditorPage() {
                       </div>
                     </div>
                     
-                    {(element.type === 'text' || element.type === 'button') && (
+                    {element.type === 'heading' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Heading Level</label>
+                        <select
+                          value={element.headingLevel || 1}
+                          onChange={(e) => updateElement(element.id, {
+                            headingLevel: parseInt(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6
+                          })}
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        >
+                          <option value={1}>H1 - Main Heading</option>
+                          <option value={2}>H2 - Section Heading</option>
+                          <option value={3}>H3 - Sub Heading</option>
+                          <option value={4}>H4 - Minor Heading</option>
+                          <option value={5}>H5 - Small Heading</option>
+                          <option value={6}>H6 - Smallest Heading</option>
+                        </select>
+                      </div>
+                    )}
+                    
+                    {(element.type === 'text' || element.type === 'heading' || element.type === 'button') && (
                       <>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
@@ -2109,7 +2209,7 @@ export default function TemplateEditorPage() {
                           )}
                         </div>
 
-                        {element.type === 'text' && (
+                        {(element.type === 'text' || element.type === 'heading') && (
                           <>
                             <div className="relative color-picker-container">
                               <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>

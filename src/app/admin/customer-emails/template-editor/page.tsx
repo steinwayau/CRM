@@ -92,6 +92,7 @@ export default function TemplateEditorPage() {
     elementId: null as string | null
   })
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastElementInteractionRef = useRef<number>(0)
   
   // Ref for the text editing textarea
   const textEditRef = useRef<HTMLTextAreaElement>(null)
@@ -1331,10 +1332,18 @@ export default function TemplateEditorPage() {
                   `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
                 backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
               }}
-              onClick={() => {
-                setSelectedElement(null)
-                if (editingTextElement) {
-                  finishEditingText()
+              onClick={(e) => {
+                // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
+                const timeSinceLastInteraction = Date.now() - lastElementInteractionRef.current
+                const wasRecentlyInteractingWithElement = timeSinceLastInteraction < 100 // 100ms threshold
+                const isCurrentlyDragging = dragStateRef.current.dragStarted || dragStateRef.current.isDragging
+                
+                // Don't clear selection if we just interacted with an element or are currently dragging
+                if (!wasRecentlyInteractingWithElement && !isCurrentlyDragging) {
+                  setSelectedElement(null)
+                  if (editingTextElement) {
+                    finishEditingText()
+                  }
                 }
               }}
             >
@@ -1409,6 +1418,8 @@ export default function TemplateEditorPage() {
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
+                    // Track element interaction time
+                    lastElementInteractionRef.current = Date.now()
                     // Only handle click if we haven't dragged
                     if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
                       setSelectedElement(element.id)
@@ -1420,6 +1431,8 @@ export default function TemplateEditorPage() {
                     
                     e.preventDefault()
                     e.stopPropagation()
+                    // Track element interaction time
+                    lastElementInteractionRef.current = Date.now()
                     setSelectedElement(element.id)
                     
                     // Reset drag state
@@ -1488,6 +1501,8 @@ export default function TemplateEditorPage() {
                       if (animationFrameId) {
                         cancelAnimationFrame(animationFrameId)
                       }
+                      // Track element interaction time
+                      lastElementInteractionRef.current = Date.now()
                       setIsDragging(false)
                       setDraggedElement(null)
                       setShowAlignmentGuides([])

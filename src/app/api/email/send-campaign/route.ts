@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
           subject: subject,
           html: personalizeContent(htmlContent, customer),
           text: personalizeContent(textContent, customer),
-          from: process.env.FROM_EMAIL || 'noreply@epgpianos.com.au',
+          from: 'onboarding@resend.dev',
           replyTo: process.env.REPLY_TO_EMAIL || 'info@epgpianos.com.au'
         }))
 
@@ -254,7 +254,7 @@ export async function GET() {
   try {
     // Test Resend configuration
     const testResult = await resend.emails.send({
-      from: process.env.FROM_EMAIL || 'noreply@epgpianos.com.au',
+      from: 'onboarding@resend.dev',
       to: 'test@example.com',
       subject: 'Test Email Configuration',
       html: '<p>This is a test email to verify Resend configuration.</p>',

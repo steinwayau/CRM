@@ -46,11 +46,7 @@ export async function sendFollowUpReminder(
       throw new Error('RESEND_API_KEY environment variable is not set')
     }
 
-    if (!process.env.FROM_EMAIL) {
-      throw new Error('FROM_EMAIL environment variable is not set')
-    }
-
-    // Format product interest
+    // Create product list for subject line
     const products = Array.isArray(enquiry.productInterest) 
       ? enquiry.productInterest.join(', ') 
       : enquiry.productInterest || 'Not specified'
@@ -61,7 +57,7 @@ export async function sendFollowUpReminder(
 
     // Send email using Resend
     const result = await resend.emails.send({
-      from: process.env.FROM_EMAIL,
+      from: 'noreply@steinway.com.au',
       to: staff.email,
       subject: `⏰ Follow-up Reminder: ${enquiry.firstName} ${enquiry.lastName} - ${products}`,
       html: emailHtml,
@@ -287,17 +283,13 @@ export async function testEmailConfig(): Promise<{ success: boolean; error?: str
       return { success: false, error: 'RESEND_API_KEY environment variable is not set' }
     }
 
-    if (!process.env.FROM_EMAIL) {
-      return { success: false, error: 'FROM_EMAIL environment variable is not set' }
-    }
-
     // Test connection by sending a simple test email to the from address
     const result = await resend.emails.send({
-      from: process.env.FROM_EMAIL,
-      to: process.env.FROM_EMAIL, // Send to self for testing
-      subject: 'EPG CRM Email Service Test',
-      text: 'This is a test email to verify the email service configuration is working correctly.',
-      tags: [{ name: 'type', value: 'config-test' }]
+      from: 'noreply@steinway.com.au',
+      to: 'noreply@steinway.com.au', // Send to self for testing
+      subject: 'Test Email Configuration',
+      html: '<p>This is a test email to verify Resend configuration.</p>',
+      text: 'This is a test email to verify Resend configuration.'
     })
 
     if (result.error) {

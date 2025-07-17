@@ -32,28 +32,7 @@ interface CampaignRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CampaignRequest = await request.json()
-    
-    const { 
-      templateId, 
-      subject, 
-      htmlContent, 
-      textContent, 
-      recipientType, 
-      customerIds, 
-      customEmails,
-      filters 
-    } = body
-
-    // Validate required fields
-    if (!templateId || !subject || !htmlContent) {
-      return NextResponse.json(
-        { error: 'Missing required fields: templateId, subject, htmlContent' },
-        { status: 400 }
-      )
-    }
-
-    // Validate email configuration
+    // Environment validation
     if (!process.env.RESEND_API_KEY) {
       console.error('RESEND_API_KEY environment variable is not configured')
       return NextResponse.json(
@@ -62,11 +41,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!process.env.FROM_EMAIL) {
-      console.error('FROM_EMAIL environment variable is not configured')
+    const { templateId, subject, htmlContent, textContent, recipientType, customEmails, customerIds, filters } = await request.json()
+    
+    // Validate required fields
+    if (!templateId || !subject || !htmlContent) {
       return NextResponse.json(
-        { error: 'Email service not configured: Missing FROM_EMAIL' },
-        { status: 500 }
+        { error: 'Missing required fields: templateId, subject, htmlContent' },
+        { status: 400 }
       )
     }
 
@@ -114,8 +95,8 @@ export async function POST(request: NextRequest) {
           subject: subject,
           html: personalizeContent(htmlContent, customer),
           text: personalizeContent(textContent, customer),
-          from: 'onboarding@resend.dev',
-          replyTo: process.env.REPLY_TO_EMAIL || 'info@epgpianos.com.au'
+          from: 'noreply@steinway.com.au',
+          replyTo: process.env.REPLY_TO_EMAIL || 'info@steinway.com.au'
         }))
 
         // Send batch using Resend
@@ -254,7 +235,7 @@ export async function GET() {
   try {
     // Test Resend configuration
     const testResult = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: 'noreply@steinway.com.au',
       to: 'test@example.com',
       subject: 'Test Email Configuration',
       html: '<p>This is a test email to verify Resend configuration.</p>',

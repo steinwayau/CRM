@@ -56,6 +56,20 @@ WAIT FOR EXPLICIT "YES" BEFORE DOING ANYTHING
 
 🚨 VIOLATION: Using wrong CLI commands wastes time and confuses deployment process 🚨
 
+🚨 CRITICAL: VERCEL DEPLOYMENT URL MANAGEMENT 🚨
+- **PRODUCTION URL**: https://epg-crm.vercel.app (main production with authentication disabled)
+- **PROBLEM**: `npx vercel --prod` creates NEW URLs with authentication ENABLED by default
+- **SOLUTION**: Push to git and let GitHub→Vercel integration update main production URL
+- **CORRECT PROCESS**: 
+  1. `git add .`
+  2. `git commit -m "Your changes"`
+  3. `git push origin main`
+  4. Vercel automatically deploys to epg-crm.vercel.app (no authentication issues)
+- **AVOID**: Creating new deployment URLs that require authentication reconfiguration
+- **WARNING**: Each new deployment URL needs separate authentication settings disabled
+
+🚨 DEPLOYMENT URL CONFUSION WASTES HOURS - USE MAIN PRODUCTION URL ONLY 🚨
+
 🚨 CRITICAL: DATABASE PROTECTION RULE 🚨 
 - You are NOT ALLOWED under ANY circumstances to modify, delete, or corrupt enquiry data
 - ⚠️ The database contains critical business data that must be preserved

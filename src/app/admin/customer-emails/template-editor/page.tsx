@@ -1727,12 +1727,18 @@ export default function TemplateEditorPage() {
                             height: '100%',
                             display: 'flex',
                             alignItems: 'flex-start',
+                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
                             border: '1px solid #e5e7eb',
                             cursor: 'text'
                           }}
-                          onDoubleClick={(e) => {
+                          onClick={(e) => {
                             e.stopPropagation()
-                            startEditingText(element.id)
+                            // Start editing on single click, but only if not dragging
+                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                              setTimeout(() => {
+                                startEditingText(element.id)
+                              }, 100)
+                            }
                           }}
                         >
                           {element.content}
@@ -1788,12 +1794,18 @@ export default function TemplateEditorPage() {
                             height: '100%',
                             display: 'flex',
                             alignItems: 'flex-start',
+                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
                             border: '1px solid #e5e7eb',
                             cursor: 'text'
                           }}
-                          onDoubleClick={(e) => {
+                          onClick={(e) => {
                             e.stopPropagation()
-                            startEditingText(element.id)
+                            // Start editing on single click, but only if not dragging
+                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                              setTimeout(() => {
+                                startEditingText(element.id)
+                              }, 100)
+                            }
                           }}
                         >
                           {element.content}

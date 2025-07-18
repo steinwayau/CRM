@@ -165,7 +165,7 @@ export default function TemplateEditorPage() {
   // Text editing functions
   const startEditingText = (elementId: string) => {
     const element = editorElements.find(el => el.id === elementId)
-    if (element && (element.type === 'text' || element.type === 'button')) {
+    if (element && (element.type === 'text' || element.type === 'heading' || element.type === 'button')) {
       setEditingTextElement(elementId)
       setTempTextContent(element.content)
       // Focus the textarea immediately and select all text for instant typing

@@ -413,7 +413,32 @@ export default function TemplateEditorPage() {
       }
     })
     
-    // Keep within canvas bounds
+    // Keep within canvas bounds with edge snapping
+    const edgeThreshold = 5 // pixels from edge to trigger snapping
+    
+    // Snap to left edge
+    if (snappedX <= edgeThreshold) {
+      snappedX = 0
+      guides.push({ type: 'vertical', position: 0, label: 'Left Edge' })
+    }
+    // Snap to right edge  
+    else if (snappedX + draggedElement.style.width >= canvasSize.width - edgeThreshold) {
+      snappedX = canvasSize.width - draggedElement.style.width
+      guides.push({ type: 'vertical', position: canvasSize.width, label: 'Right Edge' })
+    }
+    
+    // Snap to top edge
+    if (snappedY <= edgeThreshold) {
+      snappedY = 0
+      guides.push({ type: 'horizontal', position: 0, label: 'Top Edge' })
+    }
+    // Snap to bottom edge
+    else if (snappedY + draggedElement.style.height >= canvasSize.height - edgeThreshold) {
+      snappedY = canvasSize.height - draggedElement.style.height
+      guides.push({ type: 'horizontal', position: canvasSize.height, label: 'Bottom Edge' })
+    }
+    
+    // Ensure elements stay within bounds
     snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))
     snappedY = Math.max(0, Math.min(canvasSize.height - draggedElement.style.height, snappedY))
     
@@ -2050,33 +2075,7 @@ export default function TemplateEditorPage() {
                       </div>
                     </div>
 
-                    {/* Quick Alignment Controls */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Quick Alignment</label>
-                      <div className="grid grid-cols-3 gap-1">
-                        <button
-                          onClick={() => centerHorizontally(element.id)}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Center Horizontally"
-                        >
-                          ↔️ H
-                        </button>
-                        <button
-                          onClick={() => centerVertically(element.id)}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Center Vertically"
-                        >
-                          ↕️ V
-                        </button>
-                        <button
-                          onClick={() => centerBoth(element.id)}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Center Both"
-                        >
-                          ⊕ Both
-                        </button>
-                      </div>
-                    </div>
+
                     
                     {element.type === 'heading' && (
                       <div>
@@ -2213,21 +2212,42 @@ export default function TemplateEditorPage() {
                           <>
                             <div className="relative color-picker-container">
                               <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                              <button
-                                onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
-                                className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className="w-4 h-4 rounded border border-gray-300"
-                                    style={{ backgroundColor: element.style.backgroundColor || '#f9fafb' }}
+                              <div className="space-y-2">
+                                {/* Transparency toggle */}
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`transparent-${element.id}`}
+                                    checked={element.style.backgroundColor === 'transparent'}
+                                    onChange={(e) => updateElement(element.id, {
+                                      style: { ...element.style, backgroundColor: e.target.checked ? 'transparent' : '#f9fafb' }
+                                    })}
+                                    className="w-4 h-4"
                                   />
-                                  <span className="text-sm">{element.style.backgroundColor || '#f9fafb'}</span>
+                                  <label htmlFor={`transparent-${element.id}`} className="text-sm text-gray-700">
+                                    Transparent background
+                                  </label>
                                 </div>
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </button>
+                                
+                                {/* Color picker (only show if not transparent) */}
+                                {element.style.backgroundColor !== 'transparent' && (
+                                  <button
+                                    onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
+                                    className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className="w-4 h-4 rounded border border-gray-300"
+                                        style={{ backgroundColor: element.style.backgroundColor || '#f9fafb' }}
+                                      />
+                                      <span className="text-sm">{element.style.backgroundColor || '#f9fafb'}</span>
+                                    </div>
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
                               {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
                                 <div className="absolute top-full left-0 mt-1 z-50">
                                   <ColorPicker
@@ -2262,21 +2282,42 @@ export default function TemplateEditorPage() {
                     {(element.type === 'button' || element.type === 'divider') && (
                       <div className="relative color-picker-container">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                        <button
-                          onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
-                          className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded border border-gray-300"
-                              style={{ backgroundColor: element.style.backgroundColor || '#3b82f6' }}
+                        <div className="space-y-2">
+                          {/* Transparency toggle for buttons and dividers */}
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`transparent-${element.id}`}
+                              checked={element.style.backgroundColor === 'transparent'}
+                              onChange={(e) => updateElement(element.id, {
+                                style: { ...element.style, backgroundColor: e.target.checked ? 'transparent' : (element.type === 'button' ? '#3b82f6' : '#e5e7eb') }
+                              })}
+                              className="w-4 h-4"
                             />
-                            <span className="text-sm">{element.style.backgroundColor || '#3b82f6'}</span>
+                            <label htmlFor={`transparent-${element.id}`} className="text-sm text-gray-700">
+                              Transparent background
+                            </label>
                           </div>
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
+                          
+                          {/* Color picker (only show if not transparent) */}
+                          {element.style.backgroundColor !== 'transparent' && (
+                            <button
+                              onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
+                              className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-4 h-4 rounded border border-gray-300"
+                                  style={{ backgroundColor: element.style.backgroundColor || '#3b82f6' }}
+                                />
+                                <span className="text-sm">{element.style.backgroundColor || '#3b82f6'}</span>
+                              </div>
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                         {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
                           <div className="absolute top-full left-0 mt-1 z-50">
                             <ColorPicker
@@ -2289,6 +2330,128 @@ export default function TemplateEditorPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Precise Positioning Controls */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Precise Positioning</label>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">X Position</label>
+                          <input
+                            type="number"
+                            value={element.style.position.x}
+                            onChange={(e) => updateElement(element.id, {
+                              style: { ...element.style, position: { ...element.style.position, x: parseInt(e.target.value) || 0 } }
+                            })}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            min="0"
+                            max={canvasSize.width - element.style.width}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Y Position</label>
+                          <input
+                            type="number"
+                            value={element.style.position.y}
+                            onChange={(e) => updateElement(element.id, {
+                              style: { ...element.style, position: { ...element.style.position, y: parseInt(e.target.value) || 0 } }
+                            })}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            min="0"
+                            max={canvasSize.height - element.style.height}
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Edge Alignment Buttons */}
+                      <div className="grid grid-cols-3 gap-1 mb-2">
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { ...element.style, position: { ...element.style.position, x: 0 } }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Align to Left Edge"
+                        >
+                          ← Left
+                        </button>
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { ...element.style, position: { ...element.style.position, x: (canvasSize.width - element.style.width) / 2 } }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Center Horizontally"
+                        >
+                          ↔️ Center
+                        </button>
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { ...element.style, position: { ...element.style.position, x: canvasSize.width - element.style.width } }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Align to Right Edge"
+                        >
+                          Right →
+                        </button>
+                        
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { ...element.style, position: { ...element.style.position, y: 0 } }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Align to Top Edge"
+                        >
+                          ↑ Top
+                        </button>
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { ...element.style, position: { ...element.style.position, y: (canvasSize.height - element.style.height) / 2 } }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Center Vertically"
+                        >
+                          ↕️ Middle
+                        </button>
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { ...element.style, position: { ...element.style.position, y: canvasSize.height - element.style.height } }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Align to Bottom Edge"
+                        >
+                          ↓ Bottom
+                        </button>
+                      </div>
+                      
+                      {/* Stretch to Edges */}
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { 
+                              ...element.style, 
+                              position: { ...element.style.position, x: 0 },
+                              width: canvasSize.width
+                            }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Stretch Full Width"
+                        >
+                          ↔️ Full Width
+                        </button>
+                        <button
+                          onClick={() => updateElement(element.id, {
+                            style: { 
+                              ...element.style, 
+                              position: { ...element.style.position, y: 0 },
+                              height: canvasSize.height
+                            }
+                          })}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Stretch Full Height"
+                        >
+                          ↕️ Full Height
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )
               })()}

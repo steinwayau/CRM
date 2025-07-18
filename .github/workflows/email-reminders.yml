@@ -14,7 +14,7 @@ jobs:
       - name: Send Email Reminders
         run: |
           echo "Triggering email reminders..."
-          response=$(curl -s -w "%{http_code}" -o /tmp/response.json "https://epg-crm.vercel.app/api/reminders/check")
+          response=$(curl -s -w "%{http_code}" -o /tmp/response.json "https://crm.steinway.com.au/api/reminders/check")
           
           echo "Response code: $response"
           echo "Response body:"

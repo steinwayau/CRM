@@ -12,17 +12,17 @@ export async function GET(request: NextRequest) {
     // Find enquiries with follow-up dates that are due (past the reminder time)
     // and haven't had reminders sent yet
     const result = await sql`
-      SELECT id, status, institution_name, first_name, surname, email, phone, 
-             nationality, state, suburb, products, source, enquiry_source, 
-             comment, call_taken_by, follow_up_date, classification, step_program,
-             involving, not_involving_reason, follow_up_info, newsletter,
+      SELECT id, status, institutionname, firstname, surname, email, phone, 
+             nationality, state, suburb, interest, source, enquirysource, 
+             comment, calltakenby, fupdate, classification, stepprogram,
+             involving, notinvolvingreason, followupinfo, newsletter,
              created_at, updated_at
       FROM enquiries 
-      WHERE follow_up_date IS NOT NULL 
-        AND follow_up_date <= ${currentTime.toISOString()}
+      WHERE fupdate IS NOT NULL 
+        AND fupdate <= ${currentTime.toISOString()}
         AND (reminder_sent IS NULL OR reminder_sent = false)
-        AND newsletter != 'No'
-      ORDER BY follow_up_date ASC
+        AND newsletter != true
+      ORDER BY fupdate ASC
     `
 
     const dueEnquiries = result.rows
@@ -54,20 +54,20 @@ export async function GET(request: NextRequest) {
         // Convert database row to Enquiry type
         const enquiryData: Enquiry = {
           id: enquiry.id,
-          firstName: enquiry.first_name,
+          firstName: enquiry.firstname,
           lastName: enquiry.surname,
           email: enquiry.email,
           phone: enquiry.phone,
           state: enquiry.state,
           suburb: enquiry.suburb,
-          productInterest: enquiry.products || [],
+          productInterest: enquiry.interest || [],
           source: enquiry.source,
-          eventSource: enquiry.enquiry_source,
+          eventSource: enquiry.enquirysource,
           comments: enquiry.comment,
-          submittedBy: enquiry.call_taken_by,
+          submittedBy: enquiry.calltakenby,
           customerRating: enquiry.classification,
-          bestTimeToFollowUp: enquiry.follow_up_date,
-          followUpNotes: enquiry.follow_up_info,
+          bestTimeToFollowUp: enquiry.fupdate,
+          followUpNotes: enquiry.followupinfo,
           createdAt: enquiry.created_at
         }
 
@@ -75,10 +75,10 @@ export async function GET(request: NextRequest) {
         // Priority: 1) Original submitter if active, 2) First active staff member
         let targetStaff: StaffMember | null = null
 
-        if (enquiry.call_taken_by && enquiry.call_taken_by !== 'Online Form') {
+        if (enquiry.calltakenby && enquiry.calltakenby !== 'Online Form') {
           // Try to find the original staff member
           const originalStaff = activeStaff.find(staff => 
-            staff.name === enquiry.call_taken_by
+            staff.name === enquiry.calltakenby
           )
           if (originalStaff) {
             targetStaff = {

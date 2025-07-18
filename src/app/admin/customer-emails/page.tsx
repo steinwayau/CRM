@@ -87,6 +87,15 @@ export default function CustomerEmailsPage() {
   // Campaign view state
   const [showCampaignView, setShowCampaignView] = useState(false)
   const [viewingCampaign, setViewingCampaign] = useState<Campaign | null>(null)
+  const [editingCampaign, setEditingCampaign] = useState(false)
+  const [editCampaignForm, setEditCampaignForm] = useState({
+    name: '',
+    templateId: '',
+    subject: '',
+    recipientType: 'all',
+    customEmails: '',
+    scheduledAt: ''
+  })
   const [templateForm, setTemplateForm] = useState({
     name: '',
     subject: '',
@@ -383,6 +392,118 @@ export default function CustomerEmailsPage() {
   const handleViewCampaign = (campaign: Campaign) => {
     setViewingCampaign(campaign)
     setShowCampaignView(true)
+    setEditingCampaign(false) // Ensure editing is off when viewing
+  }
+
+  const handleEditCampaign = () => {
+    setEditingCampaign(true)
+    setEditCampaignForm({
+      name: viewingCampaign?.name || '',
+      templateId: viewingCampaign?.templateId || '',
+      subject: viewingCampaign?.subject || '',
+      recipientType: viewingCampaign?.recipientType || 'all',
+      customEmails: viewingCampaign?.customEmails || '',
+      scheduledAt: viewingCampaign?.scheduledAt || ''
+    })
+  }
+
+  const handleSaveCampaign = async () => {
+    if (!viewingCampaign) return
+
+    try {
+      const campaign = campaigns.find(c => c.id === viewingCampaign.id)
+      if (!campaign) return
+
+      // Get the selected template
+      const template = templates.find(t => t.id === editCampaignForm.templateId)
+      if (!template) {
+        alert('Template not found for this campaign')
+        return
+      }
+
+      // Update campaign status to sending
+      setCampaigns(campaigns.map(c => 
+        c.id === viewingCampaign.id 
+          ? { ...c, status: 'sending' as const }
+          : c
+      ))
+
+      // Prepare recipient data based on campaign type
+      let customerIds: number[] = []
+      let recipientFilters = {}
+
+      if (editCampaignForm.recipientType === 'selected') {
+        customerIds = selectedCustomers
+      } else if (editCampaignForm.recipientType === 'filtered') {
+        recipientFilters = filters
+      } else if (editCampaignForm.recipientType === 'custom') {
+        // For custom email lists, we'll need to handle this differently
+        // For now, we'll send to selected customers
+        console.log('Custom email lists not yet implemented, using selected customers')
+        customerIds = selectedCustomers
+      }
+
+      // Call the actual email API
+      const response = await fetch('/api/email/send-campaign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          templateId: editCampaignForm.templateId,
+          subject: editCampaignForm.subject,
+          htmlContent: template.htmlContent,
+          textContent: template.textContent,
+          recipientType: editCampaignForm.recipientType,
+          customerIds: customerIds.length > 0 ? customerIds : undefined,
+          customEmails: editCampaignForm.recipientType === 'custom' ? editCampaignForm.customEmails : undefined,
+          filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        // Update campaign with actual results
+        setCampaigns(campaigns.map(c => 
+          c.id === viewingCampaign.id 
+            ? { 
+                ...c, 
+                status: 'sent' as const, 
+                sentCount: result.results.successCount,
+                recipientCount: result.results.totalRecipients,
+                sentAt: new Date().toISOString(),
+                // Real performance data will be added when tracking is implemented
+                openRate: undefined,
+                clickRate: undefined
+              }
+            : c
+        ))
+
+        alert(`Campaign sent successfully!\n\nSent to: ${result.results.successCount} recipients\nFailed: ${result.results.failureCount} recipients\n\n${result.message}`)
+      } else {
+        // Handle API error
+        setCampaigns(campaigns.map(c => 
+          c.id === viewingCampaign.id 
+            ? { ...c, status: 'draft' as const }
+            : c
+        ))
+        
+        alert(`Failed to send campaign: ${result.error || 'Unknown error'}`)
+      }
+      
+    } catch (error) {
+      console.error('Error sending campaign:', error)
+      
+      // Reset campaign status on error
+      setCampaigns(campaigns.map(c => 
+        c.id === viewingCampaign?.id 
+          ? { ...c, status: 'draft' as const }
+          : c
+      ))
+      
+      alert(`Failed to send campaign: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   // Template management functions
@@ -1280,38 +1401,184 @@ export default function CustomerEmailsPage() {
               {/* Campaign Details */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Campaign Details</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Status:</span>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        viewingCampaign.status === 'sent' ? 'bg-green-100 text-green-800' :
-                        viewingCampaign.status === 'sending' ? 'bg-yellow-100 text-yellow-800' :
-                        viewingCampaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {viewingCampaign.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Template:</span>
-                      <span className="text-gray-900">{viewingCampaign.templateName}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Recipients:</span>
-                      <span className="text-gray-900 capitalize">{viewingCampaign.recipientType}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Created:</span>
-                      <span className="text-gray-900">{new Date(viewingCampaign.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    {viewingCampaign.sentAt && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Sent:</span>
-                        <span className="text-gray-900">{new Date(viewingCampaign.sentAt).toLocaleString()}</span>
-                      </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold text-gray-900">Campaign Details</h4>
+                    {!editingCampaign && viewingCampaign.status === 'draft' && (
+                      <button
+                        onClick={handleEditCampaign}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
                     )}
                   </div>
+                  
+                  {editingCampaign ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name</label>
+                        <input
+                          type="text"
+                          value={editCampaignForm.name}
+                          onChange={(e) => setEditCampaignForm({...editCampaignForm, name: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Subject Line</label>
+                        <input
+                          type="text"
+                          value={editCampaignForm.subject}
+                          onChange={(e) => setEditCampaignForm({...editCampaignForm, subject: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email Template</label>
+                        <select
+                          value={editCampaignForm.templateId}
+                          onChange={(e) => setEditCampaignForm({...editCampaignForm, templateId: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          {templates.map(template => (
+                            <option key={template.id} value={template.id}>{template.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
+                        <select
+                          value={editCampaignForm.recipientType}
+                          onChange={(e) => setEditCampaignForm({...editCampaignForm, recipientType: e.target.value, customEmails: ''})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                          <option value="all">All customers ({filteredCustomers.length})</option>
+                          <option value="filtered">Filtered customers ({filteredCustomers.length})</option>
+                          <option value="selected">Selected customers ({selectedCustomers.length})</option>
+                          <option value="custom">Custom email list</option>
+                        </select>
+                      </div>
+
+                      {editCampaignForm.recipientType === 'custom' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Custom Email List
+                            <span className="text-xs text-gray-500 ml-2">(Paste emails separated by commas or new lines)</span>
+                          </label>
+                          <textarea
+                            value={editCampaignForm.customEmails}
+                            onChange={(e) => setEditCampaignForm({...editCampaignForm, customEmails: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            rows={4}
+                            placeholder="Enter email addresses separated by commas or new lines"
+                          />
+                          <div className="mt-1 text-xs text-gray-500">
+                            {(() => {
+                              const emailList = editCampaignForm.customEmails
+                                .split(/[,\n\r]+/)
+                                .map(email => email.trim())
+                                .filter(email => email && /\S+@\S+\.\S+/.test(email))
+                              return `${emailList.length} valid email${emailList.length !== 1 ? 's' : ''} detected`
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex space-x-2 pt-2">
+                        <button
+                          onClick={() => setEditingCampaign(false)}
+                          className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Update campaign with new details
+                            if (viewingCampaign) {
+                              let recipients = 0
+                              
+                              if (editCampaignForm.recipientType === 'all') {
+                                recipients = filteredCustomers.length
+                              } else if (editCampaignForm.recipientType === 'filtered') {
+                                recipients = filteredCustomers.length
+                              } else if (editCampaignForm.recipientType === 'selected') {
+                                recipients = selectedCustomers.length
+                              } else if (editCampaignForm.recipientType === 'custom') {
+                                const emailList = editCampaignForm.customEmails
+                                  .split(/[,\n\r]+/)
+                                  .map(email => email.trim())
+                                  .filter(email => email && /\S+@\S+\.\S+/.test(email))
+                                recipients = emailList.length
+                              }
+
+                              const updatedCampaign = {
+                                ...viewingCampaign,
+                                name: editCampaignForm.name,
+                                templateId: editCampaignForm.templateId,
+                                templateName: templates.find(t => t.id === editCampaignForm.templateId)?.name || '',
+                                subject: editCampaignForm.subject,
+                                recipientType: editCampaignForm.recipientType as 'all' | 'filtered' | 'selected' | 'custom',
+                                customEmails: editCampaignForm.recipientType === 'custom' ? editCampaignForm.customEmails : undefined,
+                                recipientCount: recipients
+                              }
+                              
+                              setCampaigns(campaigns.map(c => 
+                                c.id === viewingCampaign.id ? updatedCampaign : c
+                              ))
+                              setViewingCampaign(updatedCampaign)
+                              setEditingCampaign(false)
+                            }
+                          }}
+                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Status:</span>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          viewingCampaign.status === 'sent' ? 'bg-green-100 text-green-800' :
+                          viewingCampaign.status === 'sending' ? 'bg-yellow-100 text-yellow-800' :
+                          viewingCampaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {viewingCampaign.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Template:</span>
+                        <span className="text-gray-900">{viewingCampaign.templateName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Recipients:</span>
+                        <span className="text-gray-900 capitalize">{viewingCampaign.recipientType}</span>
+                      </div>
+                      {viewingCampaign.recipientType === 'custom' && viewingCampaign.customEmails && (
+                        <div className="mt-2">
+                          <span className="text-gray-600 text-sm">Custom emails:</span>
+                          <div className="mt-1 p-2 bg-gray-50 rounded text-sm text-gray-700 max-h-20 overflow-y-auto">
+                            {viewingCampaign.customEmails}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Created:</span>
+                        <span className="text-gray-900">{new Date(viewingCampaign.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {viewingCampaign.sentAt && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Sent:</span>
+                          <span className="text-gray-900">{new Date(viewingCampaign.sentAt).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1364,21 +1631,32 @@ export default function CustomerEmailsPage() {
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3">
                 <button
-                  onClick={() => setShowCampaignView(false)}
+                  onClick={() => {
+                    setShowCampaignView(false)
+                    setEditingCampaign(false)
+                  }}
                   className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
                   Close
                 </button>
-                {viewingCampaign.status === 'draft' && (
-                  <button
-                    onClick={() => {
-                      setShowCampaignView(false)
-                      handleSendCampaign(viewingCampaign.id)
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Send Campaign
-                  </button>
+                {viewingCampaign.status === 'draft' && !editingCampaign && (
+                  <>
+                    <button
+                      onClick={handleEditCampaign}
+                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                    >
+                      Edit Campaign
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCampaignView(false)
+                        handleSendCampaign(viewingCampaign.id)
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      Send Campaign
+                    </button>
+                  </>
                 )}
               </div>
             </div>

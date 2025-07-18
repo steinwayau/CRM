@@ -46,15 +46,23 @@ WAIT FOR EXPLICIT "YES" BEFORE DOING ANYTHING
   Task: [Brief description of what was implemented/fixed in this task]
   ```
 
-🚨 CRITICAL: VERCEL CLI USAGE - PREVENT DEPLOYMENT CONFUSION 🚨
-- ALWAYS use `npx vercel --prod` for deployments (NOT `vercel --prod`)
+🚨 CRITICAL: VERCEL CLI USAGE - USE NPX VERCEL --PROD 🚨
+- ALWAYS use `npx vercel --prod` for deployments (NOT just GitHub integration)
 - NEVER attempt global Vercel CLI installation (`npm install -g vercel`)
 - The command `vercel` without `npx` will fail with "command not found"
 - This is the CORRECT deployment command: `npx vercel --prod`
 - This provides the visual deployment feedback the user expects to see
-- Previous agents wasted time trying to "fix" missing CLI when npx was available
+- The user wants to see deployment output on screen, not just rely on automatic GitHub integration
+- After successful deployment, provide the deployment URL to the user
 
-🚨 VIOLATION: Using wrong CLI commands wastes time and confuses deployment process 🚨
+🚨 DEPLOYMENT PROCESS: 
+1. Make code changes
+2. `git add .`
+3. `git commit -m "Your changes"`
+4. `git push origin main`
+5. `npx vercel --prod` (to get visible deployment output and URL)
+
+🚨 VIOLATION: Using wrong deployment process or not showing deployment output wastes time and doesn't meet user expectations 🚨
 
 🚨 CRITICAL: VERCEL DEPLOYMENT URL MANAGEMENT 🚨
 - **PRODUCTION URL**: https://epg-crm.vercel.app (main production with authentication disabled)

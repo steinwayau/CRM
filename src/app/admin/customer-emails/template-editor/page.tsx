@@ -722,8 +722,8 @@ export default function TemplateEditorPage() {
 
   const getDefaultContent = (type: string) => {
     switch (type) {
-      case 'text': return 'Enter your text here...'
-      case 'heading': return 'Your Heading Here'
+      case 'text': return ''
+      case 'heading': return ''
       case 'image': return 'https://via.placeholder.com/300x200'
       case 'video': return ''
       case 'button': return 'Click Here'
@@ -1733,11 +1733,9 @@ export default function TemplateEditorPage() {
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Start editing on single click, but only if not dragging
+                            // Start editing immediately on single click, but only if not dragging
                             if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              setTimeout(() => {
-                                startEditingText(element.id)
-                              }, 100)
+                              startEditingText(element.id)
                             }
                           }}
                         >

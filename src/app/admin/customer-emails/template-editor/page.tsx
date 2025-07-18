@@ -704,7 +704,7 @@ export default function TemplateEditorPage() {
         backgroundColor: type === 'button' ? '#3b82f6' : type === 'divider' ? '#e5e7eb' : type === 'text' ? '#f9fafb' : undefined,
         padding: type === 'text' || type === 'button' || type === 'heading' ? 10 : undefined,
         borderRadius: type === 'button' ? 6 : undefined,
-        textAlign: type === 'text' || type === 'heading' ? 'left' as const : undefined
+        textAlign: type === 'text' ? 'left' as const : type === 'heading' ? 'center' as const : undefined
       }
     }
     setEditorElements([...editorElements, newElement])
@@ -1798,11 +1798,9 @@ export default function TemplateEditorPage() {
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Start editing on single click, but only if not dragging
+                            // Start editing immediately on single click, but only if not dragging
                             if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              setTimeout(() => {
-                                startEditingText(element.id)
-                              }, 100)
+                              startEditingText(element.id)
                             }
                           }}
                         >

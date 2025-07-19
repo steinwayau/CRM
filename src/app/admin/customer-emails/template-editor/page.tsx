@@ -1833,9 +1833,9 @@ export default function TemplateEditorPage() {
           <div className="flex-1 bg-gray-100 overflow-auto p-8">
             {previewMode ? (
               /* Email Client Preview Mode */
-              <div className="w-full max-w-4xl mx-auto">
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-3 border-b">
+              <div className="w-full h-full">
+                <div className="bg-white h-full flex flex-col">
+                  <div className="bg-gray-50 px-4 py-3 border-b flex-shrink-0">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
@@ -1853,15 +1853,11 @@ export default function TemplateEditorPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="p-4 bg-gray-100">
-                    <div className="bg-white rounded border shadow-sm">
+                  <div className="flex-1 bg-gray-100 p-4 overflow-hidden">
+                    <div className="bg-white h-full rounded border shadow-sm overflow-hidden">
                       <iframe
                         srcDoc={generateClientSpecificHtml(selectedEmailClient)}
-                        className="w-full border-0"
-                        style={{ 
-                          minHeight: '1000px',
-                          maxWidth: '100%'
-                        }}
+                        className="w-full h-full border-0"
                         title={`${selectedEmailClient} Email Preview`}
                       />
                     </div>
@@ -2442,7 +2438,7 @@ export default function TemplateEditorPage() {
         )}
 
         {/* Properties Panel */}
-        {selectedElement && (
+        {(selectedElement || previewMode) && (
           <div 
             className="bg-white border-l flex-shrink-0 overflow-hidden"
             style={{ width: propertiesPanelWidth }}
@@ -2455,7 +2451,44 @@ export default function TemplateEditorPage() {
                 </div>
               </div>
               <div className="p-4">
-              {(() => {
+              {previewMode ? (
+                /* Email Client Selection in Preview Mode */
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Email Client Preview</h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Select an email client to see how your template will render:
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'gmail', name: 'Gmail', description: 'Limited CSS support, strips many styles' },
+                      { id: 'outlook', name: 'Outlook', description: 'Uses Word engine, requires VML for advanced features' },
+                      { id: 'apple', name: 'Apple Mail', description: 'Full CSS support, best rendering' },
+                      { id: 'generic', name: 'Generic Client', description: 'Standard email client rendering' }
+                    ].map((client) => (
+                      <label key={client.id} className="flex items-start space-x-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="emailClient"
+                          value={client.id}
+                          checked={selectedEmailClient === client.id}
+                          onChange={(e) => setSelectedEmailClient(e.target.value as any)}
+                          className="mt-1 w-4 h-4 text-blue-600"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-gray-900">{client.name}</div>
+                          <div className="text-xs text-gray-500 mt-1">{client.description}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="text-xs text-blue-700">
+                      <strong>Current Preview:</strong> {selectedEmailClient.charAt(0).toUpperCase() + selectedEmailClient.slice(1)} rendering. 
+                      Button positioning and styles will vary between clients.
+                    </div>
+                  </div>
+                </div>
+              ) : (() => {
                 const element = editorElements.find(el => el.id === selectedElement)
                 if (!element) return null
                 
@@ -2956,62 +2989,6 @@ export default function TemplateEditorPage() {
                 )
               })()}
               </div>
-              
-              {/* Email Client Preview Selection */}
-              {previewMode && (
-                <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-900 mb-3">Email Client Preview</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Select an email client to see how your template will render:
-                  </p>
-                  <div className="space-y-2">
-                    {[
-                      { id: 'gmail', name: 'Gmail', description: 'Limited CSS support, strips many styles' },
-                      { id: 'outlook', name: 'Outlook', description: 'Uses Word engine, requires VML for advanced features' },
-                      { id: 'apple', name: 'Apple Mail', description: 'Full CSS support, best rendering' },
-                      { id: 'generic', name: 'Generic Client', description: 'Standard email client rendering' }
-                    ].map((client) => (
-                      <label key={client.id} className="flex items-start space-x-3 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="emailClient"
-                          value={client.id}
-                          checked={selectedEmailClient === client.id}
-                          onChange={(e) => setSelectedEmailClient(e.target.value as any)}
-                          className="mt-1 w-4 h-4 text-blue-600"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900">{client.name}</div>
-                          <div className="text-xs text-gray-500">{client.description}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="text-xs text-blue-700">
-                      <strong>Preview Mode:</strong> The canvas now shows how your email will render in {selectedEmailClient.charAt(0).toUpperCase() + selectedEmailClient.slice(1)}. 
-                      Button positioning and styles will vary between clients.
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Email Client Selection even when no element selected */}
-              {!selectedElement && !previewMode && (
-                <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-900 mb-3">Email Preview</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Click "Email Preview" in the sidebar to test how your template renders in different email clients.
-                  </p>
-                  <button
-                    onClick={() => setPreviewMode(true)}
-                    disabled={editorElements.length === 0}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {editorElements.length === 0 ? 'Add elements to preview' : 'Start Email Preview'}
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}

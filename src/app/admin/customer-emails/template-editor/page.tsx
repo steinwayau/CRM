@@ -10,6 +10,12 @@ interface EmailTemplate {
   type: 'newsletter' | 'promotional' | 'event' | 'follow-up'
   htmlContent: string
   textContent: string
+  elements: EditorElement[] // Add elements storage
+  canvasSettings: {
+    width: number
+    height: number
+    backgroundColor: string
+  }
   createdAt: string
 }
 
@@ -64,6 +70,8 @@ export default function TemplateEditorPage() {
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 800 })
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#ffffff')
   const [showPreview, setShowPreview] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
+  const [selectedEmailClient, setSelectedEmailClient] = useState<'gmail' | 'outlook' | 'apple' | 'generic'>('gmail')
   const [saving, setSaving] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState<{elementId: string, property: string} | null>(null)
   const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(() => {
@@ -676,8 +684,23 @@ export default function TemplateEditorPage() {
           subject: template.subject,
           type: template.type
         })
-        // Parse elements from HTML (simplified - in real app you'd store elements separately)
-        loadElementsFromHtml(template.htmlContent)
+        
+        // Load elements directly if available, otherwise fallback to HTML parsing
+        if (template.elements && Array.isArray(template.elements)) {
+          setEditorElements(template.elements)
+          
+          // Load canvas settings if available
+          if (template.canvasSettings) {
+            setCanvasSize({
+              width: template.canvasSettings.width,
+              height: template.canvasSettings.height
+            })
+            setCanvasBackgroundColor(template.canvasSettings.backgroundColor)
+          }
+        } else {
+          // Fallback to HTML parsing for older templates
+          loadElementsFromHtml(template.htmlContent)
+        }
       }
     }
   }, [isEditing, templateId])
@@ -1018,6 +1041,314 @@ export default function TemplateEditorPage() {
     }
   }
 
+  // Email Client Preview Functions
+  const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
+    const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
+    
+    let html = ''
+    let clientStyles = ''
+    
+    // Client-specific styles and limitations
+    switch (client) {
+      case 'gmail':
+        clientStyles = `
+          <style type="text/css">
+            /* Gmail strips most CSS, so we use inline styles heavily */
+            .gmail-container { max-width: ${canvasSize.width}px; margin: 0 auto; }
+            .gmail-element { margin-bottom: 20px; }
+          </style>`
+        break
+      case 'outlook':
+        clientStyles = `
+          <style type="text/css">
+            /* Outlook requires VML for advanced features */
+            .outlook-container { max-width: ${canvasSize.width}px; margin: 0 auto; }
+            .outlook-element { margin-bottom: 20px; }
+          </style>`
+        break
+      case 'apple':
+        clientStyles = `
+          <style type="text/css">
+            /* Apple Mail supports most CSS */
+            .apple-container { max-width: ${canvasSize.width}px; margin: 0 auto; }
+            .apple-element { margin-bottom: 20px; transition: all 0.3s ease; }
+            .apple-element:hover { transform: translateY(-2px); }
+          </style>`
+        break
+      case 'generic':
+        clientStyles = `
+          <style type="text/css">
+            .generic-container { max-width: ${canvasSize.width}px; margin: 0 auto; }
+            .generic-element { margin-bottom: 20px; }
+          </style>`
+        break
+    }
+
+    html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${client.toUpperCase()} Preview - ${templateForm.name || 'Email Template'}</title>
+  ${clientStyles}
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="${canvasSize.width}" style="max-width: ${canvasSize.width}px; background-color: ${canvasBackgroundColor}; margin: 0 auto;">
+          <tr>
+            <td style="padding: 0; position: relative; min-height: ${canvasSize.height}px;">`
+
+    // Process each element with client-specific rendering
+    sortedElements.forEach((element, index) => {
+      const { type, content, style } = element
+      
+      // Determine if element should be centered based on its position
+      const elementCenterX = style.position.x + style.width / 2
+      const canvasCenterX = canvasSize.width / 2
+      const isElementCentered = Math.abs(elementCenterX - canvasCenterX) < 50
+
+      html += `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: ${index < sortedElements.length - 1 ? '20px' : '0'};">
+                <tr>
+                  <td style="text-align: ${isElementCentered ? 'center' : 'left'}; padding: 0;">`
+
+      switch (type) {
+        case 'text':
+          const textAlign = style.textAlign || (isElementCentered ? 'center' : 'left')
+          // Apply client-specific limitations
+          let textStyles = `
+            font-size: ${style.fontSize || 16}px;
+            font-weight: ${style.fontWeight || 'normal'};
+            font-family: ${client === 'gmail' ? 'Arial, sans-serif' : style.fontFamily || 'Arial, sans-serif'};
+            font-style: ${style.fontStyle || 'normal'};
+            text-decoration: ${style.textDecoration || 'none'};
+            color: ${style.color || '#000000'};
+            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+            ${client !== 'gmail' && style.padding ? `padding: ${style.padding}px;` : ''}
+            ${client !== 'gmail' && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            text-align: ${textAlign};
+            line-height: 1.4;
+            width: ${style.width}px;
+            ${isElementCentered ? 'margin: 0 auto;' : ''}
+          `
+          html += `<div style="${textStyles}">${content}</div>`
+          break
+
+        case 'heading':
+          const headingLevel = element.headingLevel || 1
+          const headingTag = `h${headingLevel}`
+          const headingAlign = style.textAlign || (isElementCentered ? 'center' : 'left')
+          
+          html += `<${headingTag} style="
+            font-size: ${style.fontSize || (32 - (headingLevel - 1) * 4)}px;
+            font-weight: ${style.fontWeight || 'bold'};
+            font-family: ${client === 'gmail' ? 'Arial, sans-serif' : style.fontFamily || 'Arial, sans-serif'};
+            color: ${style.color || '#000000'};
+            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+            ${client !== 'gmail' && style.padding ? `padding: ${style.padding}px;` : ''}
+            ${client !== 'gmail' && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            text-align: ${headingAlign};
+            margin: 0 0 10px 0;
+            width: ${style.width}px;
+            ${isElementCentered ? 'margin-left: auto; margin-right: auto; margin-bottom: 10px;' : ''}
+          ">${content}</${headingTag}>`
+          break
+
+        case 'image':
+          let imageStyles = `
+            display: block;
+            width: ${style.width}px;
+            height: ${style.height}px;
+            max-width: ${style.width}px;
+            max-height: ${style.height}px;
+            ${client !== 'gmail' && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            border: 0;
+            outline: none;
+            text-decoration: none;
+            -ms-interpolation-mode: bicubic;
+            ${isElementCentered ? 'margin: 0 auto;' : ''}
+          `
+          html += `<img src="${content}" alt="Email Image" style="${imageStyles}" width="${style.width}" height="${style.height}" />`
+          break
+
+        case 'video':
+          const videoData = element.videoData
+          const thumbnailUrl = videoData?.thumbnailUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE1IDEwTDE5LjU1MyA3LjcyNEExIDEgMCAwIDEgMjEgOC42MThWMTUuMzgyQTEgMSAwIDAgMSAxOS1NIDEyNy4yNzZMMTUgMTRNMTUgMTRWOEEyIDIgMCAwIDAgMTMgNkg1QTIgMiAwIDAgMCAzIDhWMTZBMiAyIDAgMCAwIDUgMThIMTNBMiAyIDAgMCAwIDE1IDE2VjE0WiIgc3Ryb2tlPSIjOUNBM0FGIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4='
+          
+          html += `<a href="${content}" style="display: block; text-decoration: none; ${isElementCentered ? 'margin: 0 auto;' : ''} width: ${style.width}px;">
+            <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
+              display: block;
+              width: ${style.width}px;
+              height: ${style.height}px;
+              max-width: ${style.width}px;
+              max-height: ${style.height}px;
+              ${client !== 'gmail' && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              border: 0;
+              outline: none;
+              text-decoration: none;
+              -ms-interpolation-mode: bicubic;
+            " width="${style.width}" height="${style.height}" />
+          </a>`
+          break
+
+        case 'button':
+          // Position button exactly as it appears in template editor
+          const buttonLeft = style.position.x
+          const buttonTop = style.position.y
+          
+          // Create positioned container that matches template editor positioning
+          html += `
+              <div style="
+                position: relative;
+                width: ${canvasSize.width}px;
+                height: ${style.height + 40}px;
+                margin-bottom: 10px;
+              ">
+                <div style="
+                  position: absolute;
+                  left: ${buttonLeft}px;
+                  top: 0px;
+                  width: ${style.width}px;
+                  height: ${style.height + 30}px;
+                ">`
+          
+          // Apply client-specific button differences with proper positioning
+          if (client === 'outlook') {
+            html += `
+                  <div style="background: #f0f0f0; border: 1px solid #333; padding: 2px; font-size: 10px; margin-bottom: 5px; text-align: center; color: #333;">OUTLOOK MODE</div>
+                  <!--[if mso]>
+                  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor || '#007BFF'}" fillcolor="${style.backgroundColor || '#007BFF'}">
+                    <w:anchorlock/>
+                    <center style="color:${style.color || '#FFFFFF'};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
+                  </v:roundrect>
+                  <![endif]-->
+                  <!--[if !mso]><!-->
+                  <a href="#" style="
+                    display: inline-block;
+                    width: ${style.width}px;
+                    height: ${style.height}px;
+                    line-height: ${style.height}px;
+                    background-color: ${style.backgroundColor || '#007BFF'};
+                    color: ${style.color || '#FFFFFF'};
+                    text-decoration: none;
+                    border-radius: ${style.borderRadius || 4}px;
+                    font-family: Arial, sans-serif;
+                    font-size: ${style.fontSize || 16}px;
+                    font-weight: ${style.fontWeight || 'normal'};
+                    text-align: center;
+                    border: 0;
+                    outline: none;
+                  ">${content}</a>
+                  <!--<![endif]-->`
+          } else if (client === 'gmail') {
+            html += `
+                  <div style="background: #ffe6e6; border: 1px solid red; padding: 2px; font-size: 10px; margin-bottom: 5px; text-align: center; color: red;">GMAIL - Limited CSS</div>
+                  <a href="#" style="
+                    display: inline-block;
+                    width: ${style.width}px;
+                    height: ${style.height}px;
+                    line-height: ${style.height}px;
+                    background-color: ${style.backgroundColor || '#007BFF'};
+                    color: ${style.color || '#FFFFFF'};
+                    text-decoration: none;
+                    font-family: Arial, sans-serif;
+                    font-size: ${style.fontSize || 16}px;
+                    font-weight: ${style.fontWeight || 'normal'};
+                    text-align: center;
+                    border: 0;
+                    outline: none;
+                  ">${content}</a>`
+          } else if (client === 'apple') {
+            html += `
+                  <div style="background: #e6ffe6; border: 1px solid green; padding: 2px; font-size: 10px; margin-bottom: 5px; text-align: center; color: green;">APPLE MAIL - Full CSS</div>
+                  <a href="#" style="
+                    display: inline-block;
+                    width: ${style.width}px;
+                    height: ${style.height}px;
+                    line-height: ${style.height}px;
+                    background-color: ${style.backgroundColor || '#007BFF'};
+                    color: ${style.color || '#FFFFFF'};
+                    text-decoration: none;
+                    border-radius: ${style.borderRadius || 4}px;
+                    font-family: ${style.fontFamily || 'Arial, sans-serif'};
+                    font-size: ${style.fontSize || 16}px;
+                    font-weight: ${style.fontWeight || 'normal'};
+                    text-align: center;
+                    border: 0;
+                    outline: none;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    transition: all 0.3s ease;
+                  ">${content}</a>`
+          } else {
+            html += `
+                  <div style="background: #e6f3ff; border: 1px solid blue; padding: 2px; font-size: 10px; margin-bottom: 5px; text-align: center; color: blue;">GENERIC CLIENT</div>
+                  <a href="#" style="
+                    display: inline-block;
+                    width: ${style.width}px;
+                    height: ${style.height}px;
+                    line-height: ${style.height}px;
+                    background-color: ${style.backgroundColor || '#007BFF'};
+                    color: ${style.color || '#FFFFFF'};
+                    text-decoration: none;
+                    border-radius: ${style.borderRadius || 4}px;
+                    font-family: ${style.fontFamily || 'Arial, sans-serif'};
+                    font-size: ${style.fontSize || 16}px;
+                    font-weight: ${style.fontWeight || 'normal'};
+                    text-align: center;
+                    border: 0;
+                    outline: none;
+                  ">${content}</a>`
+          }
+          
+          html += `
+                </div>
+              </div>`
+          break
+
+        case 'divider':
+          html += `<hr style="
+            border: 0;
+            height: 1px;
+            background-color: ${style.backgroundColor || '#CCCCCC'};
+            margin: 10px 0;
+            outline: none;
+            width: ${style.width}px;
+            ${isElementCentered ? 'margin-left: auto; margin-right: auto; margin-top: 10px; margin-bottom: 10px;' : ''}
+          " />`
+          break
+      }
+
+      html += `
+                  </td>
+                </tr>
+              </table>`
+    })
+
+    html += `
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+    
+    return html
+  }
+
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -1028,6 +1359,12 @@ export default function TemplateEditorPage() {
         type: templateForm.type,
         htmlContent: generateHtmlFromElements(),
         textContent: generatePlainTextFromElements(),
+        elements: editorElements,
+        canvasSettings: {
+          width: canvasSize.width,
+          height: canvasSize.height,
+          backgroundColor: canvasBackgroundColor
+        },
         createdAt: new Date().toISOString()
       }
 
@@ -1367,6 +1704,22 @@ export default function TemplateEditorPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                   </svg>
                   <span className="text-sm font-medium">Divider</span>
+                </div>
+              </button>
+              
+              {/* Email Preview Button */}
+              <button
+                onClick={() => setPreviewMode(!previewMode)}
+                className={`w-full p-3 text-left border border-gray-200 rounded-md hover:bg-gray-50 hover:shadow-sm transition-all ${
+                  previewMode ? 'bg-blue-50 border-blue-300' : ''
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span className="text-sm font-medium">Email Preview</span>
                 </div>
               </button>
             </div>

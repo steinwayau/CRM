@@ -1831,32 +1831,71 @@ export default function TemplateEditorPage() {
 
           {/* Visual Canvas */}
           <div className="flex-1 bg-gray-100 overflow-auto p-8">
-            <div 
-              className="shadow-lg mx-auto relative"
-              style={{ 
-                width: `${canvasSize.width}px`, 
-                minHeight: `${canvasSize.height}px`,
-                backgroundColor: canvasBackgroundColor,
-                border: '1px solid #e5e7eb',
-                backgroundImage: showGrid ? 
-                  `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
-                backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
-              }}
-              onClick={(e) => {
-                // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
-                const timeSinceLastInteraction = Date.now() - lastElementInteractionRef.current
-                const wasRecentlyInteractingWithElement = timeSinceLastInteraction < 100 // 100ms threshold
-                const isCurrentlyDragging = dragStateRef.current.dragStarted || dragStateRef.current.isDragging
-                
-                // Don't clear selection if we just interacted with an element or are currently dragging
-                if (!wasRecentlyInteractingWithElement && !isCurrentlyDragging) {
-                  setSelectedElement(null)
-                  if (editingTextElement) {
-                    finishEditingText()
+            {previewMode ? (
+              /* Email Client Preview Mode */
+              <div className="w-full max-w-4xl mx-auto">
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {selectedEmailClient.charAt(0).toUpperCase() + selectedEmailClient.slice(1)} Preview
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {templateForm.name || 'Untitled Template'} • Subject: {templateForm.subject || 'No Subject'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setPreviewMode(false)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      >
+                        Back to Editor
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-100">
+                    <div className="bg-white rounded border shadow-sm">
+                      <iframe
+                        srcDoc={generateClientSpecificHtml(selectedEmailClient)}
+                        className="w-full border-0"
+                        style={{ 
+                          minHeight: '1000px',
+                          maxWidth: '100%'
+                        }}
+                        title={`${selectedEmailClient} Email Preview`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Regular Template Editor Mode */
+              <div 
+                className="shadow-lg mx-auto relative"
+                style={{ 
+                  width: `${canvasSize.width}px`, 
+                  minHeight: `${canvasSize.height}px`,
+                  backgroundColor: canvasBackgroundColor,
+                  border: '1px solid #e5e7eb',
+                  backgroundImage: showGrid ? 
+                    `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
+                  backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
+                }}
+                onClick={(e) => {
+                  // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
+                  const timeSinceLastInteraction = Date.now() - lastElementInteractionRef.current
+                  const wasRecentlyInteractingWithElement = timeSinceLastInteraction < 100 // 100ms threshold
+                  const isCurrentlyDragging = dragStateRef.current.dragStarted || dragStateRef.current.isDragging
+                  
+                  // Don't clear selection if we just interacted with an element or are currently dragging
+                  if (!wasRecentlyInteractingWithElement && !isCurrentlyDragging) {
+                    setSelectedElement(null)
+                    if (editingTextElement) {
+                      finishEditingText()
+                    }
                   }
-                }
-              }}
-            >
+                }}
+              >
               {/* Grid overlay */}
               {showGrid && (
                 <div 
@@ -2379,6 +2418,7 @@ export default function TemplateEditorPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 
@@ -2916,6 +2956,62 @@ export default function TemplateEditorPage() {
                 )
               })()}
               </div>
+              
+              {/* Email Client Preview Selection */}
+              {previewMode && (
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Email Client Preview</h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Select an email client to see how your template will render:
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'gmail', name: 'Gmail', description: 'Limited CSS support, strips many styles' },
+                      { id: 'outlook', name: 'Outlook', description: 'Uses Word engine, requires VML for advanced features' },
+                      { id: 'apple', name: 'Apple Mail', description: 'Full CSS support, best rendering' },
+                      { id: 'generic', name: 'Generic Client', description: 'Standard email client rendering' }
+                    ].map((client) => (
+                      <label key={client.id} className="flex items-start space-x-3 p-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="emailClient"
+                          value={client.id}
+                          checked={selectedEmailClient === client.id}
+                          onChange={(e) => setSelectedEmailClient(e.target.value as any)}
+                          className="mt-1 w-4 h-4 text-blue-600"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-gray-900">{client.name}</div>
+                          <div className="text-xs text-gray-500">{client.description}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="text-xs text-blue-700">
+                      <strong>Preview Mode:</strong> The canvas now shows how your email will render in {selectedEmailClient.charAt(0).toUpperCase() + selectedEmailClient.slice(1)}. 
+                      Button positioning and styles will vary between clients.
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Email Client Selection even when no element selected */}
+              {!selectedElement && !previewMode && (
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Email Preview</h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Click "Email Preview" in the sidebar to test how your template renders in different email clients.
+                  </p>
+                  <button
+                    onClick={() => setPreviewMode(true)}
+                    disabled={editorElements.length === 0}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {editorElements.length === 0 ? 'Add elements to preview' : 'Start Email Preview'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

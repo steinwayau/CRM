@@ -1135,13 +1135,17 @@ export default function TemplateEditorPage() {
           break
 
         case 'image':
+          const imageAlign = style.textAlign || 'left'  // Use actual element alignment
+          const imageMargin = imageAlign === 'center' ? '0 auto' : 
+                              imageAlign === 'right' ? '0 0 0 auto' : '0'
+          
           html += `
-              <div style="text-align: center;">
+              <div style="text-align: ${imageAlign};">
                 <img src="${content}" alt="Image" style="
                   max-width: 100%;
                   height: auto;
                   display: block;
-                  margin: 0 auto;
+                  margin: ${imageMargin};
                 " width="${style.width}" />
               </div>`
           break
@@ -1149,9 +1153,10 @@ export default function TemplateEditorPage() {
         case 'video':
           const videoData = element.videoData
           const thumbnailUrl = videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
+          const videoAlign = style.textAlign || 'left'  // Use actual element alignment
           
           html += `
-              <div style="text-align: center;">
+              <div style="text-align: ${videoAlign};">
                 <a href="${content}" style="display: inline-block; text-decoration: none;">
                   <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
                     max-width: 100%;
@@ -1174,11 +1179,14 @@ export default function TemplateEditorPage() {
           const buttonBg = style.backgroundColor || '#007acc'
           const buttonColor = style.color || '#ffffff'
           const buttonText = content
+          const buttonAlign = style.textAlign || 'left'  // Use actual element alignment
+          const buttonPadding = style.padding || 12
+          const buttonBorderRadius = style.borderRadius || 4
           
           // Different button rendering for different clients
           if (client === 'outlook') {
             html += `
-              <div style="text-align: center;">
+              <div style="text-align: ${buttonAlign};">
                 <!--[if mso]>
                 <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="#" style="height:40px;v-text-anchor:middle;width:200px;" arcsize="10%" fillcolor="${buttonBg}">
                   <w:anchorlock/>
@@ -1188,11 +1196,11 @@ export default function TemplateEditorPage() {
                 <!--[if !mso]><!-->
                 <a href="#" style="
                   display: inline-block;
-                  padding: 12px 30px;
+                  padding: ${buttonPadding}px 30px;
                   background-color: ${buttonBg};
                   color: ${buttonColor};
                   text-decoration: none;
-                  border-radius: 4px;
+                  border-radius: ${buttonBorderRadius}px;
                   font-family: Arial, sans-serif;
                   font-size: 16px;
                 ">${buttonText}</a>
@@ -1200,14 +1208,14 @@ export default function TemplateEditorPage() {
               </div>`
           } else {
             html += `
-              <div style="text-align: center;">
+              <div style="text-align: ${buttonAlign};">
                 <a href="#" style="
                   display: inline-block;
-                  padding: 12px 30px;
+                  padding: ${buttonPadding}px 30px;
                   background-color: ${buttonBg};
                   color: ${buttonColor};
                   text-decoration: none;
-                  ${client === 'apple' ? 'border-radius: 4px;' : ''}
+                  ${client === 'apple' ? `border-radius: ${buttonBorderRadius}px;` : ''}
                   font-family: Arial, sans-serif;
                   font-size: 16px;
                 ">${buttonText}</a>
@@ -1217,13 +1225,22 @@ export default function TemplateEditorPage() {
 
         case 'divider':
           const dividerColor = style.backgroundColor || '#cccccc'
+          const dividerHeight = style.height || 1
+          const dividerAlign = style.textAlign || 'left'
+          const dividerWidth = style.width ? `${style.width}px` : '100%'
+          
           html += `
-              <hr style="
-                border: none;
-                height: 1px;
-                background-color: ${dividerColor};
-                margin: 20px 0;
-              " />`
+              <div style="text-align: ${dividerAlign};">
+                <hr style="
+                  border: none;
+                  height: ${dividerHeight}px;
+                  background-color: ${dividerColor};
+                  margin: 20px 0;
+                  width: ${dividerWidth};
+                  ${dividerAlign === 'center' ? 'margin-left: auto; margin-right: auto;' : ''}
+                  ${dividerAlign === 'right' ? 'margin-left: auto; margin-right: 0;' : ''}
+                " />
+              </div>`
           break
       }
 

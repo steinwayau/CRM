@@ -1629,24 +1629,41 @@ export default function CustomerEmailsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowCampaignView(false)
-                    setEditingCampaign(false)
-                  }}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Close
-                </button>
-                {viewingCampaign.status === 'draft' && !editingCampaign && (
-                  <>
-                    <button
-                      onClick={handleEditCampaign}
-                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                    >
-                      Edit Campaign
-                    </button>
+              <div className="flex justify-between">
+                <div className="flex space-x-3">
+                  {!editingCampaign && (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+                            setCampaigns(campaigns.filter(c => c.id !== viewingCampaign.id))
+                            setShowCampaignView(false)
+                          }
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                      >
+                        Delete Campaign
+                      </button>
+                      <button
+                        onClick={handleEditCampaign}
+                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                      >
+                        Edit Campaign
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowCampaignView(false)
+                      setEditingCampaign(false)
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                  {viewingCampaign.status === 'draft' && !editingCampaign && (
                     <button
                       onClick={() => {
                         setShowCampaignView(false)
@@ -1656,8 +1673,33 @@ export default function CustomerEmailsPage() {
                     >
                       Send Campaign
                     </button>
-                  </>
-                )}
+                  )}
+                  {viewingCampaign.status === 'sent' && !editingCampaign && (
+                    <button
+                      onClick={() => {
+                        // Create a duplicate campaign for re-sending
+                        const duplicateCampaign: Campaign = {
+                          ...viewingCampaign,
+                          id: Date.now().toString(),
+                          name: `Copy of ${viewingCampaign.name}`,
+                          status: 'draft',
+                          sentCount: 0,
+                          sentAt: undefined,
+                          openRate: undefined,
+                          clickRate: undefined,
+                          createdAt: new Date().toISOString()
+                        }
+                        setCampaigns([duplicateCampaign, ...campaigns])
+                        setShowCampaignView(false)
+                        setViewingCampaign(duplicateCampaign)
+                        setShowCampaignView(true)
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      Duplicate & Resend
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -122,6 +122,12 @@ export default function EmailPreviewPage() {
     sortedElements.forEach((element, index) => {
       const { type, content, style } = element
       
+      // Determine alignment based on element position relative to canvas center
+      const canvasCenterX = canvasSettings.width / 2
+      const elementCenterX = style.position.x + (style.width / 2)
+      const elementAlignment = Math.abs(elementCenterX - canvasCenterX) < 20 ? 'center' : 
+                               style.position.x < canvasCenterX ? 'left' : 'right'
+      
       html += `
           <tr>
             <td style="padding: 0;">`
@@ -130,18 +136,17 @@ export default function EmailPreviewPage() {
         case 'text':
           const textColor = style.color || '#000000'
           const textSize = style.fontSize || 16
-          const textAlign = style.textAlign || 'left'
           const bgColor = style.backgroundColor && style.backgroundColor !== 'transparent' ? style.backgroundColor : 'transparent'
           const padding = style.padding || 10
           
           html += `
               <table width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td style="
+                  <td align="${elementAlignment}" style="
                     font-family: Arial, sans-serif;
                     font-size: ${textSize}px;
                     color: ${textColor};
-                    text-align: ${textAlign};
+                    text-align: ${elementAlignment};
                     line-height: 1.5;
                     padding: ${padding}px;
                     ${bgColor !== 'transparent' ? `background-color: ${bgColor};` : ''}
@@ -154,17 +159,16 @@ export default function EmailPreviewPage() {
           const headingLevel = element.headingLevel || 1
           const headingSize = style.fontSize || (32 - (headingLevel - 1) * 4)
           const headingColor = style.color || '#000000'
-          const headingAlign = style.textAlign || 'center'
           const headingPadding = style.padding || 10
           
           html += `
               <table width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td style="
+                  <td align="${elementAlignment}" style="
                     font-family: Arial, sans-serif;
                     font-size: ${headingSize}px;
                     color: ${headingColor};
-                    text-align: ${headingAlign};
+                    text-align: ${elementAlignment};
                     font-weight: bold;
                     padding: ${headingPadding}px;
                     margin: 0;
@@ -177,13 +181,12 @@ export default function EmailPreviewPage() {
           break
 
         case 'image':
-          const imageAlign = style.textAlign || 'left'
           const imagePadding = style.padding || 0
           
           html += `
               <table width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td align="${imageAlign}" style="padding: ${imagePadding}px;">
+                  <td align="${elementAlignment}" style="padding: ${imagePadding}px;">
                     <img src="${content}" alt="Image" style="
                       display: block;
                       max-width: ${style.width}px;
@@ -224,7 +227,7 @@ export default function EmailPreviewPage() {
           const buttonBg = style.backgroundColor || '#007acc'
           const buttonColor = style.color || '#ffffff'
           const buttonText = content
-          const buttonAlign = style.textAlign || 'left'
+
           const buttonPadding = style.padding || 12
           const buttonBorderRadius = style.borderRadius || 4
           
@@ -233,7 +236,7 @@ export default function EmailPreviewPage() {
             html += `
               <table width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td align="${buttonAlign}" style="padding: 10px;">
+                  <td align="${elementAlignment}" style="padding: 10px;">
                     <!--[if mso]>
                     <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="#" style="height:${buttonPadding * 2 + 32}px;v-text-anchor:middle;width:${content.length * 12 + 60}px;" arcsize="${(buttonBorderRadius / (buttonPadding * 2 + 32)) * 100}%" fillcolor="${buttonBg}">
                       <w:anchorlock/>
@@ -265,7 +268,7 @@ export default function EmailPreviewPage() {
             html += `
               <table width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td align="${buttonAlign}" style="padding: 10px;">
+                  <td align="${elementAlignment}" style="padding: 10px;">
                     <a href="#" style="
                       background-color: ${buttonBg};
                       border: none;

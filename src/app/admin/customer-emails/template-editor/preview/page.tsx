@@ -70,38 +70,39 @@ export default function EmailPreviewPage() {
     const editorElements = template.elements || []
     const canvasSettings = template.canvasSettings || { width: 600, height: 800, backgroundColor: '#ffffff' }
     
-    // Generate HTML that preserves exact element positioning from the template
+    // Sort elements by Y position to create proper email flow
+    const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
+    
+    // Generate EMAIL-SAFE HTML using only tables and inline styles
     let html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${template.name || 'Email Template'}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-  <div style="
-    width: 100%;
-    min-height: 100vh;
-    background-color: #f4f4f4;
-    padding: 20px;
-    box-sizing: border-box;
-  ">
-    <div style="
-      width: ${canvasSettings.width}px;
-      height: ${canvasSettings.height}px;
-      background-color: ${canvasSettings.backgroundColor};
-      margin: 0 auto;
-      position: relative;
-      border: 1px solid #e5e7eb;
-    ">`
+  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <table width="${canvasSettings.width}" cellspacing="0" cellpadding="0" border="0" style="background-color: ${canvasSettings.backgroundColor}; max-width: ${canvasSettings.width}px;">`
 
-    // Add client indicator at the top
+    // Add client indicator
     let clientColor = '#007acc'
     let clientText = 'GENERIC EMAIL CLIENT PREVIEW'
     
     if (client === 'gmail') {
       clientColor = '#ff6b6b'
-      clientText = 'GMAIL PREVIEW: Limited CSS support - simplified rendering'
+      clientText = 'GMAIL PREVIEW: Limited CSS support'
     } else if (client === 'outlook') {
       clientColor = '#0078d4'
       clientText = 'OUTLOOK PREVIEW: Uses Word rendering engine'
@@ -111,31 +112,19 @@ export default function EmailPreviewPage() {
     }
     
     html += `
-      <div style="
-        position: absolute;
-        top: -30px;
-        left: 0;
-        right: 0;
-        background-color: ${clientColor};
-        color: white;
-        padding: 8px;
-        text-align: center;
-        font-size: 12px;
-        font-weight: bold;
-      ">${clientText}</div>`
+          <tr>
+            <td style="background-color: ${clientColor}; color: white; padding: 10px; text-align: center; font-size: 12px; font-weight: bold;">
+              ${clientText}
+            </td>
+          </tr>`
 
-    // Process each element using EXACT positioning from the template
-    editorElements.forEach((element, index) => {
+    // Process each element in email-safe table rows
+    sortedElements.forEach((element, index) => {
       const { type, content, style } = element
       
       html += `
-        <div style="
-          position: absolute;
-          left: ${style.position.x}px;
-          top: ${style.position.y}px;
-          width: ${style.width}px;
-          height: ${style.height}px;
-        ">`
+          <tr>
+            <td style="padding: 0;">`
 
       switch (type) {
         case 'text':
@@ -143,20 +132,22 @@ export default function EmailPreviewPage() {
           const textSize = style.fontSize || 16
           const textAlign = style.textAlign || 'left'
           const bgColor = style.backgroundColor && style.backgroundColor !== 'transparent' ? style.backgroundColor : 'transparent'
+          const padding = style.padding || 10
           
           html += `
-            <div style="
-              font-family: Arial, sans-serif;
-              font-size: ${textSize}px;
-              color: ${textColor};
-              text-align: ${textAlign};
-              line-height: 1.5;
-              width: 100%;
-              height: 100%;
-              ${bgColor !== 'transparent' ? `background-color: ${bgColor};` : ''}
-              ${style.padding ? `padding: ${style.padding}px;` : ''}
-              overflow: hidden;
-            ">${content}</div>`
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="
+                    font-family: Arial, sans-serif;
+                    font-size: ${textSize}px;
+                    color: ${textColor};
+                    text-align: ${textAlign};
+                    line-height: 1.5;
+                    padding: ${padding}px;
+                    ${bgColor !== 'transparent' ? `background-color: ${bgColor};` : ''}
+                  ">${content}</td>
+                </tr>
+              </table>`
           break
 
         case 'heading':
@@ -164,40 +155,44 @@ export default function EmailPreviewPage() {
           const headingSize = style.fontSize || (32 - (headingLevel - 1) * 4)
           const headingColor = style.color || '#000000'
           const headingAlign = style.textAlign || 'center'
+          const headingPadding = style.padding || 10
           
           html += `
-            <h${headingLevel} style="
-              font-family: Arial, sans-serif;
-              font-size: ${headingSize}px;
-              color: ${headingColor};
-              text-align: ${headingAlign};
-              margin: 0;
-              font-weight: bold;
-              width: 100%;
-              height: 100%;
-              display: flex;
-              align-items: center;
-              justify-content: ${headingAlign === 'center' ? 'center' : headingAlign === 'right' ? 'flex-end' : 'flex-start'};
-            ">${content}</h${headingLevel}>`
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="
+                    font-family: Arial, sans-serif;
+                    font-size: ${headingSize}px;
+                    color: ${headingColor};
+                    text-align: ${headingAlign};
+                    font-weight: bold;
+                    padding: ${headingPadding}px;
+                    margin: 0;
+                    line-height: 1.2;
+                  ">
+                    ${content}
+                  </td>
+                </tr>
+              </table>`
           break
 
         case 'image':
           const imageAlign = style.textAlign || 'left'
+          const imagePadding = style.padding || 0
           
           html += `
-            <div style="
-              width: 100%;
-              height: 100%;
-              display: flex;
-              align-items: center;
-              justify-content: ${imageAlign === 'center' ? 'center' : imageAlign === 'right' ? 'flex-end' : 'flex-start'};
-            ">
-              <img src="${content}" alt="Image" style="
-                max-width: 100%;
-                max-height: 100%;
-                object-fit: contain;
-              " />
-            </div>`
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="${imageAlign}" style="padding: ${imagePadding}px;">
+                    <img src="${content}" alt="Image" style="
+                      display: block;
+                      max-width: ${style.width}px;
+                      height: auto;
+                      border: 0;
+                    " width="${style.width}" />
+                  </td>
+                </tr>
+              </table>`
           break
 
         case 'video':
@@ -233,26 +228,63 @@ export default function EmailPreviewPage() {
           const buttonPadding = style.padding || 12
           const buttonBorderRadius = style.borderRadius || 4
           
-          html += `
-            <div style="
-              width: 100%;
-              height: 100%;
-              display: flex;
-              align-items: center;
-              justify-content: ${buttonAlign === 'center' ? 'center' : buttonAlign === 'right' ? 'flex-end' : 'flex-start'};
-            ">
-              <a href="#" style="
-                display: inline-block;
-                padding: ${buttonPadding}px 30px;
-                background-color: ${buttonBg};
-                color: ${buttonColor};
-                text-decoration: none;
-                border-radius: ${buttonBorderRadius}px;
-                font-family: Arial, sans-serif;
-                font-size: 16px;
-                white-space: nowrap;
-              ">${buttonText}</a>
-            </div>`
+          // Email-safe button with Outlook VML fallback
+          if (client === 'outlook') {
+            html += `
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="${buttonAlign}" style="padding: 10px;">
+                    <!--[if mso]>
+                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="#" style="height:${buttonPadding * 2 + 32}px;v-text-anchor:middle;width:${content.length * 12 + 60}px;" arcsize="${(buttonBorderRadius / (buttonPadding * 2 + 32)) * 100}%" fillcolor="${buttonBg}">
+                      <w:anchorlock/>
+                      <center style="color:${buttonColor};font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">${buttonText}</center>
+                    </v:roundrect>
+                    <![endif]-->
+                    <!--[if !mso]><!-->
+                    <a href="#" style="
+                      background-color: ${buttonBg};
+                      border: none;
+                      border-radius: ${buttonBorderRadius}px;
+                      color: ${buttonColor};
+                      display: inline-block;
+                      font-family: Arial, sans-serif;
+                      font-size: 16px;
+                      font-weight: bold;
+                      line-height: 1;
+                      padding: ${buttonPadding}px 30px;
+                      text-align: center;
+                      text-decoration: none;
+                      -webkit-text-size-adjust: none;
+                      mso-hide: all;
+                    ">${buttonText}</a>
+                    <!--<![endif]-->
+                  </td>
+                </tr>
+              </table>`
+          } else {
+            html += `
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="${buttonAlign}" style="padding: 10px;">
+                    <a href="#" style="
+                      background-color: ${buttonBg};
+                      border: none;
+                      ${client === 'apple' ? `border-radius: ${buttonBorderRadius}px;` : ''}
+                      color: ${buttonColor};
+                      display: inline-block;
+                      font-family: Arial, sans-serif;
+                      font-size: 16px;
+                      font-weight: bold;
+                      line-height: 1;
+                      padding: ${buttonPadding}px 30px;
+                      text-align: center;
+                      text-decoration: none;
+                      -webkit-text-size-adjust: none;
+                    ">${buttonText}</a>
+                  </td>
+                </tr>
+              </table>`
+          }
           break
 
         case 'divider':
@@ -277,12 +309,15 @@ export default function EmailPreviewPage() {
       }
 
       html += `
-        </div>`
+            </td>
+          </tr>`
     })
 
     html += `
-    </div>
-  </div>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`
     

@@ -1620,17 +1620,47 @@ export default function TemplateEditorPage() {
               
               {/* Email Preview Button */}
               <button
-                onClick={() => setPreviewMode(!previewMode)}
-                className={`w-full p-3 text-left border border-gray-200 rounded-md hover:bg-gray-50 hover:shadow-sm transition-all ${
-                  previewMode ? 'bg-blue-50 border-blue-300' : ''
-                }`}
+                onClick={() => {
+                  // Save current template first
+                  const templateData = {
+                    id: templateId || Date.now().toString(),
+                    name: templateForm.name || 'Untitled Template',
+                    subject: templateForm.subject || 'Email Subject',
+                    type: templateForm.type,
+                    htmlContent: generateHtmlFromElements(),
+                    textContent: generatePlainTextFromElements(),
+                    elements: editorElements,
+                    canvasSettings: {
+                      width: canvasSize.width,
+                      height: canvasSize.height,
+                      backgroundColor: canvasBackgroundColor
+                    },
+                    createdAt: new Date().toISOString()
+                  }
+                  
+                  // Save to localStorage temporarily for preview
+                  const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+                  const tempId = templateId || 'temp-preview-' + Date.now()
+                  const updatedTemplates = savedTemplates.filter((t: any) => !t.id.startsWith('temp-preview-'))
+                  localStorage.setItem('emailTemplates', JSON.stringify([{...templateData, id: tempId}, ...updatedTemplates]))
+                  
+                  // Open preview in new tab
+                  const previewUrl = `/admin/customer-emails/template-editor/preview?id=${tempId}&client=gmail`
+                  window.open(previewUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes')
+                }}
+                className="w-full p-3 text-left border border-gray-200 rounded-md hover:bg-gray-50 hover:shadow-sm transition-all"
               >
-                <div className="flex items-center space-x-2">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 8l6-6m-1 1l-6 6" />
+                    </svg>
+                    <span className="text-sm font-medium">Full Screen Preview</span>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M15 8l6-6m-1 1l-6 6" />
                   </svg>
-                  <span className="text-sm font-medium">Email Preview</span>
                 </div>
               </button>
             </div>

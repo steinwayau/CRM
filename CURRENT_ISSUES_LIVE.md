@@ -1,41 +1,52 @@
 # 🚨 CURRENT ISSUES LIVE TRACKER 🚨
 
-**Last Updated**: January 18th, 2025 - 6:30 PM by Agent #47
-**Status**: ✅ **DEFINITIVE RESOLUTION** - Email Campaign System Fully Functional
+**Last Updated**: December 20th, 2024 - 7:30 PM by Agent #40
+**Status**: ❌ **UNRESOLVED CRITICAL ISSUE** - Email Template Preview Alignment Broken
 
-## 🎉 FINAL RESOLUTION - EMAIL CAMPAIGN SYSTEM WORKING
+## 🚨 CRITICAL ISSUE - EMAIL TEMPLATE PREVIEW ALIGNMENT BROKEN
 
-### **✅ DEFINITIVE FINDING: EMAIL SYSTEM IS FULLY FUNCTIONAL**
+### **❌ UNRESOLVED: EMAIL TEMPLATE PREVIEW DOES NOT MATCH TEMPLATE LAYOUT**
 
-**Status**: ✅ **CONFIRMED WORKING** - Comprehensive testing proves email campaign system is operational
+**Status**: ❌ **CRITICAL FAILURE** - Preview system completely misrepresents template layout
+**User Report**: "The preview is still cutting off the left hand side of the template and the images, video and buttons are all being forced to the left when in fact if you see the template they are centered."
+
 **Evidence**: 
-- **Live API Test**: `curl` test returned `{"success":true,"results":{"totalRecipients":1,"successCount":1,"failureCount":0,"failures":[]}}`
-- **Production URL**: `https://crm.steinway.com.au/api/email/send-campaign` returns HTTP 200
-- **Customer Data**: Successfully retrieving 3 customers from database
-- **Domain Configuration**: `noreply@steinway.com.au` properly configured and verified
+- **User Screenshots**: Template editor shows centered elements, preview shows left-aligned
+- **Multiple Failed Attempts**: Agent #40 tried 6 different technical approaches
+- **User Confirmation**: "You haven't managed to fix the issue"
+- **Production Impact**: Users cannot trust preview for email campaigns
 
-### **🔍 ROOT CAUSE ANALYSIS COMPLETED**
+### **🔍 ROOT CAUSE ANALYSIS REQUIRED**
 
-**User's Issue**: "I have sent out a campaign to myself for testing purposes but I haven't actually received the email"
+**User's Issue**: "The preview is still cutting off the left hand side of the template and the images, video and buttons are all being forced to the left when in fact if you see the template they are centered."
 
-**Actual Causes Identified**:
+**ROOT CAUSE: UNKNOWN** - Agent #40 failed to identify the fundamental issue
 
-**1. Template Storage Issue (Primary)**
-- **Problem**: Custom templates stored in `localStorage` (browser-based)
-- **Impact**: User's custom template was lost when localStorage was cleared
-- **Evidence**: Code shows `localStorage.getItem('emailTemplates')` usage
-- **Result**: No template available for campaign sending
+**FAILED INVESTIGATION ATTEMPTS**:
 
-**2. Resend Audience Misunderstanding (Secondary)**
-- **User Screenshot**: Showed 0 contacts in Resend "Audiences" 
-- **Misunderstanding**: User thought this meant system was broken
-- **Reality**: CRM doesn't use Resend audiences - sends directly via API
-- **Architecture**: `getCustomersForCampaign()` pulls from CRM database, not Resend
+**1. Assumed TextAlign Property Issue**
+- **Agent #40 Assumption**: Preview was using hardcoded alignment
+- **Fix Attempted**: Modified `generateClientSpecificHtml` to use `style.textAlign`
+- **Result**: FAILED - Elements still appeared left-aligned
+- **Problem**: May not be related to textAlign property at all
 
-**3. Previous Agent Confusion (Tertiary)**
-- **Agent #46**: Made false claims about email system being broken
-- **Agent #43/44**: Tested wrong URLs with authentication blocking
-- **Agent #45**: Actually fixed the system correctly but didn't complete documentation
+**2. Created Dedicated Preview Page**
+- **Agent #40 Solution**: Built full-screen preview page in new tab
+- **Implementation**: `src/app/admin/customer-emails/template-editor/preview/page.tsx`
+- **Result**: FAILED - Same alignment issues in dedicated page
+- **Problem**: Didn't solve underlying alignment detection
+
+**3. Position-Based Alignment Calculation**
+- **Agent #40 Algorithm**: Calculate alignment from canvas position
+- **Logic**: `Math.abs(elementCenterX - canvasCenterX) < 20 ? 'center' : 'left'`
+- **Result**: FAILED - User confirmed issue not resolved
+- **Problem**: May not understand how template editor stores alignment
+
+**CRITICAL KNOWLEDGE GAPS**:
+- How does template editor determine element is "centered"?
+- What data structure stores element alignment information?
+- Is alignment stored as positioning (x,y) or as properties?
+- How does the template save/load alignment data?
 
 ## 📊 TECHNICAL STATUS VERIFIED
 

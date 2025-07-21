@@ -1041,7 +1041,7 @@ export default function TemplateEditorPage() {
     }
   }
 
-  // Email Client Preview Functions - TRUE EMAIL CLIENT DIFFERENCES
+  // FIXED EMAIL CLIENT PREVIEW - TRUE DIFFERENCES WITH PROPER RENDERING
   const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
@@ -1102,7 +1102,7 @@ export default function TemplateEditorPage() {
     
     const rules = clientRules[client]
     
-    // Generate client-specific HTML structure
+    // Generate SIMPLIFIED, EMAIL-SAFE HTML structure
     let html = `<!DOCTYPE html>
 <html>
 <head>
@@ -1119,11 +1119,11 @@ export default function TemplateEditorPage() {
   </noscript>
   <![endif]-->` : ''}
 </head>
-<body style="margin: 0; padding: 20px; font-family: ${rules.defaultFont}; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: ${rules.defaultFont}; background-color: #f4f4f4;">
   <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
     <tr>
-      <td align="center">
-        <table width="${canvasSize.width}" cellspacing="0" cellpadding="20" border="0" style="background-color: ${canvasBackgroundColor}; max-width: ${canvasSize.width}px;">`
+      <td align="center" style="padding: 20px 0;">
+        <table width="${canvasSize.width}" cellspacing="0" cellpadding="0" border="0" style="background-color: ${canvasBackgroundColor}; max-width: ${canvasSize.width}px; margin: 0 auto;">`
 
     // Add prominent client indicator with different styling
     if (client === 'gmail') {
@@ -1156,36 +1156,32 @@ export default function TemplateEditorPage() {
           </tr>`
     }
 
-    // Process each element with client-specific rendering and proper alignment
+    // FIXED: Consistent table-based structure for all elements
     sortedElements.forEach((element, index) => {
       const { type, content, style } = element
       const elementAlign = getElementAlignment(element)  // Use calculated alignment from template builder
-      
-      html += `
-          <tr>
-            <td style="padding: 10px 0;">`
 
       switch (type) {
         case 'text':
           const textColor = style.color || '#000000'
           const textSize = style.fontSize || 16
           const bgColor = style.backgroundColor && style.backgroundColor !== 'transparent' ? style.backgroundColor : 'transparent'
-          const textPadding = rules.stripsPadding ? '0' : (style.padding || 0)
           
           html += `
+          <tr>
+            <td style="text-align: ${elementAlign}; padding: 10px;">
               <div style="
                 font-family: ${rules.defaultFont};
                 font-size: ${textSize}px;
                 color: ${textColor};
-                text-align: ${elementAlign};
                 line-height: 1.5;
                 ${bgColor !== 'transparent' ? `background-color: ${bgColor};` : ''}
                 ${!rules.stripsPadding && style.padding ? `padding: ${style.padding}px;` : ''}
-                ${rules.supportsBoxShadow && bgColor !== 'transparent' ? 'box-shadow: 0 1px 3px rgba(0,0,0,0.1);' : ''}
                 ${rules.supportsBorderRadius && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-                width: ${elementAlign === 'center' ? 'fit-content' : '100%'};
-                ${elementAlign === 'center' ? 'margin: 0 auto;' : ''}
-              ">${content}</div>`
+                ${elementAlign === 'center' ? 'text-align: center; margin: 0 auto;' : `text-align: ${elementAlign};`}
+              ">${content}</div>
+            </td>
+          </tr>`
           break
 
         case 'heading':
@@ -1194,35 +1190,43 @@ export default function TemplateEditorPage() {
           const headingColor = style.color || '#000000'
           
           html += `
+          <tr>
+            <td style="text-align: ${elementAlign}; padding: 15px 10px;">
               <h${headingLevel} style="
                 font-family: ${rules.defaultFont};
                 font-size: ${headingSize}px;
                 color: ${headingColor};
-                text-align: ${elementAlign};
-                margin: 20px 0;
+                margin: 0;
                 font-weight: bold;
-                ${rules.supportsBoxShadow ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.1);' : ''}
-              ">${content}</h${headingLevel}>`
+                line-height: 1.2;
+              ">${content}</h${headingLevel}>
+            </td>
+          </tr>`
           break
 
         case 'image':
+          // FIXED: Proper image sizing to prevent stretching in Apple Mail
           const imageWidth = Math.min(style.width, rules.maxImageWidth)
-          const imageMargin = elementAlign === 'center' ? '0 auto' : 
-                              elementAlign === 'right' ? '0 0 0 auto' : '0'
+          const imageHeight = style.height || 'auto'
           
           html += `
-              <div style="text-align: ${elementAlign};">
-                <img src="${content}" alt="Image" style="
-                  max-width: ${rules.maxImageWidth}px;
-                  width: ${imageWidth}px;
-                  height: auto;
-                  display: block;
-                  margin: ${imageMargin};
-                  ${rules.supportsBorderRadius && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-                  ${rules.supportsBoxShadow ? 'box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}
-                  ${client === 'gmail' ? 'border: 1px solid #ddd;' : ''}
-                " width="${imageWidth}" />
-              </div>`
+          <tr>
+            <td style="text-align: ${elementAlign}; padding: 10px;">
+              <img src="${content}" alt="Image" 
+                   width="${imageWidth}" 
+                   ${typeof imageHeight === 'number' ? `height="${imageHeight}"` : ''} 
+                   style="
+                     display: block;
+                     width: ${imageWidth}px;
+                     ${typeof imageHeight === 'number' ? `height: ${imageHeight}px;` : 'height: auto;'}
+                     max-width: ${imageWidth}px;
+                     ${rules.supportsBorderRadius && style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                     border: 0;
+                     outline: none;
+                     ${elementAlign === 'center' ? 'margin: 0 auto;' : ''}
+                   " />
+            </td>
+          </tr>`
           break
 
         case 'video':
@@ -1231,27 +1235,40 @@ export default function TemplateEditorPage() {
           const videoWidth = Math.min(style.width, rules.maxImageWidth)
           
           html += `
-              <div style="text-align: ${elementAlign};">
-                <a href="${content}" style="display: inline-block; text-decoration: none;">
-                  <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
-                    max-width: ${rules.maxImageWidth}px;
-                    width: ${videoWidth}px;
-                    height: auto;
-                    border: 2px solid ${client === 'apple' ? '#007acc' : '#333'};
-                    ${rules.supportsBorderRadius ? 'border-radius: 8px;' : ''}
-                    ${rules.supportsBoxShadow ? 'box-shadow: 0 4px 8px rgba(0,0,0,0.2);' : ''}
-                  " width="${videoWidth}" />
-                  <div style="
-                    background-color: ${client === 'apple' ? '#007acc' : '#333'};
-                    color: white;
-                    padding: 10px;
-                    text-align: center;
-                    font-family: ${rules.defaultFont};
-                    font-size: 14px;
-                    ${rules.supportsBorderRadius ? 'border-radius: 0 0 8px 8px;' : ''}
-                  ">▶ ${videoData?.title || 'Play Video'}</div>
-                </a>
-              </div>`
+          <tr>
+            <td style="text-align: ${elementAlign}; padding: 10px;">
+              <a href="${content}" style="display: inline-block; text-decoration: none;">
+                <table cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td>
+                      <img src="${thumbnailUrl}" alt="Video Thumbnail" 
+                           width="${videoWidth}" 
+                           style="
+                             display: block;
+                             width: ${videoWidth}px;
+                             height: auto;
+                             border: 2px solid ${client === 'apple' ? '#007acc' : '#333'};
+                             ${rules.supportsBorderRadius ? 'border-radius: 8px 8px 0 0;' : ''}
+                           " />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="
+                      background-color: ${client === 'apple' ? '#007acc' : '#333'};
+                      color: white;
+                      padding: 10px;
+                      text-align: center;
+                      font-family: ${rules.defaultFont};
+                      font-size: 14px;
+                      ${rules.supportsBorderRadius ? 'border-radius: 0 0 8px 8px;' : ''}
+                    ">
+                      ▶ ${videoData?.title || 'Play Video'}
+                    </td>
+                  </tr>
+                </table>
+              </a>
+            </td>
+          </tr>`
           break
 
         case 'button':
@@ -1263,73 +1280,41 @@ export default function TemplateEditorPage() {
           const buttonWidth = style.width || 200
           const buttonHeight = style.height || 40
           
-          // METICULOUS BUTTON ALIGNMENT AND CLIENT-SPECIFIC RENDERING
-          if (rules.requiresVML && client === 'outlook') {
-            // Outlook VML button with perfect centering
-            html += `
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                <tr>
-                  <td style="text-align: ${elementAlign};">
-                    <!--[if mso]>
-                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" 
-                                 href="#" style="height:${buttonHeight}px;v-text-anchor:middle;width:${buttonWidth}px;" 
-                                 arcsize="${buttonBorderRadius > 0 ? Math.round((buttonBorderRadius / Math.min(buttonWidth, buttonHeight)) * 100) : 0}%" 
-                                 fillcolor="${buttonBg}" strokecolor="${buttonBg}">
-                      <w:anchorlock/>
-                      <center style="color:${buttonColor};font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">${buttonText}</center>
-                    </v:roundrect>
-                    <![endif]-->
-                    <!--[if !mso]><!-->
-                    <a href="#" style="
-                      display: inline-block;
-                      width: ${buttonWidth}px;
-                      height: ${buttonHeight}px;
-                      line-height: ${buttonHeight}px;
-                      padding: 0;
-                      background-color: ${buttonBg};
-                      color: ${buttonColor};
-                      text-decoration: none;
-                      font-family: ${rules.defaultFont};
-                      font-size: 16px;
-                      font-weight: bold;
-                      text-align: center;
-                      border: 0;
-                      outline: none;
-                    ">${buttonText}</a>
-                    <!--<![endif]-->
-                  </td>
-                </tr>
-              </table>`
-          } else {
-            // Modern email clients - table-based perfect centering
-            html += `
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                <tr>
-                  <td style="text-align: ${elementAlign};">
-                    <a href="#" style="
-                      display: inline-block;
-                      width: ${buttonWidth}px;
-                      height: ${buttonHeight}px;
-                      line-height: ${buttonHeight}px;
-                      padding: 0;
-                      background-color: ${buttonBg};
-                      color: ${buttonColor};
-                      text-decoration: none;
-                      font-family: ${rules.defaultFont};
-                      font-size: 16px;
-                      font-weight: bold;
-                      text-align: center;
-                      border: 0;
-                      outline: none;
-                      ${rules.supportsBorderRadius && buttonBorderRadius > 0 ? `border-radius: ${buttonBorderRadius}px;` : ''}
-                      ${rules.supportsBoxShadow ? 'box-shadow: 0 2px 4px rgba(0,0,0,0.2);' : ''}
-                      ${client === 'gmail' ? 'border: 1px solid #ddd;' : ''}
-                      transition: ${rules.supportsAdvancedCSS ? 'all 0.2s ease;' : 'none'};
-                    ">${buttonText}</a>
-                  </td>
-                </tr>
-              </table>`
-          }
+          // SIMPLIFIED BUTTON RENDERING WITH CLICK TRACKING
+          const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://epg-crm.vercel.app'}/api/email/tracking/click?c=CAMPAIGN_ID&r=RECIPIENT_ID&l=button-${element.id}&url=${encodeURIComponent('#')}`
+          
+          html += `
+          <tr>
+            <td style="text-align: ${elementAlign}; padding: 15px 10px;">
+              ${client === 'outlook' && rules.requiresVML ? `
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" 
+                           href="${trackingUrl}" style="height:${buttonHeight}px;v-text-anchor:middle;width:${buttonWidth}px;" 
+                           arcsize="${buttonBorderRadius > 0 ? Math.round((buttonBorderRadius / Math.min(buttonWidth, buttonHeight)) * 100) : 0}%" 
+                           fillcolor="${buttonBg}" strokecolor="${buttonBg}">
+                <w:anchorlock/>
+                <center style="color:${buttonColor};font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">${buttonText}</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-->` : ''}
+              <a href="${trackingUrl}" style="
+                display: inline-block;
+                width: ${buttonWidth}px;
+                height: ${buttonHeight}px;
+                line-height: ${buttonHeight}px;
+                background-color: ${buttonBg};
+                color: ${buttonColor};
+                text-decoration: none;
+                font-family: ${rules.defaultFont};
+                font-size: 16px;
+                font-weight: bold;
+                text-align: center;
+                border: 0;
+                ${rules.supportsBorderRadius && buttonBorderRadius > 0 ? `border-radius: ${buttonBorderRadius}px;` : ''}
+              ">${buttonText}</a>
+              ${client === 'outlook' && rules.requiresVML ? '<!--<![endif]-->' : ''}
+            </td>
+          </tr>`
           break
 
         case 'divider':
@@ -1338,28 +1323,30 @@ export default function TemplateEditorPage() {
           const dividerWidth = style.width ? `${style.width}px` : '100%'
           
           html += `
-              <div style="text-align: ${elementAlign};">
-                <hr style="
-                  border: none;
-                  height: ${dividerHeight}px;
-                  background-color: ${dividerColor};
-                  margin: 20px 0;
-                  width: ${dividerWidth};
-                  ${elementAlign === 'center' ? 'margin-left: auto; margin-right: auto;' : ''}
-                  ${elementAlign === 'right' ? 'margin-left: auto; margin-right: 0;' : ''}
-                  ${rules.supportsBoxShadow ? 'box-shadow: 0 1px 2px rgba(0,0,0,0.1);' : ''}
-                " />
-              </div>`
-          break
-      }
-
-      html += `
+          <tr>
+            <td style="text-align: ${elementAlign}; padding: 10px;">
+              <hr style="
+                border: none;
+                height: ${dividerHeight}px;
+                background-color: ${dividerColor};
+                margin: 0;
+                width: ${dividerWidth};
+                ${elementAlign === 'center' ? 'margin: 0 auto;' : ''}
+                ${elementAlign === 'right' ? 'margin: 0 0 0 auto;' : ''}
+              " />
             </td>
           </tr>`
+          break
+      }
     })
 
+    // Add email tracking pixel at the bottom
     html += `
         </table>
+        
+        <!-- Email Open Tracking Pixel -->
+        <img src="${process.env.NEXT_PUBLIC_APP_URL || 'https://epg-crm.vercel.app'}/api/email/tracking/open?c=CAMPAIGN_ID&r=RECIPIENT_ID" 
+             width="1" height="1" style="display:none;" alt="" />
       </td>
     </tr>
   </table>
@@ -1726,9 +1713,26 @@ export default function TemplateEditorPage() {
                   <span className="text-sm font-medium">Divider</span>
                 </div>
               </button>
-              
-              {/* Email Preview Button */}
-              {/* Removed redundant Full Screen Preview button as user requested */}
+
+              {/* Email Client Preview Button */}
+              <button
+                onClick={() => setPreviewMode(!previewMode)}
+                className={`w-full p-3 text-left border rounded-md hover:shadow-sm transition-all ${
+                  previewMode 
+                    ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span className="text-sm font-medium">
+                    {previewMode ? 'Exit Preview' : 'Email Preview'}
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         </div>

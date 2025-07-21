@@ -1017,7 +1017,7 @@ export default function TemplateEditorPage() {
   const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
-    // GMAIL: Return dramatically simplified version (strips all styling)
+    // GMAIL: Show actual Gmail rendering (table-based, Gmail-compatible CSS only)
     if (client === 'gmail') {
       let gmailHtml = `<!DOCTYPE html>
 <html>
@@ -1025,64 +1025,92 @@ export default function TemplateEditorPage() {
   <meta charset="UTF-8">
   <title>${templateForm.name || 'Email Template'}</title>
 </head>
-<body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: white; color: black;">
-  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto; background-color: white;">
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
     <tr>
-      <td style="background-color: #EA4335; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">
-        📧 GMAIL - Strips All Styling, Text Only
-      </td>
-    </tr>`
+      <td style="padding: 20px 0;">
+        <table width="600" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color: #EA4335; color: white; padding: 12px 20px; text-align: center; font-size: 13px; font-weight: bold; border-bottom: 2px solid #d33;">
+              📧 GMAIL PREVIEW - How your template will appear in Gmail
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0; position: relative; width: 600px; height: ${canvasSize.height}px; background-color: ${canvasBackgroundColor};">
+              <!-- Template content positioned absolutely within this cell -->`
 
       // Check if template has elements
       if (sortedElements.length === 0) {
         gmailHtml += `
-            <tr>
-              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6; text-align: center;">
-                <p style="margin: 20px 0; color: #666;">This template has no content elements yet.</p>
-                <p style="margin: 20px 0; color: #666;">Add text, images, or buttons in the template editor to see how Gmail will display them.</p>
-              </td>
-            </tr>`
+              <div style="padding: 40px; text-align: center; color: #666; font-family: Arial, sans-serif;">
+                <p style="margin: 0 0 15px 0; font-size: 16px;">Your template is empty</p>
+                <p style="margin: 0; font-size: 14px;">Add elements to see how they'll appear in Gmail</p>
+              </div>`
       } else {
         sortedElements.forEach((element) => {
-          const { type, content } = element
+          const { type, content, style } = element
+          const { position, width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+          
+          // Convert absolute positioning to Gmail-compatible table cell
+          const cellStyle = `
+            position: absolute;
+            left: ${position.x}px;
+            top: ${position.y}px;
+            width: ${width}px;
+            height: ${height}px;
+            font-family: ${fontFamily || 'Arial, sans-serif'};
+            font-size: ${fontSize || 14}px;
+            font-weight: ${fontWeight || 'normal'};
+            color: ${color || '#000000'};
+            text-align: ${textAlign || 'left'};
+            background-color: ${backgroundColor || 'transparent'};
+            overflow: hidden;
+            box-sizing: border-box;
+          `.replace(/\s+/g, ' ').trim()
           
           if (type === 'text' || type === 'heading') {
-            const textContent = content || '[Empty text element]'
+            const textContent = content || '[Empty text]'
             gmailHtml += `
-              <tr>
-                <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6;">
-                  ${textContent}
-                </td>
-              </tr>`
+              <div style="${cellStyle} padding: 8px; line-height: 1.4;">
+                ${textContent}
+              </div>`
           } else if (type === 'image') {
+            const imageUrl = content || '/images.png'
             gmailHtml += `
-              <tr>
-                <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: blue; text-decoration: underline;">
-                  [Image: Click to view - Gmail strips images]
-                </td>
-              </tr>`
+              <div style="${cellStyle}">
+                <img src="${imageUrl}" alt="Template Image" style="width: 100%; height: 100%; object-fit: cover; display: block; border: none;">
+              </div>`
           } else if (type === 'button') {
-            const buttonText = content || '[Button]'
+            const buttonText = content || 'Click Here'
             gmailHtml += `
-              <tr>
-                <td style="padding: 20px;">
-                  <a href="#" style="color: blue; text-decoration: underline; font-family: Arial, sans-serif; font-size: 14px;">
-                    ${buttonText}
-                  </a>
-                </td>
-              </tr>`
+              <div style="${cellStyle} display: flex; align-items: center; justify-content: center;">
+                <a href="#" style="
+                  display: inline-block;
+                  padding: 12px 24px;
+                  background-color: #1a73e8;
+                  color: white;
+                  text-decoration: none;
+                  border-radius: 4px;
+                  font-weight: bold;
+                  text-align: center;
+                  line-height: 1;
+                ">${buttonText}</a>
+              </div>`
           } else if (type === 'divider') {
             gmailHtml += `
-              <tr>
-                <td style="padding: 10px 20px;">
-                  <hr style="border: none; border-top: 1px solid #ccc; margin: 10px 0;">
-                </td>
-              </tr>`
+              <div style="${cellStyle} display: flex; align-items: center;">
+                <hr style="width: 100%; border: none; border-top: 1px solid #ddd; margin: 0;">
+              </div>`
           }
         })
       }
 
       gmailHtml += `
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>`

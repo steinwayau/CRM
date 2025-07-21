@@ -1158,21 +1158,51 @@ export default function TemplateEditorPage() {
                   <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 10px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'normal'}; color: ${color || '#000000'}; background-color: ${backgroundColor || 'transparent'};">
                     ${textContent}
                   </td>`
-      } else if (type === 'divider') {
-        rowHtml += `
-                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px;">
-                    <table border="0" cellpadding="0" cellspacing="0" width="80%">
-                      <tr>
-                        <td style="border-top: 1px solid #dddddd; font-size: 1px; line-height: 1px;">&nbsp;</td>
-                      </tr>
-                    </table>
-                  </td>`
-      } else {
-        rowHtml += `
-                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px; color: #666666; font-family: Arial, sans-serif; font-size: 12px;">
-                    [Unsupported: ${type}]
-                  </td>`
-      }
+             } else if (type === 'video') {
+         // Convert video to clickable thumbnail with play button (email-safe approach)
+         const videoThumbnail = content || '/images.png' // Use video thumbnail or fallback
+         const videoUrl = style.videoUrl || '#' // External video URL (YouTube, Vimeo, etc.)
+         
+         rowHtml += `
+                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
+                     <table border="0" cellpadding="0" cellspacing="0">
+                       <tr>
+                         <td align="center" valign="middle" style="background-image: url('${videoThumbnail}'); background-size: cover; background-position: center; width: ${element.scaledWidth}px; height: ${element.scaledHeight}px; background-repeat: no-repeat;">
+                           <a href="${videoUrl}" target="_blank" style="display: block; width: ${element.scaledWidth}px; height: ${element.scaledHeight}px; text-decoration: none;">
+                             <table border="0" cellpadding="0" cellspacing="0" width="100%" height="100%">
+                               <tr>
+                                 <td align="center" valign="middle">
+                                   <!-- Email-safe play button using Unicode -->
+                                   <div style="width: 60px; height: 60px; background-color: rgba(0,0,0,0.8); border-radius: 30px; line-height: 60px; text-align: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">▶</div>
+                                 </td>
+                               </tr>
+                             </table>
+                           </a>
+                         </td>
+                       </tr>
+                       <!-- Fallback for clients that don't support background images -->
+                       <tr>
+                         <td align="center" style="font-size: 12px; color: #666666; padding: 5px; font-family: Arial, sans-serif;">
+                           📹 <a href="${videoUrl}" target="_blank" style="color: #1a73e8; text-decoration: none;">Click to play video</a>
+                         </td>
+                       </tr>
+                     </table>
+                   </td>`
+       } else if (type === 'divider') {
+         rowHtml += `
+                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px;">
+                     <table border="0" cellpadding="0" cellspacing="0" width="80%">
+                       <tr>
+                         <td style="border-top: 1px solid #dddddd; font-size: 1px; line-height: 1px;">&nbsp;</td>
+                       </tr>
+                     </table>
+                   </td>`
+       } else {
+         rowHtml += `
+                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px; color: #666666; font-family: Arial, sans-serif; font-size: 12px;">
+                     [Unsupported: ${type}]
+                   </td>`
+       }
       
       // Add right spacer if needed
       if (rightOffset > 10) {
@@ -1224,12 +1254,24 @@ export default function TemplateEditorPage() {
                       </tr>
                     </table>
                   </td>`
-        } else {
-          rowHtml += `
-                  <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 5px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; color: ${color || '#000000'};">
-                    ${content || '[Text]'}
-                  </td>`
-        }
+                 } else if (type === 'video') {
+           // Video in multi-element row - simplified version
+           const videoThumbnail = content || '/images.png'
+           const videoUrl = style.videoUrl || '#'
+           
+           rowHtml += `
+                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
+                     <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+                       <img src="${videoThumbnail}" alt="Play Video" width="${element.scaledWidth}" height="${element.scaledHeight}" style="display: block; border: 2px solid #1a73e8; border-radius: 4px;">
+                       <div style="text-align: center; font-size: 12px; color: #1a73e8; padding: 3px; font-family: Arial, sans-serif;">▶ Play Video</div>
+                     </a>
+                   </td>`
+         } else {
+           rowHtml += `
+                   <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 5px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; color: ${color || '#000000'};">
+                     ${content || '[Text]'}
+                   </td>`
+         }
         
         // Add spacing between elements (except last)
         if (index < row.length - 1) {

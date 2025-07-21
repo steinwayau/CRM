@@ -1079,58 +1079,91 @@ export default function TemplateEditorPage() {
           gmailHtml += `
                 <tr>`
           
-          // If single element in row, span full width
+          // If single element in row, maintain its proportional size
           if (row.length === 1) {
             const element = row[0]
             const { type, content, style } = element
             const { width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
             
-            const cellStyle = `
-              padding: 10px 20px;
-              font-family: ${fontFamily || 'Arial, sans-serif'};
-              font-size: ${fontSize || 14}px;
-              font-weight: ${fontWeight || 'normal'};
-              color: ${color || '#000000'};
-              text-align: ${textAlign || 'left'};
-              background-color: ${backgroundColor || 'transparent'};
-              vertical-align: top;
-            `.replace(/\s+/g, ' ').trim()
+            // Calculate proportional width based on canvas (600px Gmail width)
+            const elementWidthPercent = Math.min((width / 600) * 100, 100)
+            const remainingWidth = 100 - elementWidthPercent
+            const leftPadding = remainingWidth / 2 // Center the element
             
-            gmailHtml += `
-                  <td style="${cellStyle}">`
-            
-            if (type === 'text' || type === 'heading') {
-              const textContent = content || '[Empty text]'
-              gmailHtml += `${textContent}`
-            } else if (type === 'image') {
-              const imageUrl = content || '/images.png'
-              gmailHtml += `<img src="${imageUrl}" alt="Template Image" style="max-width: 100%; height: auto; display: block;">`
+            // Different handling based on element type
+            if (type === 'image') {
+              // For images, maintain exact dimensions
+              gmailHtml += `
+                  <td style="text-align: center; padding: 10px;">
+                    <img src="${content || '/images.png'}" alt="Template Image" style="width: ${width}px; height: ${height}px; max-width: ${width}px; display: block; margin: 0 auto;">
+                  </td>`
             } else if (type === 'button') {
+              // For buttons, create properly sized button
               const buttonText = content || 'Click Here'
               gmailHtml += `
-                    <table cellspacing="0" cellpadding="0" border="0">
+                  <td style="text-align: ${textAlign || 'center'}; padding: 10px;">
+                    <table cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr>
-                        <td style="background-color: #1a73e8; border-radius: 4px;">
-                          <a href="#" style="display: inline-block; padding: 12px 24px; color: white; text-decoration: none; font-weight: bold;">${buttonText}</a>
+                        <td style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 12px 24px;">
+                          <a href="#" style="display: inline-block; color: ${color || 'white'}; text-decoration: none; font-weight: ${fontWeight || 'bold'}; font-size: ${fontSize || 14}px; font-family: ${fontFamily || 'Arial, sans-serif'};">${buttonText}</a>
                         </td>
                       </tr>
-                    </table>`
-            } else if (type === 'divider') {
-              gmailHtml += `<hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0;">`
-            }
-            
-            gmailHtml += `
-                  </td>`
+                                         </table>
+                   </td>`
+            } else if (type === 'text' || type === 'heading') {
+              // For text elements, use proportional width with proper alignment
+              const cellStyle = `
+                text-align: ${textAlign || 'left'};
+                padding: 10px 20px;
+                font-family: ${fontFamily || 'Arial, sans-serif'};
+                font-size: ${fontSize || 14}px;
+                font-weight: ${fontWeight || 'normal'};
+                color: ${color || '#000000'};
+                background-color: ${backgroundColor || 'transparent'};
+                vertical-align: top;
+                width: ${elementWidthPercent}%;
+              `.replace(/\s+/g, ' ').trim()
+              
+              if (textAlign === 'center' || leftPadding > 10) {
+                // If centered or needs significant padding, use three-column layout
+                gmailHtml += `
+                  <td style="width: ${leftPadding}%;"></td>
+                  <td style="${cellStyle}">
+                    ${content || '[Empty text]'}
+                  </td>
+                  <td style="width: ${leftPadding}%;"></td>`
+              } else {
+                // Otherwise use single column with appropriate alignment
+                gmailHtml += `
+                  <td style="${cellStyle}">
+                                         ${content || '[Empty text]'}
+                   </td>`
+               }
+             } else if (type === 'divider') {
+               gmailHtml += `
+                   <td style="padding: 10px 20px; text-align: center;">
+                     <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0; width: ${Math.min(elementWidthPercent, 80)}%;">
+                   </td>`
+             } else {
+               // Fallback for any other element types
+               gmailHtml += `
+                   <td style="padding: 10px; text-align: center; color: #666;">
+                     [Unsupported element type: ${type}]
+                   </td>`
+             }
           } else {
-            // Multiple elements in row - create columns
-            const columnWidth = Math.floor(100 / row.length)
+            // Multiple elements in row - create columns with proportional sizing
+            const totalRowWidth = row.reduce((sum, el) => sum + el.style.width, 0)
             
             row.forEach((element) => {
               const { type, content, style } = element
-              const { color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+              const { width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+              
+              // Calculate proportional width for this element within the row
+              const elementProportion = (width / totalRowWidth) * 100
               
               const cellStyle = `
-                width: ${columnWidth}%;
+                width: ${elementProportion}%;
                 padding: 10px;
                 font-family: ${fontFamily || 'Arial, sans-serif'};
                 font-size: ${fontSize || 14}px;
@@ -1149,19 +1182,22 @@ export default function TemplateEditorPage() {
                 gmailHtml += `${textContent}`
               } else if (type === 'image') {
                 const imageUrl = content || '/images.png'
-                gmailHtml += `<img src="${imageUrl}" alt="Template Image" style="max-width: 100%; height: auto; display: block;">`
+                // Maintain image aspect ratio but fit within column
+                const maxWidth = Math.min(width, (600 * elementProportion) / 100)
+                const scaledHeight = (height * maxWidth) / width
+                gmailHtml += `<img src="${imageUrl}" alt="Template Image" style="width: ${maxWidth}px; height: ${scaledHeight}px; max-width: 100%; display: block;">`
               } else if (type === 'button') {
                 const buttonText = content || 'Click Here'
                 gmailHtml += `
-                    <table cellspacing="0" cellpadding="0" border="0">
+                    <table cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr>
-                        <td style="background-color: #1a73e8; border-radius: 4px;">
-                          <a href="#" style="display: inline-block; padding: 8px 16px; color: white; text-decoration: none; font-weight: bold; font-size: 12px;">${buttonText}</a>
+                        <td style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 8px 16px;">
+                          <a href="#" style="display: inline-block; color: ${color || 'white'}; text-decoration: none; font-weight: ${fontWeight || 'bold'}; font-size: ${fontSize || 12}px; font-family: ${fontFamily || 'Arial, sans-serif'};">${buttonText}</a>
                         </td>
                       </tr>
                     </table>`
               } else if (type === 'divider') {
-                gmailHtml += `<hr style="border: none; border-top: 1px solid #ddd; margin: 5px 0;">`
+                gmailHtml += `<hr style="border: none; border-top: 1px solid #ddd; margin: 5px 0; width: 90%;">`
               }
               
               gmailHtml += `

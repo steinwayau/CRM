@@ -1018,17 +1018,14 @@ export default function TemplateEditorPage() {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
     // GMAIL: Return dramatically simplified version (strips all styling)
-    console.log('generateClientSpecificHtml called with client:', client, 'type:', typeof client)
-    console.log('editorElements count:', editorElements.length, 'elements:', editorElements.map(e => ({type: e.type, content: e.content?.substring(0, 50)})))
     if (client === 'gmail') {
-      console.log('Gmail branch executed, returning simplified version')
       let gmailHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <title>${templateForm.name || 'Email Template'}</title>
 </head>
-<body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: white;">
+<body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: white; color: black;">
   <table width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto; background-color: white;">
     <tr>
       <td style="background-color: #EA4335; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">
@@ -1036,34 +1033,54 @@ export default function TemplateEditorPage() {
       </td>
     </tr>`
 
-      sortedElements.forEach((element) => {
-        const { type, content } = element
-        
-        if (type === 'text' || type === 'heading') {
-          gmailHtml += `
+      // Check if template has elements
+      if (sortedElements.length === 0) {
+        gmailHtml += `
             <tr>
-              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6;">
-                ${content}
+              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6; text-align: center;">
+                <p style="margin: 20px 0; color: #666;">This template has no content elements yet.</p>
+                <p style="margin: 20px 0; color: #666;">Add text, images, or buttons in the template editor to see how Gmail will display them.</p>
               </td>
             </tr>`
-        } else if (type === 'image') {
-          gmailHtml += `
-            <tr>
-              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: blue; text-decoration: underline;">
-                [Image: Click to view - Gmail strips images]
-              </td>
-            </tr>`
-        } else if (type === 'button') {
-          gmailHtml += `
-            <tr>
-              <td style="padding: 20px;">
-                <a href="#" style="color: blue; text-decoration: underline; font-family: Arial, sans-serif; font-size: 14px;">
-                  ${content}
-                </a>
-              </td>
-            </tr>`
-        }
-      })
+      } else {
+        sortedElements.forEach((element) => {
+          const { type, content } = element
+          
+          if (type === 'text' || type === 'heading') {
+            const textContent = content || '[Empty text element]'
+            gmailHtml += `
+              <tr>
+                <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6;">
+                  ${textContent}
+                </td>
+              </tr>`
+          } else if (type === 'image') {
+            gmailHtml += `
+              <tr>
+                <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: blue; text-decoration: underline;">
+                  [Image: Click to view - Gmail strips images]
+                </td>
+              </tr>`
+          } else if (type === 'button') {
+            const buttonText = content || '[Button]'
+            gmailHtml += `
+              <tr>
+                <td style="padding: 20px;">
+                  <a href="#" style="color: blue; text-decoration: underline; font-family: Arial, sans-serif; font-size: 14px;">
+                    ${buttonText}
+                  </a>
+                </td>
+              </tr>`
+          } else if (type === 'divider') {
+            gmailHtml += `
+              <tr>
+                <td style="padding: 10px 20px;">
+                  <hr style="border: none; border-top: 1px solid #ccc; margin: 10px 0;">
+                </td>
+              </tr>`
+          }
+        })
+      }
 
       gmailHtml += `
   </table>

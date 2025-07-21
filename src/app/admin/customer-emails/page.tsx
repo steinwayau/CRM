@@ -113,6 +113,12 @@ export default function CustomerEmailsPage() {
     loadData()
   }, [])
 
+  // Helper function to update campaigns with localStorage persistence
+  const updateCampaigns = (newCampaigns: Campaign[]) => {
+    setCampaigns(newCampaigns)
+    localStorage.setItem('emailCampaigns', JSON.stringify(newCampaigns))
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
@@ -191,23 +197,9 @@ export default function CustomerEmailsPage() {
         setTemplates(savedTemplates)
       }
       
-      setCampaigns([
-        {
-          id: '1',
-          name: 'January Newsletter',
-          templateId: '1',
-          templateName: 'Welcome Newsletter',
-          subject: 'Your January Piano Update',
-          recipientCount: 1250,
-          sentCount: 1250,
-          openRate: 45.2,
-          clickRate: 12.8,
-          recipientType: 'all',
-          status: 'sent',
-          sentAt: '2024-01-15T09:00:00Z',
-          createdAt: '2024-01-14T16:00:00Z'
-        }
-      ])
+          // Load campaigns from localStorage - no more fake data
+      const savedCampaigns = JSON.parse(localStorage.getItem('emailCampaigns') || '[]')
+      setCampaigns(savedCampaigns)
       
     } catch (error) {
       console.error('Error loading data:', error)
@@ -276,7 +268,7 @@ export default function CustomerEmailsPage() {
         createdAt: new Date().toISOString()
       }
 
-      setCampaigns([newCampaign, ...campaigns])
+      updateCampaigns([newCampaign, ...campaigns])
       setShowNewCampaign(false)
       setCampaignForm({
         name: '',
@@ -304,7 +296,7 @@ export default function CustomerEmailsPage() {
       }
 
       // Update campaign status to sending
-      setCampaigns(campaigns.map(c => 
+      updateCampaigns(campaigns.map(c => 
         c.id === campaignId 
           ? { ...c, status: 'sending' as const }
           : c
@@ -347,7 +339,7 @@ export default function CustomerEmailsPage() {
 
       if (response.ok && result.success) {
         // Update campaign with actual results
-        setCampaigns(campaigns.map(c => 
+        updateCampaigns(campaigns.map(c => 
           c.id === campaignId 
             ? { 
                 ...c, 
@@ -365,7 +357,7 @@ export default function CustomerEmailsPage() {
         alert(`Campaign sent successfully!\n\nSent to: ${result.results.successCount} recipients\nFailed: ${result.results.failureCount} recipients\n\n${result.message}`)
       } else {
         // Handle API error
-        setCampaigns(campaigns.map(c => 
+        updateCampaigns(campaigns.map(c => 
           c.id === campaignId 
             ? { ...c, status: 'draft' as const }
             : c
@@ -378,7 +370,7 @@ export default function CustomerEmailsPage() {
       console.error('Error sending campaign:', error)
       
       // Reset campaign status on error
-      setCampaigns(campaigns.map(c => 
+      updateCampaigns(campaigns.map(c => 
         c.id === campaignId 
           ? { ...c, status: 'draft' as const }
           : c
@@ -1689,7 +1681,7 @@ export default function CustomerEmailsPage() {
                           clickRate: undefined,
                           createdAt: new Date().toISOString()
                         }
-                        setCampaigns([duplicateCampaign, ...campaigns])
+                        updateCampaigns([duplicateCampaign, ...campaigns])
                         setShowCampaignView(false)
                         setViewingCampaign(duplicateCampaign)
                         setShowCampaignView(true)

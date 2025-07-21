@@ -1017,201 +1017,93 @@ export default function TemplateEditorPage() {
   const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
-    // GMAIL: Convert absolute positioning to table-based layout (like Mailchimp)
+        // GMAIL: Complete rewrite using Mailchimp-style email-safe HTML
     if (client === 'gmail') {
-      // Group elements into rows based on Y position
-      const rowTolerance = 20 // Elements within 20px Y difference go in same row
-      const rows: EditorElement[][] = []
+      const GMAIL_WIDTH = 600 // Gmail max width
+      const CANVAS_WIDTH = canvasSize.width || 1000
+      const SCALE_FACTOR = GMAIL_WIDTH / CANVAS_WIDTH // Scale down to 600px
       
-      sortedElements.forEach((element) => {
-        const elementY = element.style.position.y
-        
-        // Find existing row that this element can fit into
-        const existingRow = rows.find(row => {
-          const rowY = row[0].style.position.y
-          return Math.abs(elementY - rowY) <= rowTolerance
-        })
+      // Scale all elements to Gmail dimensions
+      const scaledElements = sortedElements.map(element => ({
+        ...element,
+        scaledX: Math.round(element.style.position.x * SCALE_FACTOR),
+        scaledY: Math.round(element.style.position.y * SCALE_FACTOR),
+        scaledWidth: Math.round(element.style.width * SCALE_FACTOR),
+        scaledHeight: Math.round(element.style.height * SCALE_FACTOR),
+        scaledFontSize: Math.round((element.style.fontSize || 14) * SCALE_FACTOR)
+      }))
+      
+      // Group elements into rows based on Y position (with scaled tolerance)
+      const rowTolerance = Math.round(15 * SCALE_FACTOR)
+      const emailRows: any[][] = []
+      
+      scaledElements.forEach((element) => {
+        const existingRow = emailRows.find(row => 
+          Math.abs(element.scaledY - row[0].scaledY) <= rowTolerance
+        )
         
         if (existingRow) {
           existingRow.push(element)
-          // Sort elements in row by X position (left to right)
-          existingRow.sort((a, b) => a.style.position.x - b.style.position.x)
+          existingRow.sort((a, b) => a.scaledX - b.scaledX)
         } else {
-          rows.push([element])
+          emailRows.push([element])
         }
       })
       
-      // Sort rows by Y position (top to bottom)
-      rows.sort((a, b) => a[0].style.position.y - b[0].style.position.y)
+      // Sort rows by Y position
+      emailRows.sort((a, b) => a[0].scaledY - b[0].scaledY)
       
-      let gmailHtml = `<!DOCTYPE html>
-<html>
+      // Generate email-safe HTML structure
+      let gmailHtml = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${templateForm.name || 'Email Template'}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; width: 100%; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <!-- Gmail Preview Header -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
     <tr>
-      <td style="padding: 20px 0;">
-        <table width="600" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto; background-color: white;">
+      <td align="center" valign="top" style="padding: 20px 0;">
+        <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: white;">
+          <!-- Header Row -->
           <tr>
-            <td style="background-color: #EA4335; color: white; padding: 12px 20px; text-align: center; font-size: 13px; font-weight: bold;">
-              📧 GMAIL PREVIEW - How your template will actually render
+            <td align="center" valign="top" style="background-color: #EA4335; color: white; padding: 12px 20px; font-size: 13px; font-weight: bold; font-family: Arial, sans-serif;">
+              📧 GMAIL PREVIEW - Mailchimp-style rendering (${CANVAS_WIDTH}px → 600px)
             </td>
           </tr>
+          <!-- Content Container -->
           <tr>
-            <td style="padding: 0; background-color: ${canvasBackgroundColor};">
-              <table width="100%" cellspacing="0" cellpadding="0" border="0">`
+            <td align="left" valign="top" style="padding: 0; background-color: ${canvasBackgroundColor};">`
 
-      // Check if template has elements
-      if (rows.length === 0) {
+      if (emailRows.length === 0) {
         gmailHtml += `
+              <table border="0" cellpadding="40" cellspacing="0" width="100%">
                 <tr>
-                  <td style="padding: 40px; text-align: center; color: #666; font-family: Arial, sans-serif;">
-                    <p style="margin: 0 0 15px 0; font-size: 16px;">Your template is empty</p>
-                    <p style="margin: 0; font-size: 14px;">Add elements to see Gmail rendering</p>
+                  <td align="center" valign="top" style="color: #666666; font-family: Arial, sans-serif; font-size: 16px;">
+                    Your template is empty<br>
+                    <span style="font-size: 14px;">Add elements to see Gmail rendering</span>
                   </td>
-                </tr>`
+                </tr>
+              </table>`
       } else {
-        // Generate table rows for each element row
-        rows.forEach((row) => {
-          gmailHtml += `
-                <tr>`
-          
-          // If single element in row, maintain its proportional size
+        // Generate rows using proper email table structure
+        emailRows.forEach((row, rowIndex) => {
           if (row.length === 1) {
+            // Single element row
             const element = row[0]
             const { type, content, style } = element
-            const { width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
             
-            // Calculate proportional width based on canvas (600px Gmail width)
-            const elementWidthPercent = Math.min((width / 600) * 100, 100)
-            const remainingWidth = 100 - elementWidthPercent
-            const leftPadding = remainingWidth / 2 // Center the element
-            
-            // Different handling based on element type
-            if (type === 'image') {
-              // For images, maintain exact dimensions
-              gmailHtml += `
-                  <td style="text-align: center; padding: 10px;">
-                    <img src="${content || '/images.png'}" alt="Template Image" style="width: ${width}px; height: ${height}px; max-width: ${width}px; display: block; margin: 0 auto;">
-                  </td>`
-            } else if (type === 'button') {
-              // For buttons, create properly sized button
-              const buttonText = content || 'Click Here'
-              gmailHtml += `
-                  <td style="text-align: ${textAlign || 'center'}; padding: 10px;">
-                    <table cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
-                      <tr>
-                        <td style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 12px 24px;">
-                          <a href="#" style="display: inline-block; color: ${color || 'white'}; text-decoration: none; font-weight: ${fontWeight || 'bold'}; font-size: ${fontSize || 14}px; font-family: ${fontFamily || 'Arial, sans-serif'};">${buttonText}</a>
-                        </td>
-                      </tr>
-                                         </table>
-                   </td>`
-            } else if (type === 'text' || type === 'heading') {
-              // For text elements, use proportional width with proper alignment
-              const cellStyle = `
-                text-align: ${textAlign || 'left'};
-                padding: 10px 20px;
-                font-family: ${fontFamily || 'Arial, sans-serif'};
-                font-size: ${fontSize || 14}px;
-                font-weight: ${fontWeight || 'normal'};
-                color: ${color || '#000000'};
-                background-color: ${backgroundColor || 'transparent'};
-                vertical-align: top;
-                width: ${elementWidthPercent}%;
-              `.replace(/\s+/g, ' ').trim()
-              
-              if (textAlign === 'center' || leftPadding > 10) {
-                // If centered or needs significant padding, use three-column layout
-                gmailHtml += `
-                  <td style="width: ${leftPadding}%;"></td>
-                  <td style="${cellStyle}">
-                    ${content || '[Empty text]'}
-                  </td>
-                  <td style="width: ${leftPadding}%;"></td>`
-              } else {
-                // Otherwise use single column with appropriate alignment
-                gmailHtml += `
-                  <td style="${cellStyle}">
-                                         ${content || '[Empty text]'}
-                   </td>`
-               }
-             } else if (type === 'divider') {
-               gmailHtml += `
-                   <td style="padding: 10px 20px; text-align: center;">
-                     <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0; width: ${Math.min(elementWidthPercent, 80)}%;">
-                   </td>`
-             } else {
-               // Fallback for any other element types
-               gmailHtml += `
-                   <td style="padding: 10px; text-align: center; color: #666;">
-                     [Unsupported element type: ${type}]
-                   </td>`
-             }
+            gmailHtml += generateSingleElementRow(element, GMAIL_WIDTH)
           } else {
-            // Multiple elements in row - create columns with proportional sizing
-            const totalRowWidth = row.reduce((sum, el) => sum + el.style.width, 0)
-            
-            row.forEach((element) => {
-              const { type, content, style } = element
-              const { width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
-              
-              // Calculate proportional width for this element within the row
-              const elementProportion = (width / totalRowWidth) * 100
-              
-              const cellStyle = `
-                width: ${elementProportion}%;
-                padding: 10px;
-                font-family: ${fontFamily || 'Arial, sans-serif'};
-                font-size: ${fontSize || 14}px;
-                font-weight: ${fontWeight || 'normal'};
-                color: ${color || '#000000'};
-                text-align: ${textAlign || 'left'};
-                background-color: ${backgroundColor || 'transparent'};
-                vertical-align: top;
-              `.replace(/\s+/g, ' ').trim()
-              
-              gmailHtml += `
-                  <td style="${cellStyle}">`
-              
-              if (type === 'text' || type === 'heading') {
-                const textContent = content || '[Empty text]'
-                gmailHtml += `${textContent}`
-              } else if (type === 'image') {
-                const imageUrl = content || '/images.png'
-                // Maintain image aspect ratio but fit within column
-                const maxWidth = Math.min(width, (600 * elementProportion) / 100)
-                const scaledHeight = (height * maxWidth) / width
-                gmailHtml += `<img src="${imageUrl}" alt="Template Image" style="width: ${maxWidth}px; height: ${scaledHeight}px; max-width: 100%; display: block;">`
-              } else if (type === 'button') {
-                const buttonText = content || 'Click Here'
-                gmailHtml += `
-                    <table cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
-                      <tr>
-                        <td style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 8px 16px;">
-                          <a href="#" style="display: inline-block; color: ${color || 'white'}; text-decoration: none; font-weight: ${fontWeight || 'bold'}; font-size: ${fontSize || 12}px; font-family: ${fontFamily || 'Arial, sans-serif'};">${buttonText}</a>
-                        </td>
-                      </tr>
-                    </table>`
-              } else if (type === 'divider') {
-                gmailHtml += `<hr style="border: none; border-top: 1px solid #ddd; margin: 5px 0; width: 90%;">`
-              }
-              
-              gmailHtml += `
-                  </td>`
-            })
+            // Multiple elements in row
+            gmailHtml += generateMultiElementRow(row, GMAIL_WIDTH)
           }
-          
-          gmailHtml += `
-                </tr>`
         })
       }
 
       gmailHtml += `
-              </table>
             </td>
           </tr>
         </table>
@@ -1221,6 +1113,147 @@ export default function TemplateEditorPage() {
 </body>
 </html>`
       return gmailHtml
+    }
+    
+    // Helper function to generate single element row
+    function generateSingleElementRow(element: any, maxWidth: number): string {
+      const { type, content, style } = element
+      const { color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+      
+      // Calculate positioning within 600px container
+      const leftOffset = element.scaledX
+      const rightOffset = maxWidth - (element.scaledX + element.scaledWidth)
+      
+      let rowHtml = `
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>`
+      
+      // Add left spacer if needed
+      if (leftOffset > 10) {
+        rowHtml += `
+                  <td width="${leftOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
+      }
+      
+      // Main content cell
+      if (type === 'image') {
+        rowHtml += `
+                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
+                    <img src="${content || '/images.png'}" alt="Image" width="${element.scaledWidth}" height="${element.scaledHeight}" style="display: block; border: none; outline: none; max-width: ${element.scaledWidth}px;">
+                  </td>`
+      } else if (type === 'button') {
+        const buttonText = content || 'Click Here'
+        rowHtml += `
+                  <td width="${element.scaledWidth}" align="${textAlign || 'center'}" valign="top" style="padding: 10px;">
+                    <table border="0" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" valign="middle" style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 12px 24px;">
+                          <a href="#" style="color: ${color || '#ffffff'}; text-decoration: none; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'bold'}; display: inline-block;">${buttonText}</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>`
+      } else if (type === 'text' || type === 'heading') {
+        const textContent = content || '[Empty text]'
+        rowHtml += `
+                  <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 10px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'normal'}; color: ${color || '#000000'}; background-color: ${backgroundColor || 'transparent'};">
+                    ${textContent}
+                  </td>`
+      } else if (type === 'divider') {
+        rowHtml += `
+                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="80%">
+                      <tr>
+                        <td style="border-top: 1px solid #dddddd; font-size: 1px; line-height: 1px;">&nbsp;</td>
+                      </tr>
+                    </table>
+                  </td>`
+      } else {
+        rowHtml += `
+                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px; color: #666666; font-family: Arial, sans-serif; font-size: 12px;">
+                    [Unsupported: ${type}]
+                  </td>`
+      }
+      
+      // Add right spacer if needed
+      if (rightOffset > 10) {
+        rowHtml += `
+                  <td width="${rightOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
+      }
+      
+      rowHtml += `
+                </tr>
+              </table>`
+      
+      return rowHtml
+    }
+    
+    // Helper function to generate multi-element row
+    function generateMultiElementRow(row: any[], maxWidth: number): string {
+      let rowHtml = `
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>`
+      
+      // Calculate total width and spacing
+      const totalElementWidth = row.reduce((sum, el) => sum + el.scaledWidth, 0)
+      const leftOffset = row[0].scaledX
+      
+      // Add left spacer
+      if (leftOffset > 5) {
+        rowHtml += `
+                  <td width="${leftOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
+      }
+      
+      // Add each element
+      row.forEach((element, index) => {
+        const { type, content, style } = element
+        const { color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+        
+        if (type === 'image') {
+          rowHtml += `
+                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
+                    <img src="${content || '/images.png'}" alt="Image" width="${element.scaledWidth}" height="${element.scaledHeight}" style="display: block; border: none; max-width: ${element.scaledWidth}px;">
+                  </td>`
+        } else if (type === 'button') {
+          rowHtml += `
+                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
+                    <table border="0" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 8px 16px;">
+                          <a href="#" style="color: ${color || '#ffffff'}; text-decoration: none; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'bold'};">${content || 'Click'}</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>`
+        } else {
+          rowHtml += `
+                  <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 5px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; color: ${color || '#000000'};">
+                    ${content || '[Text]'}
+                  </td>`
+        }
+        
+        // Add spacing between elements (except last)
+        if (index < row.length - 1) {
+          const nextElement = row[index + 1]
+          const spacing = nextElement.scaledX - (element.scaledX + element.scaledWidth)
+          if (spacing > 5) {
+            rowHtml += `
+                  <td width="${spacing}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
+          }
+        }
+      })
+      
+      // Add right spacer
+      const rightOffset = maxWidth - (row[row.length - 1].scaledX + row[row.length - 1].scaledWidth)
+      if (rightOffset > 5) {
+        rowHtml += `
+                  <td width="${rightOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
+      }
+      
+      rowHtml += `
+                </tr>
+              </table>`
+      
+      return rowHtml
     }
     
     // OTHER CLIENTS: Use actual template design with client header

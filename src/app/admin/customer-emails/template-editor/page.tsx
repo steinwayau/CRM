@@ -1097,6 +1097,30 @@ export default function TemplateEditorPage() {
       return gmailHtml
     }
     
+    // OTHER CLIENTS: Use actual template design with client header
+    let actualTemplate = generateHtmlFromElements()
+    
+    // Add client headers
+    const clientHeaders = {
+      outlook: '<tr><td style="background-color: #0078D4; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">📧 OUTLOOK - Your Actual Template Design</td></tr>',
+      apple: '<tr><td style="background-color: #34C759; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">📧 APPLE MAIL - Your Actual Template Design</td></tr>',
+      generic: '<tr><td style="background-color: #6B7280; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">📧 GENERIC CLIENT - Your Actual Template Design</td></tr>'
+    }
+    
+    const headerHtml = clientHeaders[client as keyof typeof clientHeaders] || ''
+    const insertAfter = '<td style="padding: 0; position: relative; min-height:'
+    const insertPos = actualTemplate.indexOf(insertAfter)
+    
+    if (insertPos !== -1 && headerHtml) {
+      const afterPos = actualTemplate.indexOf('>', insertPos) + 1
+      actualTemplate = actualTemplate.slice(0, afterPos) + '\n                ' + headerHtml + actualTemplate.slice(afterPos)
+    }
+    
+    return actualTemplate
+  }
+
+  // Fallback function for old implementation
+  const generateClientSpecificHtmlOld = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     // Calculate element centering based on template builder positioning
     const getElementAlignment = (element: EditorElement) => {
       const elementCenterX = element.style.position.x + (element.style.width / 2)

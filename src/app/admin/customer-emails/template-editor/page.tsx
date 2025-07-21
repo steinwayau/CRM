@@ -1041,9 +1041,61 @@ export default function TemplateEditorPage() {
     }
   }
 
-  // FIXED EMAIL CLIENT PREVIEW - TRUE DIFFERENCES WITH PROPER RENDERING
+  // TRUE EMAIL CLIENT DIFFERENCES - GMAIL GETS SIMPLIFIED VERSION
   const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
+    
+    // GMAIL: Return dramatically simplified version (strips all styling)
+    if (client === 'gmail') {
+      let gmailHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${templateForm.name || 'Email Template'}</title>
+</head>
+<body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: white;">
+  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto; background-color: white;">
+    <tr>
+      <td style="background-color: #EA4335; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">
+        📧 GMAIL - Strips All Styling, Text Only
+      </td>
+    </tr>`
+
+      sortedElements.forEach((element) => {
+        const { type, content } = element
+        
+        if (type === 'text' || type === 'heading') {
+          gmailHtml += `
+            <tr>
+              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6;">
+                ${content}
+              </td>
+            </tr>`
+        } else if (type === 'image') {
+          gmailHtml += `
+            <tr>
+              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: blue; text-decoration: underline;">
+                [Image: Click to view - Gmail strips images]
+              </td>
+            </tr>`
+        } else if (type === 'button') {
+          gmailHtml += `
+            <tr>
+              <td style="padding: 20px;">
+                <a href="#" style="color: blue; text-decoration: underline; font-family: Arial, sans-serif; font-size: 14px;">
+                  ${content}
+                </a>
+              </td>
+            </tr>`
+        }
+      })
+
+      gmailHtml += `
+  </table>
+</body>
+</html>`
+      return gmailHtml
+    }
     
     // Calculate element centering based on template builder positioning
     const getElementAlignment = (element: EditorElement) => {
@@ -1125,15 +1177,8 @@ export default function TemplateEditorPage() {
       <td align="center" style="padding: 20px 0;">
         <table width="${canvasSize.width}" cellspacing="0" cellpadding="0" border="0" style="background-color: ${canvasBackgroundColor}; max-width: ${canvasSize.width}px; margin: 0 auto;">`
 
-    // Add prominent client indicator with different styling
-    if (client === 'gmail') {
-      html += `
-          <tr>
-            <td style="background-color: #EA4335; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">
-              📧 GMAIL PREVIEW - Strips CSS, No Border Radius, Limited Styling
-            </td>
-          </tr>`
-    } else if (client === 'outlook') {
+    // Add prominent client indicator with different styling  
+    if (client === 'outlook') {
       html += `
           <tr>
             <td style="background-color: #0078D4; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">
@@ -1186,7 +1231,7 @@ export default function TemplateEditorPage() {
 
         case 'heading':
           const headingLevel = element.headingLevel || 1
-          const headingSize = client === 'gmail' ? Math.min(style.fontSize || (32 - (headingLevel - 1) * 4), 28) : (style.fontSize || (32 - (headingLevel - 1) * 4))
+          const headingSize = style.fontSize || (32 - (headingLevel - 1) * 4)
           const headingColor = style.color || '#000000'
           
           html += `

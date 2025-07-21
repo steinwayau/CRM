@@ -12,7 +12,9 @@ interface EditorElement {
     width: number
     height: number
     fontSize?: number
-    fontWeight?: 'normal' | 'bold'
+    fontWeight?: string
+    fontFamily?: string
+    fontStyle?: 'normal' | 'italic'
     textDecoration?: 'none' | 'underline' | 'line-through'
     color?: string
     backgroundColor?: string
@@ -35,7 +37,7 @@ interface EmailTemplate {
   htmlContent: string
   textContent: string
   elements: EditorElement[]
-  canvasSettings?: {
+  canvasSettings: {
     width: number
     height: number
     backgroundColor: string
@@ -70,12 +72,64 @@ export default function EmailPreviewPage() {
     const editorElements = template.elements || []
     const canvasSettings = template.canvasSettings || { width: 600, height: 800, backgroundColor: '#ffffff' }
     
-    // Sort elements by Y position to create proper email flow
+    // Sort elements by Y position to maintain proper stacking order
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
-    // Generate EMAIL-SAFE HTML using only tables and inline styles
-    let html = `<!DOCTYPE html>
+    // GMAIL: Return dramatically simplified version (strips all styling)  
+    if (client === 'gmail') {
+      let gmailHtml = `<!DOCTYPE html>
 <html>
+<head>
+  <meta charset="UTF-8">
+  <title>${template.name || 'Email Template'}</title>
+</head>
+<body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: white;">
+  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto; background-color: white;">
+    <tr>
+      <td style="background-color: #EA4335; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold;">
+        📧 GMAIL - Strips All Styling, Text Only
+      </td>
+    </tr>`
+
+      sortedElements.forEach((element) => {
+        const { type, content } = element
+        
+        if (type === 'text' || type === 'heading') {
+          gmailHtml += `
+            <tr>
+              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: black; line-height: 1.6;">
+                ${content}
+              </td>
+            </tr>`
+        } else if (type === 'image') {
+          gmailHtml += `
+            <tr>
+              <td style="padding: 20px; font-family: Arial, sans-serif; font-size: 14px; color: blue; text-decoration: underline;">
+                [Image: Click to view - Gmail strips images]
+              </td>
+            </tr>`
+        } else if (type === 'button') {
+          gmailHtml += `
+            <tr>
+              <td style="padding: 20px;">
+                <a href="#" style="color: blue; text-decoration: underline; font-family: Arial, sans-serif; font-size: 14px;">
+                  ${content}
+                </a>
+              </td>
+            </tr>`
+        }
+      })
+
+      gmailHtml += `
+  </table>
+</body>
+</html>`
+      return gmailHtml
+    }
+    
+    // OTHER CLIENTS: Use EXACT template layout with absolute positioning to preserve design
+    let html = `<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -90,237 +144,162 @@ export default function EmailPreviewPage() {
   </noscript>
   <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
-    <tr>
-      <td align="center" style="padding: 20px;">
-        <table width="${canvasSettings.width}" cellspacing="0" cellpadding="0" border="0" style="background-color: ${canvasSettings.backgroundColor}; max-width: ${canvasSettings.width}px;">`
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <center>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+      <tr>
+        <td align="center" style="padding: 20px 0;">`
 
-    // Add client indicator
-    let clientColor = '#007acc'
-    let clientText = 'GENERIC EMAIL CLIENT PREVIEW'
-    
-    if (client === 'gmail') {
-      clientColor = '#ff6b6b'
-      clientText = 'GMAIL PREVIEW: Limited CSS support'
-    } else if (client === 'outlook') {
-      clientColor = '#0078d4'
-      clientText = 'OUTLOOK PREVIEW: Uses Word rendering engine'
-    } else if (client === 'apple') {
-      clientColor = '#34c759'
-      clientText = 'APPLE MAIL PREVIEW: Full CSS support'
+    // Add client-specific headers
+    const clientHeaders = {
+      outlook: '<div style="background-color: #0078D4; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 20px;">📧 OUTLOOK - Your Actual Template Design</div>',
+      apple: '<div style="background-color: #34C759; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 20px;">📧 APPLE MAIL - Your Actual Template Design</div>',
+      generic: '<div style="background-color: #6B7280; color: white; padding: 15px; text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 20px;">📧 GENERIC CLIENT - Your Actual Template Design</div>'
     }
     
-    html += `
-          <tr>
-            <td style="background-color: ${clientColor}; color: white; padding: 10px; text-align: center; font-size: 12px; font-weight: bold;">
-              ${clientText}
-            </td>
-          </tr>`
+    html += clientHeaders[client as keyof typeof clientHeaders] || ''
 
-    // Process each element in email-safe table rows
+    html += `
+          <div style="
+            position: relative; 
+            width: ${canvasSettings.width}px; 
+            height: ${canvasSettings.height}px;
+            max-width: ${canvasSettings.width}px; 
+            background-color: ${canvasSettings.backgroundColor}; 
+            margin: 0 auto;
+            display: block;
+          ">`
+
+    // FIXED: Render each element with its EXACT positioning and dimensions from template editor
     sortedElements.forEach((element, index) => {
-      const { type, content, style } = element
+      const { style, content, type } = element
       
-      // Determine alignment based on element position relative to canvas center
-      const canvasCenterX = canvasSettings.width / 2
-      const elementCenterX = style.position.x + (style.width / 2)
-      const elementAlignment = Math.abs(elementCenterX - canvasCenterX) < 20 ? 'center' : 
-                               style.position.x < canvasCenterX ? 'left' : 'right'
-      
-      html += `
-          <tr>
-            <td style="padding: 0;">`
+      // Use exact positioning from the visual editor
+      const elementHtml = `
+            <div style="
+              position: absolute;
+              left: ${style.position.x}px;
+              top: ${style.position.y}px;
+              width: ${style.width}px;
+              height: ${style.height}px;
+              ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
+              ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+              ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+              ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
+              ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
+              ${style.color ? `color: ${style.color};` : ''}
+              ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+              ${style.padding ? `padding: ${style.padding}px;` : ''}
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              ${style.textAlign ? `text-align: ${style.textAlign};` : ''}
+              line-height: 1.4;
+              box-sizing: border-box;
+            ">`
 
       switch (type) {
         case 'text':
-          const textColor = style.color || '#000000'
-          const textSize = style.fontSize || 16
-          const bgColor = style.backgroundColor && style.backgroundColor !== 'transparent' ? style.backgroundColor : 'transparent'
-          const padding = style.padding || 10
-          
-          html += `
-              <table width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="${elementAlignment}" style="
-                    font-family: Arial, sans-serif;
-                    font-size: ${textSize}px;
-                    color: ${textColor};
-                    text-align: ${elementAlignment};
-                    line-height: 1.5;
-                    padding: ${padding}px;
-                    ${bgColor !== 'transparent' ? `background-color: ${bgColor};` : ''}
-                  ">${content}</td>
-                </tr>
-              </table>`
+          html += elementHtml + content + '</div>'
           break
-
         case 'heading':
-          const headingLevel = element.headingLevel || 1
-          const headingSize = style.fontSize || (32 - (headingLevel - 1) * 4)
-          const headingColor = style.color || '#000000'
-          const headingPadding = style.padding || 10
-          
-          html += `
-              <table width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="${elementAlignment}" style="
-                    font-family: Arial, sans-serif;
-                    font-size: ${headingSize}px;
-                    color: ${headingColor};
-                    text-align: ${elementAlignment};
-                    font-weight: bold;
-                    padding: ${headingPadding}px;
-                    margin: 0;
-                    line-height: 1.2;
-                  ">
-                    ${content}
-                  </td>
-                </tr>
-              </table>`
+          const headingTag = `h${element.headingLevel || 1}`
+          html += elementHtml + `<${headingTag} style="margin: 0; font-size: inherit; font-weight: inherit; color: inherit;">${content}</${headingTag}></div>`
           break
-
         case 'image':
-          const imagePadding = style.padding || 0
-          
-          html += `
-              <table width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="${elementAlignment}" style="padding: ${imagePadding}px;">
-                    <img src="${content}" alt="Image" style="
-                      display: block;
-                      max-width: ${style.width}px;
-                      height: auto;
-                      border: 0;
-                    " width="${style.width}" />
-                  </td>
-                </tr>
-              </table>`
+          // FIXED: Use exact dimensions from the element style to prevent stretching
+          html += elementHtml + `<img src="${content}" alt="Email Image" style="
+            width: ${style.width}px;
+            height: ${style.height}px;
+            display: block;
+            border: 0;
+            outline: none;
+            object-fit: cover;
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+          " width="${style.width}" height="${style.height}" /></div>`
           break
-
         case 'video':
           const videoData = element.videoData
           const thumbnailUrl = videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
-          const videoAlign = style.textAlign || 'left'
-          
-          html += `
-              <div style="text-align: ${videoAlign};">
-                <a href="${content}" style="display: inline-block; text-decoration: none;">
-                  <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
-                    max-width: 100%;
-                    height: auto;
-                    border: 2px solid #007acc;
-                  " width="${style.width}" />
-                  <div style="
-                    background-color: #007acc;
-                    color: white;
-                    padding: 10px;
-                    text-align: center;
-                    font-family: Arial, sans-serif;
-                    font-size: 14px;
-                  ">▶ ${videoData?.title || 'Play Video'}</div>
-                </a>
-              </div>`
+          html += elementHtml + `
+            <a href="${content}" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
+              <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
+                width: ${style.width}px;
+                height: ${style.height}px;
+                display: block;
+                border: 0;
+                object-fit: cover;
+                ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              " width="${style.width}" height="${style.height}">
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 48px;
+                height: 48px;
+                background-color: rgba(0, 0, 0, 0.7);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
+                <div style="
+                  width: 0;
+                  height: 0;
+                  border-left: 16px solid white;
+                  border-top: 10px solid transparent;
+                  border-bottom: 10px solid transparent;
+                  margin-left: 4px;
+                "></div>
+              </div>
+            </a>
+          </div>`
           break
-
         case 'button':
-          const buttonBg = style.backgroundColor || '#007acc'
-          const buttonColor = style.color || '#ffffff'
-          const buttonText = content
-
-          const buttonPadding = style.padding || 12
-          const buttonBorderRadius = style.borderRadius || 4
-          
-          // Email-safe button with Outlook VML fallback
-          if (client === 'outlook') {
-            html += `
-              <table width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="${elementAlignment}" style="padding: 10px;">
-                    <!--[if mso]>
-                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="#" style="height:${buttonPadding * 2 + 32}px;v-text-anchor:middle;width:${content.length * 12 + 60}px;" arcsize="${(buttonBorderRadius / (buttonPadding * 2 + 32)) * 100}%" fillcolor="${buttonBg}">
-                      <w:anchorlock/>
-                      <center style="color:${buttonColor};font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">${buttonText}</center>
-                    </v:roundrect>
-                    <![endif]-->
-                    <!--[if !mso]><!-->
-                    <a href="#" style="
-                      background-color: ${buttonBg};
-                      border: none;
-                      border-radius: ${buttonBorderRadius}px;
-                      color: ${buttonColor};
-                      display: inline-block;
-                      font-family: Arial, sans-serif;
-                      font-size: 16px;
-                      font-weight: bold;
-                      line-height: 1;
-                      padding: ${buttonPadding}px 30px;
-                      text-align: center;
-                      text-decoration: none;
-                      -webkit-text-size-adjust: none;
-                      mso-hide: all;
-                    ">${buttonText}</a>
-                    <!--<![endif]-->
-                  </td>
-                </tr>
-              </table>`
-          } else {
-            html += `
-              <table width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="${elementAlignment}" style="padding: 10px;">
-                    <a href="#" style="
-                      background-color: ${buttonBg};
-                      border: none;
-                      ${client === 'apple' ? `border-radius: ${buttonBorderRadius}px;` : ''}
-                      color: ${buttonColor};
-                      display: inline-block;
-                      font-family: Arial, sans-serif;
-                      font-size: 16px;
-                      font-weight: bold;
-                      line-height: 1;
-                      padding: ${buttonPadding}px 30px;
-                      text-align: center;
-                      text-decoration: none;
-                      -webkit-text-size-adjust: none;
-                    ">${buttonText}</a>
-                  </td>
-                </tr>
-              </table>`
-          }
+          html += elementHtml + `
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
+              <w:anchorlock/>
+              <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <a href="#" style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+              height: 100%;
+              background-color: ${style.backgroundColor || '#007BFF'};
+              color: ${style.color || '#FFFFFF'};
+              text-decoration: none;
+              border-radius: ${style.borderRadius || 4}px;
+              font-family: inherit;
+              font-size: inherit;
+              font-weight: inherit;
+              text-align: center;
+              box-sizing: border-box;
+            ">${content}</a>
+            <!--<![endif]-->
+          </div>`
           break
-
         case 'divider':
-          const dividerColor = style.backgroundColor || '#cccccc'
-          const dividerHeight = style.height || 1
-          const dividerAlign = style.textAlign || 'left'
-          const dividerWidth = style.width ? `${style.width}px` : '100%'
-          
-          html += `
-              <div style="text-align: ${dividerAlign};">
-                <hr style="
-                  border: none;
-                  height: ${dividerHeight}px;
-                  background-color: ${dividerColor};
-                  margin: 20px 0;
-                  width: ${dividerWidth};
-                  ${dividerAlign === 'center' ? 'margin-left: auto; margin-right: auto;' : ''}
-                  ${dividerAlign === 'right' ? 'margin-left: auto; margin-right: 0;' : ''}
-                " />
-              </div>`
+          html += elementHtml + `<hr style="
+            border: none; 
+            height: ${style.height || 1}px; 
+            background-color: ${style.backgroundColor || '#CCCCCC'}; 
+            margin: 0;
+            width: 100%;
+          " /></div>`
           break
       }
-
-      html += `
-            </td>
-          </tr>`
     })
 
     html += `
-        </table>
-      </td>
-    </tr>
-  </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </center>
 </body>
 </html>`
     

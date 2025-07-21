@@ -1018,7 +1018,10 @@ export default function TemplateEditorPage() {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
     // GMAIL: Return dramatically simplified version (strips all styling)
+    console.log('generateClientSpecificHtml called with client:', client, 'type:', typeof client)
+    console.log('editorElements count:', editorElements.length, 'elements:', editorElements.map(e => ({type: e.type, content: e.content?.substring(0, 50)})))
     if (client === 'gmail') {
+      console.log('Gmail branch executed, returning simplified version')
       let gmailHtml = `<!DOCTYPE html>
 <html>
 <head>

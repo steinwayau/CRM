@@ -827,10 +827,10 @@ export default function TemplateEditorPage() {
   }
 
   const generateHtmlFromElements = () => {
-    // Sort elements by Y position to maintain proper order
+    // FIXED: Preserve precise layout using absolute positioning for capable email clients
+    // Sort elements by Y position to maintain proper stacking order
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
-    // Generate email-optimized HTML using tables for better email client compatibility
     let html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -853,170 +853,142 @@ export default function TemplateEditorPage() {
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
       <tr>
         <td align="center" style="padding: 20px 0;">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="${canvasSize.width}" style="max-width: ${canvasSize.width}px; background-color: ${canvasBackgroundColor}; margin: 0 auto;">
-            <tr>
-              <td style="padding: 0; position: relative; min-height: ${canvasSize.height}px;">`
-    
-    // Group elements into rows based on Y position proximity
-    const rows: EditorElement[][] = []
-    const rowThreshold = 20 // Elements within 20px Y distance are considered in the same row
-    
-    sortedElements.forEach(element => {
-      const elementY = element.style.position.y
-      let addedToRow = false
+          <div style="
+            position: relative; 
+            width: ${canvasSize.width}px; 
+            height: ${canvasSize.height}px;
+            max-width: ${canvasSize.width}px; 
+            background-color: ${canvasBackgroundColor}; 
+            margin: 0 auto;
+            display: block;
+          ">`
+
+    // FIXED: Render each element with its EXACT positioning and dimensions
+    sortedElements.forEach((element, index) => {
+      const { style, content, type } = element
       
-      for (let i = 0; i < rows.length; i++) {
-        const rowY = rows[i][0].style.position.y
-        if (Math.abs(elementY - rowY) <= rowThreshold) {
-          rows[i].push(element)
-          addedToRow = true
+      // Use exact positioning from the visual editor
+      const elementHtml = `
+            <div style="
+              position: absolute;
+              left: ${style.position.x}px;
+              top: ${style.position.y}px;
+              width: ${style.width}px;
+              height: ${style.height}px;
+              ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
+              ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+              ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+              ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
+              ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
+              ${style.color ? `color: ${style.color};` : ''}
+              ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+              ${style.padding ? `padding: ${style.padding}px;` : ''}
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              ${style.textAlign ? `text-align: ${style.textAlign};` : ''}
+              line-height: 1.4;
+              box-sizing: border-box;
+            ">`
+
+      switch (type) {
+        case 'text':
+          html += elementHtml + content + '</div>'
           break
-        }
-      }
-      
-      if (!addedToRow) {
-        rows.push([element])
-      }
-    })
-    
-    // Sort elements within each row by X position
-    rows.forEach(row => {
-      row.sort((a, b) => a.style.position.x - b.style.position.x)
-    })
-
-    // Generate HTML for each row
-    rows.forEach(row => {
-      html += `
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 10px;">
-                  <tr>`
-      
-      row.forEach(element => {
-        const { style, content, type } = element
-        const cellWidth = Math.round((style.width / canvasSize.width) * 100)
-        
-        const elementStyles = `
-          ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
-          ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
-          ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
-          ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
-          ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
-          ${style.color ? `color: ${style.color};` : ''}
-          ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
-          ${style.padding ? `padding: ${style.padding}px;` : ''}
-          ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-          ${style.textAlign ? `text-align: ${style.textAlign};` : ''}
-          line-height: 1.4;
-        `
-
-        html += `
-                    <td width="${cellWidth}%" style="vertical-align: top; ${elementStyles}">`
-
-        switch (type) {
-          case 'text':
-            html += `<div style="${elementStyles}">${content}</div>`
-            break
-          case 'heading':
-            const headingTag = `h${element.headingLevel || 1}`
-            html += `<${headingTag} style="${elementStyles} margin: 0;">${content}</${headingTag}>`
-            break
-          case 'image':
-            html += `<img src="${content}" style="display: block; max-width: 100%; height: auto; ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}" alt="Email Image" />`
-            break
-          case 'video':
-            // Videos in emails need fallback images since most clients don't support video
-            const videoData = element.videoData
-            const thumbnailUrl = videoData?.thumbnailUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE1IDEwTDE5LjU1MyA3LjcyNEExIDEgMCAwIDEgMjEgOC42MThWMTUuMzgyQTEgMSAwIDAgMSAxOS41NTMgMTYuMjc2TDE1IDE0TTE1IDE0VjhBMiAyIDAgMCAwIDEzIDZINUEyIDIgMCAwIDAgMyA4VjE2QTIgMiAwIDAgMCA1IDE4SDEzQTIgMiAwIDAgMCAxNSAxNlYxNFoiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+'
-            
-            html += `
-              <a href="${content}" style="display: block; text-decoration: none; position: relative;">
-                <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
-                  display: block;
-                  max-width: 100%;
-                  height: auto;
-                  ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-                ">
+        case 'heading':
+          const headingTag = `h${element.headingLevel || 1}`
+          html += elementHtml + `<${headingTag} style="margin: 0; font-size: inherit; font-weight: inherit; color: inherit;">${content}</${headingTag}></div>`
+          break
+        case 'image':
+          // FIXED: Use exact dimensions from the element style to prevent stretching
+          html += elementHtml + `<img src="${content}" alt="Email Image" style="
+            width: ${style.width}px;
+            height: ${style.height}px;
+            display: block;
+            border: 0;
+            outline: none;
+            object-fit: cover;
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+          " width="${style.width}" height="${style.height}" /></div>`
+          break
+        case 'video':
+          const videoData = element.videoData
+          const thumbnailUrl = videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
+          html += elementHtml + `
+            <a href="${content}" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
+              <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
+                width: ${style.width}px;
+                height: ${style.height}px;
+                display: block;
+                border: 0;
+                object-fit: cover;
+                ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              " width="${style.width}" height="${style.height}">
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 48px;
+                height: 48px;
+                background-color: rgba(0, 0, 0, 0.7);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
                 <div style="
-                  position: absolute;
-                  top: 50%;
-                  left: 50%;
-                  transform: translate(-50%, -50%);
-                  width: 48px;
-                  height: 48px;
-                  background-color: rgba(0, 0, 0, 0.7);
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                ">
-                  <div style="
-                    width: 0;
-                    height: 0;
-                    border-left: 16px solid white;
-                    border-top: 10px solid transparent;
-                    border-bottom: 10px solid transparent;
-                    margin-left: 4px;
-                  "></div>
-                </div>
-                ${videoData?.platform ? `
-                  <div style="
-                    position: absolute;
-                    bottom: 8px;
-                    left: 8px;
-                    right: 8px;
-                    background-color: rgba(0, 0, 0, 0.8);
-                    color: white;
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    text-align: center;
-                  ">
-                    ${videoData.platform.toUpperCase()} • ${videoData.title}
-                  </div>
-                ` : ''}
-              </a>
-            `
-            break
-          case 'button':
-            html += `<!--[if mso]>
-              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
-                <w:anchorlock/>
-                <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
-              </v:roundrect>
+                  width: 0;
+                  height: 0;
+                  border-left: 16px solid white;
+                  border-top: 10px solid transparent;
+                  border-bottom: 10px solid transparent;
+                  margin-left: 4px;
+                "></div>
+              </div>
+            </a>
+          </div>`
+          break
+        case 'button':
+          html += elementHtml + `
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
+              <w:anchorlock/>
+              <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
+            </v:roundrect>
             <![endif]-->
             <!--[if !mso]><!-->
             <a href="#" style="
-              display: inline-block;
-              padding: ${style.padding || 12}px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+              height: 100%;
               background-color: ${style.backgroundColor || '#007BFF'};
               color: ${style.color || '#FFFFFF'};
               text-decoration: none;
               border-radius: ${style.borderRadius || 4}px;
-              font-family: Arial, sans-serif;
-              font-size: ${style.fontSize || 16}px;
-              font-weight: ${style.fontWeight || 'normal'};
+              font-family: inherit;
+              font-size: inherit;
+              font-weight: inherit;
               text-align: center;
-              line-height: 1;
+              box-sizing: border-box;
             ">${content}</a>
-            <!--<![endif]-->`
-            break
-          case 'divider':
-            html += `<hr style="border: none; height: 1px; background-color: ${style.backgroundColor || '#CCCCCC'}; margin: 10px 0;" />`
-            break
-        }
-
-        html += `
-                    </td>`
-      })
-
-      html += `
-                  </tr>
-                </table>`
+            <!--<![endif]-->
+          </div>`
+          break
+        case 'divider':
+          html += elementHtml + `<hr style="
+            border: none; 
+            height: ${style.height || 1}px; 
+            background-color: ${style.backgroundColor || '#CCCCCC'}; 
+            margin: 0;
+            width: 100%;
+          " /></div>`
+          break
+      }
     })
 
     html += `
-              </td>
-            </tr>
-          </table>
+          </div>
         </td>
       </tr>
     </table>

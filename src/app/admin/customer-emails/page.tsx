@@ -338,7 +338,7 @@ export default function CustomerEmailsPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Update campaign with actual results
+        // Update campaign with actual results and start tracking
         updateCampaigns(campaigns.map(c => 
           c.id === campaignId 
             ? { 
@@ -347,12 +347,35 @@ export default function CustomerEmailsPage() {
                 sentCount: result.results.successCount,
                 recipientCount: result.results.totalRecipients,
                 sentAt: new Date().toISOString(),
-                // Real performance data will be added when tracking is implemented
-                openRate: undefined,
-                clickRate: undefined
+                openRate: 0,  // Will be updated by tracking
+                clickRate: 0  // Will be updated by tracking
               }
             : c
         ))
+        
+        // Start polling for tracking updates every 30 seconds
+        const trackingInterval = setInterval(async () => {
+          try {
+            const analyticsResponse = await fetch(`/api/email/analytics?campaignId=${campaignId}`)
+            if (analyticsResponse.ok) {
+              const analytics = await analyticsResponse.json()
+              updateCampaigns(campaigns.map(c => 
+                c.id === campaignId 
+                  ? { 
+                      ...c, 
+                      openRate: analytics.metrics?.openRate || c.openRate,
+                      clickRate: analytics.metrics?.clickRate || c.clickRate
+                    }
+                  : c
+              ))
+            }
+          } catch (error) {
+            console.error('Error fetching analytics:', error)
+          }
+        }, 30000) // Poll every 30 seconds
+        
+        // Clear polling after 1 hour
+        setTimeout(() => clearInterval(trackingInterval), 3600000)
 
         alert(`Campaign sent successfully!\n\nSent to: ${result.results.successCount} recipients\nFailed: ${result.results.failureCount} recipients\n\n${result.message}`)
       } else {

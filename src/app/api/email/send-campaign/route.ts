@@ -90,14 +90,22 @@ export async function POST(request: NextRequest) {
     // Process each batch
     for (const batch of batches) {
       try {
-        const batchEmails = batch.map(customer => ({
-          to: customer.email,
-          subject: subject,
-          html: personalizeContent(htmlContent, customer),
-          text: personalizeContent(textContent, customer),
-          from: 'noreply@steinway.com.au',
-          replyTo: process.env.REPLY_TO_EMAIL || 'info@steinway.com.au'
-        }))
+        const batchEmails = batch.map(customer => {
+          const personalizedHtml = personalizeContent(htmlContent, customer)
+          const personalizedText = personalizeContent(textContent, customer)
+          
+          // Add tracking to HTML email
+          const trackedHtml = addEmailTracking(personalizedHtml, templateId, customer.id)
+          
+          return {
+            to: customer.email,
+            subject: subject,
+            html: trackedHtml,
+            text: personalizedText,
+            from: 'noreply@steinway.com.au',
+            replyTo: process.env.REPLY_TO_EMAIL || 'info@steinway.com.au'
+          }
+        })
 
         // Send batch using Resend
         const batchResults = await Promise.allSettled(
@@ -219,6 +227,41 @@ async function getCustomersForCampaign(
     console.error('Error fetching customers:', error)
     return []
   }
+}
+
+// Helper function to add email tracking (open pixel + click tracking)
+function addEmailTracking(htmlContent: string, campaignId: string, recipientId: number): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'
+  
+  // 1. Add tracking pixel for email opens
+  const trackingPixelUrl = `${baseUrl}/api/email/tracking/open?c=${campaignId}&r=${recipientId}&t=${Date.now()}`
+  const trackingPixel = `<img src="${trackingPixelUrl}" alt="" width="1" height="1" style="display:block;border:none;outline:none;text-decoration:none;" />`
+  
+  // 2. Convert all links to tracked links
+  let trackedHtml = htmlContent.replace(
+    /href=["']([^"']+)["']/gi,
+    (match, url) => {
+      // Skip already tracked links and tracking pixels
+      if (url.includes('/api/email/tracking/') || url.includes('mailto:') || url.startsWith('#')) {
+        return match
+      }
+      
+      // Create tracked link
+      const encodedUrl = encodeURIComponent(url)
+      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&r=${recipientId}&url=${encodedUrl}&t=${Date.now()}`
+      return `href="${trackedUrl}"`
+    }
+  )
+  
+  // 3. Insert tracking pixel before closing body tag
+  if (trackedHtml.includes('</body>')) {
+    trackedHtml = trackedHtml.replace('</body>', `${trackingPixel}</body>`)
+  } else {
+    // If no body tag, append to end
+    trackedHtml += trackingPixel
+  }
+  
+  return trackedHtml
 }
 
 // Helper function to personalize email content

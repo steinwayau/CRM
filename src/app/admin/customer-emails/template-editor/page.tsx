@@ -1017,8 +1017,33 @@ export default function TemplateEditorPage() {
   const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
-    // GMAIL: Show actual Gmail rendering (table-based, Gmail-compatible CSS only)
+    // GMAIL: Convert absolute positioning to table-based layout (like Mailchimp)
     if (client === 'gmail') {
+      // Group elements into rows based on Y position
+      const rowTolerance = 20 // Elements within 20px Y difference go in same row
+      const rows: EditorElement[][] = []
+      
+      sortedElements.forEach((element) => {
+        const elementY = element.style.position.y
+        
+        // Find existing row that this element can fit into
+        const existingRow = rows.find(row => {
+          const rowY = row[0].style.position.y
+          return Math.abs(elementY - rowY) <= rowTolerance
+        })
+        
+        if (existingRow) {
+          existingRow.push(element)
+          // Sort elements in row by X position (left to right)
+          existingRow.sort((a, b) => a.style.position.x - b.style.position.x)
+        } else {
+          rows.push([element])
+        }
+      })
+      
+      // Sort rows by Y position (top to bottom)
+      rows.sort((a, b) => a[0].style.position.y - b[0].style.position.y)
+      
       let gmailHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -1029,83 +1054,128 @@ export default function TemplateEditorPage() {
   <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
     <tr>
       <td style="padding: 20px 0;">
-        <table width="600" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <table width="600" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto; background-color: white;">
           <tr>
-            <td style="background-color: #EA4335; color: white; padding: 12px 20px; text-align: center; font-size: 13px; font-weight: bold; border-bottom: 2px solid #d33;">
-              📧 GMAIL PREVIEW - How your template will appear in Gmail
+            <td style="background-color: #EA4335; color: white; padding: 12px 20px; text-align: center; font-size: 13px; font-weight: bold;">
+              📧 GMAIL PREVIEW - How your template will actually render
             </td>
           </tr>
           <tr>
-            <td style="padding: 0; position: relative; width: 600px; height: ${canvasSize.height}px; background-color: ${canvasBackgroundColor};">
-              <!-- Template content positioned absolutely within this cell -->`
+            <td style="padding: 0; background-color: ${canvasBackgroundColor};">
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">`
 
       // Check if template has elements
-      if (sortedElements.length === 0) {
+      if (rows.length === 0) {
         gmailHtml += `
-              <div style="padding: 40px; text-align: center; color: #666; font-family: Arial, sans-serif;">
-                <p style="margin: 0 0 15px 0; font-size: 16px;">Your template is empty</p>
-                <p style="margin: 0; font-size: 14px;">Add elements to see how they'll appear in Gmail</p>
-              </div>`
+                <tr>
+                  <td style="padding: 40px; text-align: center; color: #666; font-family: Arial, sans-serif;">
+                    <p style="margin: 0 0 15px 0; font-size: 16px;">Your template is empty</p>
+                    <p style="margin: 0; font-size: 14px;">Add elements to see Gmail rendering</p>
+                  </td>
+                </tr>`
       } else {
-        sortedElements.forEach((element) => {
-          const { type, content, style } = element
-          const { position, width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+        // Generate table rows for each element row
+        rows.forEach((row) => {
+          gmailHtml += `
+                <tr>`
           
-          // Convert absolute positioning to Gmail-compatible table cell
-          const cellStyle = `
-            position: absolute;
-            left: ${position.x}px;
-            top: ${position.y}px;
-            width: ${width}px;
-            height: ${height}px;
-            font-family: ${fontFamily || 'Arial, sans-serif'};
-            font-size: ${fontSize || 14}px;
-            font-weight: ${fontWeight || 'normal'};
-            color: ${color || '#000000'};
-            text-align: ${textAlign || 'left'};
-            background-color: ${backgroundColor || 'transparent'};
-            overflow: hidden;
-            box-sizing: border-box;
-          `.replace(/\s+/g, ' ').trim()
-          
-          if (type === 'text' || type === 'heading') {
-            const textContent = content || '[Empty text]'
+          // If single element in row, span full width
+          if (row.length === 1) {
+            const element = row[0]
+            const { type, content, style } = element
+            const { width, height, color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+            
+            const cellStyle = `
+              padding: 10px 20px;
+              font-family: ${fontFamily || 'Arial, sans-serif'};
+              font-size: ${fontSize || 14}px;
+              font-weight: ${fontWeight || 'normal'};
+              color: ${color || '#000000'};
+              text-align: ${textAlign || 'left'};
+              background-color: ${backgroundColor || 'transparent'};
+              vertical-align: top;
+            `.replace(/\s+/g, ' ').trim()
+            
             gmailHtml += `
-              <div style="${cellStyle} padding: 8px; line-height: 1.4;">
-                ${textContent}
-              </div>`
-          } else if (type === 'image') {
-            const imageUrl = content || '/images.png'
+                  <td style="${cellStyle}">`
+            
+            if (type === 'text' || type === 'heading') {
+              const textContent = content || '[Empty text]'
+              gmailHtml += `${textContent}`
+            } else if (type === 'image') {
+              const imageUrl = content || '/images.png'
+              gmailHtml += `<img src="${imageUrl}" alt="Template Image" style="max-width: 100%; height: auto; display: block;">`
+            } else if (type === 'button') {
+              const buttonText = content || 'Click Here'
+              gmailHtml += `
+                    <table cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="background-color: #1a73e8; border-radius: 4px;">
+                          <a href="#" style="display: inline-block; padding: 12px 24px; color: white; text-decoration: none; font-weight: bold;">${buttonText}</a>
+                        </td>
+                      </tr>
+                    </table>`
+            } else if (type === 'divider') {
+              gmailHtml += `<hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0;">`
+            }
+            
             gmailHtml += `
-              <div style="${cellStyle}">
-                <img src="${imageUrl}" alt="Template Image" style="width: 100%; height: 100%; object-fit: cover; display: block; border: none;">
-              </div>`
-          } else if (type === 'button') {
-            const buttonText = content || 'Click Here'
-            gmailHtml += `
-              <div style="${cellStyle} display: flex; align-items: center; justify-content: center;">
-                <a href="#" style="
-                  display: inline-block;
-                  padding: 12px 24px;
-                  background-color: #1a73e8;
-                  color: white;
-                  text-decoration: none;
-                  border-radius: 4px;
-                  font-weight: bold;
-                  text-align: center;
-                  line-height: 1;
-                ">${buttonText}</a>
-              </div>`
-          } else if (type === 'divider') {
-            gmailHtml += `
-              <div style="${cellStyle} display: flex; align-items: center;">
-                <hr style="width: 100%; border: none; border-top: 1px solid #ddd; margin: 0;">
-              </div>`
+                  </td>`
+          } else {
+            // Multiple elements in row - create columns
+            const columnWidth = Math.floor(100 / row.length)
+            
+            row.forEach((element) => {
+              const { type, content, style } = element
+              const { color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
+              
+              const cellStyle = `
+                width: ${columnWidth}%;
+                padding: 10px;
+                font-family: ${fontFamily || 'Arial, sans-serif'};
+                font-size: ${fontSize || 14}px;
+                font-weight: ${fontWeight || 'normal'};
+                color: ${color || '#000000'};
+                text-align: ${textAlign || 'left'};
+                background-color: ${backgroundColor || 'transparent'};
+                vertical-align: top;
+              `.replace(/\s+/g, ' ').trim()
+              
+              gmailHtml += `
+                  <td style="${cellStyle}">`
+              
+              if (type === 'text' || type === 'heading') {
+                const textContent = content || '[Empty text]'
+                gmailHtml += `${textContent}`
+              } else if (type === 'image') {
+                const imageUrl = content || '/images.png'
+                gmailHtml += `<img src="${imageUrl}" alt="Template Image" style="max-width: 100%; height: auto; display: block;">`
+              } else if (type === 'button') {
+                const buttonText = content || 'Click Here'
+                gmailHtml += `
+                    <table cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="background-color: #1a73e8; border-radius: 4px;">
+                          <a href="#" style="display: inline-block; padding: 8px 16px; color: white; text-decoration: none; font-weight: bold; font-size: 12px;">${buttonText}</a>
+                        </td>
+                      </tr>
+                    </table>`
+              } else if (type === 'divider') {
+                gmailHtml += `<hr style="border: none; border-top: 1px solid #ddd; margin: 5px 0;">`
+              }
+              
+              gmailHtml += `
+                  </td>`
+            })
           }
+          
+          gmailHtml += `
+                </tr>`
         })
       }
 
       gmailHtml += `
+              </table>
             </td>
           </tr>
         </table>

@@ -1669,7 +1669,7 @@ export default function CustomerEmailsPage() {
                       <button
                         onClick={() => {
                           if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-                            setCampaigns(campaigns.filter(c => c.id !== viewingCampaign.id))
+                            updateCampaigns(campaigns.filter(c => c.id !== viewingCampaign.id))
                             setShowCampaignView(false)
                           }
                         }}

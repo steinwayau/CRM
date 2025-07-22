@@ -129,4 +129,94 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+// Email Campaign Management and Analytics
+model EmailCampaign {
+  id            String   @id @default(cuid())
+  name          String
+  subject       String
+  templateId    String
+  templateName  String?
+  htmlContent   String?  @db.Text
+  textContent   String?  @db.Text
+  
+  // Campaign recipients
+  recipientType String   // 'all', 'filtered', 'selected', 'custom'
+  recipientCount Int     @default(0)
+  sentCount     Int      @default(0)
+  
+  // Campaign status
+  status        String   @default("draft") // 'draft', 'scheduled', 'sending', 'sent', 'paused'
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  
+  // Tracking and analytics
+  opens         EmailOpen[]
+  clicks        EmailClick[]
+  bounces       EmailBounce[]
+  
+  // System fields
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("email_campaigns")
+}
+
+model EmailOpen {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // Recipient information
+  recipientId String?  // Can be null for custom email recipients
+  recipientEmail String
+  
+  // Tracking details
+  openedAt    DateTime @default(now())
+  userAgent   String?
+  ipAddress   String?
+  source      String   @default("pixel") // 'pixel', 'webhook'
+  
+  // Prevent duplicate tracking (same recipient can open multiple times)
+  @@unique([campaignId, recipientEmail, openedAt])
+  @@map("email_opens")
+}
+
+model EmailClick {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // Recipient information
+  recipientId String?  // Can be null for custom email recipients  
+  recipientEmail String
+  
+  // Click details
+  targetUrl   String
+  clickedAt   DateTime @default(now())
+  userAgent   String?
+  ipAddress   String?
+  source      String   @default("redirect") // 'redirect', 'webhook'
+  
+  @@map("email_clicks")
+}
+
+model EmailBounce {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // Recipient information
+  recipientId String?  // Can be null for custom email recipients
+  recipientEmail String
+  
+  // Bounce details
+  bounceType  String   // 'hard', 'soft', 'complaint'
+  bounceReason String?
+  bouncedAt   DateTime @default(now())
+  
+  @@unique([campaignId, recipientEmail]) // One bounce record per recipient per campaign
+  @@map("email_bounces")
 } 

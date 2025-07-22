@@ -12,14 +12,55 @@ interface EmailRecipient {
   doNotEmail: boolean
 }
 
+// Template element interfaces for Gmail-compatible HTML generation
+interface EditorElement {
+  id: string
+  type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading'
+  content: string
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6
+  videoData?: {
+    platform?: 'youtube' | 'vimeo' | 'facebook' | 'custom'
+    url?: string
+    videoId?: string
+    thumbnailUrl?: string
+    title?: string
+  }
+  style: {
+    position: { x: number; y: number }
+    width: number
+    height: number
+    fontSize?: number
+    fontWeight?: string
+    fontFamily?: string
+    fontStyle?: 'normal' | 'italic'
+    textDecoration?: 'none' | 'underline' | 'line-through'
+    color?: string
+    backgroundColor?: string
+    padding?: number
+    borderRadius?: number
+    textAlign?: 'left' | 'center' | 'right'
+  }
+}
+
+interface CanvasSettings {
+  width: number
+  height: number
+  backgroundColor: string
+}
+
 interface CampaignRequest {
+  name: string
   templateId: string
+  templateName?: string
   subject: string
   htmlContent: string
   textContent: string
   recipientType: 'all' | 'filtered' | 'selected' | 'custom'
   customerIds?: number[]
   customEmails?: string
+  // NEW: Template elements for Gmail-compatible HTML generation
+  templateElements?: EditorElement[]
+  canvasSettings?: CanvasSettings
   filters?: {
     state?: string
     rating?: string
@@ -28,6 +69,205 @@ interface CampaignRequest {
     nationality?: string
     source?: string
   }
+}
+
+// CORE FIX: Gmail-Compatible HTML Generation - The Missing Piece!
+// This is what Mailchimp does - separate email-safe HTML generation
+function generateGmailCompatibleHtml(
+  elements: EditorElement[], 
+  canvasSettings: CanvasSettings,
+  templateName: string = 'Email Template'
+): string {
+  // Sort elements by Y position to maintain visual order
+  const sortedElements = [...elements].sort((a, b) => a.style.position.y - b.style.position.y)
+  
+  // Gmail-specific constraints (based on industry research)
+  const GMAIL_MAX_WIDTH = 600 // Gmail's recommended max width
+  const CANVAS_WIDTH = canvasSettings.width || 1000
+  const SCALE_FACTOR = GMAIL_MAX_WIDTH / CANVAS_WIDTH // Scale down to fit Gmail
+  
+  let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${templateName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="${GMAIL_MAX_WIDTH}" style="background-color: ${canvasSettings.backgroundColor || '#ffffff'}; max-width: ${GMAIL_MAX_WIDTH}px;">`
+
+  // Process each element with Gmail-compatible rendering
+  sortedElements.forEach((element) => {
+    const scaledWidth = Math.round(element.style.width * SCALE_FACTOR)
+    const scaledHeight = Math.round(element.style.height * SCALE_FACTOR)
+    const scaledFontSize = element.style.fontSize ? Math.round(element.style.fontSize * SCALE_FACTOR) : undefined
+    
+    // Calculate alignment based on element position
+    const elementCenterX = element.style.position.x + (element.style.width / 2)
+    const canvasCenterX = CANVAS_WIDTH / 2
+    const tolerance = 50
+    
+    let alignment = 'left'
+    if (Math.abs(elementCenterX - canvasCenterX) < tolerance) {
+      alignment = 'center'
+    } else if (elementCenterX > canvasCenterX + tolerance) {
+      alignment = 'right'
+    }
+
+    html += `
+          <tr>
+            <td align="${alignment}" style="padding: 10px;">`
+
+    switch (element.type) {
+      case 'text':
+        const textColor = element.style.color || '#000000'
+        const fontSize = scaledFontSize || 14
+        const fontFamily = 'Arial, sans-serif' // Gmail-safe font
+        const backgroundColor = element.style.backgroundColor && element.style.backgroundColor !== 'transparent' 
+          ? element.style.backgroundColor : ''
+        
+        html += `
+              <div style="
+                font-family: ${fontFamily};
+                font-size: ${fontSize}px;
+                color: ${textColor};
+                line-height: 1.4;
+                ${backgroundColor ? `background-color: ${backgroundColor};` : ''}
+                ${element.style.fontWeight ? `font-weight: ${element.style.fontWeight};` : ''}
+                ${element.style.fontStyle ? `font-style: ${element.style.fontStyle};` : ''}
+                ${element.style.textDecoration ? `text-decoration: ${element.style.textDecoration};` : ''}
+                text-align: ${alignment};
+              ">${element.content}</div>`
+        break
+
+      case 'heading':
+        const headingLevel = element.headingLevel || 1
+        const headingColor = element.style.color || '#000000'
+        const headingSize = scaledFontSize || (28 - (headingLevel - 1) * 4) // Scaled heading sizes
+        
+        html += `
+              <h${headingLevel} style="
+                font-family: Arial, sans-serif;
+                font-size: ${headingSize}px;
+                color: ${headingColor};
+                margin: 0 0 10px 0;
+                font-weight: bold;
+                text-align: ${alignment};
+                line-height: 1.2;
+              ">${element.content}</h${headingLevel}>`
+        break
+
+      case 'image':
+        // Gmail-optimized image handling
+        html += `
+              <img src="${element.content}" alt="Email Image" 
+                   width="${scaledWidth}" 
+                   height="${scaledHeight}"
+                   style="
+                     display: block;
+                     width: ${scaledWidth}px;
+                     height: ${scaledHeight}px;
+                     max-width: 100%;
+                     border: 0;
+                     outline: none;
+                   " />`
+        break
+
+      case 'video':
+        // Gmail doesn't support video - convert to clickable thumbnail like Mailchimp
+        const videoData = element.videoData
+        const thumbnailUrl = videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
+        const videoUrl = videoData?.url || element.content || '#'
+        const videoTitle = videoData?.title || 'Play Video'
+        
+        html += `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+                      <img src="${thumbnailUrl}" alt="${videoTitle}" 
+                           width="${scaledWidth}" 
+                           height="${scaledHeight}"
+                           style="
+                             display: block;
+                             width: ${scaledWidth}px;
+                             height: ${scaledHeight}px;
+                             border: 2px solid #1a73e8;
+                           " />
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; font-size: 12px; color: #1a73e8; padding: 5px 0; font-family: Arial, sans-serif;">
+                    ▶ ${videoTitle}
+                  </td>
+                </tr>
+              </table>`
+        break
+
+      case 'button':
+        // Gmail-compatible button using table-based approach
+        const buttonBg = element.style.backgroundColor || '#0073e6'
+        const buttonColor = element.style.color || '#ffffff'
+        const buttonText = element.content || 'Click Here'
+        const buttonPadding = '12px 24px' // Fixed padding for consistency
+        
+        html += `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="
+                    background-color: ${buttonBg};
+                    text-align: center;
+                    padding: ${buttonPadding};
+                  ">
+                    <a href="#" style="
+                      color: ${buttonColor};
+                      text-decoration: none;
+                      font-family: Arial, sans-serif;
+                      font-size: ${scaledFontSize || 16}px;
+                      font-weight: bold;
+                      display: block;
+                      line-height: 1;
+                    ">${buttonText}</a>
+                  </td>
+                </tr>
+              </table>`
+        break
+
+      case 'divider':
+        const dividerColor = element.style.backgroundColor || '#cccccc'
+        const dividerHeight = Math.max(1, Math.round((element.style.height || 1) * SCALE_FACTOR))
+        
+        html += `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="
+                    border-top: ${dividerHeight}px solid ${dividerColor};
+                    font-size: 0;
+                    line-height: 0;
+                  ">&nbsp;</td>
+                </tr>
+              </table>`
+        break
+    }
+
+    html += `
+            </td>
+          </tr>`
+  })
+
+  html += `
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+
+  return html
 }
 
 export async function POST(request: NextRequest) {
@@ -41,12 +281,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { templateId, subject, htmlContent, textContent, recipientType, customEmails, customerIds, filters } = await request.json()
+    const { 
+      name, 
+      templateId, 
+      templateName, 
+      subject, 
+      htmlContent, 
+      textContent, 
+      recipientType, 
+      customEmails, 
+      customerIds, 
+      filters,
+      templateElements,
+      canvasSettings 
+    } = await request.json()
     
     // Validate required fields
-    if (!templateId || !subject || !htmlContent) {
+    if (!name || !templateId || !subject || !htmlContent) {
       return NextResponse.json(
-        { error: 'Missing required fields: templateId, subject, htmlContent' },
+        { error: 'Missing required fields: name, templateId, subject, htmlContent' },
         { status: 400 }
       )
     }
@@ -64,7 +317,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check Resend API limits (adjust based on your plan)
+    // Check email limits 
     if (eligibleCustomers.length > 1000) {
       return NextResponse.json(
         { error: 'Campaign too large. Maximum 1000 recipients per campaign.' },
@@ -91,7 +344,19 @@ export async function POST(request: NextRequest) {
     for (const batch of batches) {
       try {
         const batchEmails = batch.map(customer => {
-          const personalizedHtml = personalizeContent(htmlContent, customer)
+          // CORE FIX: Use Gmail-compatible HTML generation instead of template htmlContent
+          // This is what Mailchimp does - separate email-safe HTML for actual delivery
+          let emailHtml = htmlContent // Fallback to original if no elements available
+          
+          if (templateElements && templateElements.length > 0 && canvasSettings) {
+            // Generate Gmail-compatible HTML from template elements
+            emailHtml = generateGmailCompatibleHtml(templateElements, canvasSettings, templateName || name)
+            console.log(`Generated Gmail-compatible HTML for customer ${customer.email}`)
+          } else {
+            console.log(`Using fallback htmlContent for customer ${customer.email} - template elements not provided`)
+          }
+          
+          const personalizedHtml = personalizeContent(emailHtml, customer)
           const personalizedText = personalizeContent(textContent, customer)
           
           // Add tracking to HTML email

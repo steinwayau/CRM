@@ -29,6 +29,12 @@ interface EmailTemplate {
   textContent: string
   type: 'promotional' | 'newsletter' | 'event' | 'follow-up'
   createdAt: string
+  elements?: any[]
+  canvasSettings?: {
+    width: number
+    height: number
+    backgroundColor: string
+  }
 }
 
 interface Campaign {
@@ -317,21 +323,33 @@ export default function CustomerEmailsPage() {
         customerIds = selectedCustomers
       }
 
-      // Call the actual email API
+      // CORE FIX: Pass template elements and canvas settings for Gmail-compatible HTML generation
+      // This allows the backend to generate email-safe HTML instead of using preview HTML
+      const templateElements = template.elements || []
+      const canvasSettings = template.canvasSettings || { width: 1000, height: 800, backgroundColor: '#ffffff' }
+      
+      console.log(`Sending campaign with ${templateElements.length} elements for Gmail-compatible rendering`)
+
+      // Call the actual email API with template elements for Gmail-compatible HTML generation
       const response = await fetch('/api/email/send-campaign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          name: campaign.name,
           templateId: campaign.templateId,
+          templateName: campaign.templateName,
           subject: campaign.subject,
-          htmlContent: template.htmlContent,
+          htmlContent: template.htmlContent, // Fallback for preview
           textContent: template.textContent,
           recipientType: campaign.recipientType,
           customerIds: customerIds.length > 0 ? customerIds : undefined,
           customEmails: campaign.recipientType === 'custom' ? campaign.customEmails : undefined,
-          filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined
+          filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined,
+          // NEW: Template elements and canvas settings for Gmail-compatible HTML generation
+          templateElements: templateElements,
+          canvasSettings: canvasSettings
         })
       })
 

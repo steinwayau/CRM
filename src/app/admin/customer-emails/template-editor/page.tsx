@@ -69,7 +69,7 @@ export default function TemplateEditorPage() {
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 800 })
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#ffffff')
-  const [showPreview, setShowPreview] = useState(false)
+
   const [previewMode, setPreviewMode] = useState(false)
   const [selectedEmailClient, setSelectedEmailClient] = useState<'gmail' | 'outlook' | 'apple' | 'generic'>('gmail')
   const [saving, setSaving] = useState(false)
@@ -1542,13 +1542,6 @@ export default function TemplateEditorPage() {
             
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => setShowPreview(!showPreview)}
-                disabled={editorElements.length === 0}
-                className="px-4 py-2 text-blue-600 border border-blue-300 rounded-md hover:bg-blue-50 disabled:opacity-50"
-              >
-                {showPreview ? 'Hide Preview' : 'Preview'}
-              </button>
-              <button
                 onClick={handleSave}
                 disabled={!templateForm.name || !templateForm.subject || editorElements.length === 0 || saving}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
@@ -2971,43 +2964,7 @@ export default function TemplateEditorPage() {
         )}
       </div>
 
-      {/* Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-4 border-b">
-              <div>
-                <h3 className="text-lg font-semibold">{templateForm.name || 'Untitled Template'}</h3>
-                <p className="text-sm text-gray-600">Subject: {templateForm.subject || 'No Subject'}</p>
-              </div>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="p-4">
-              <div className="border rounded-lg">
-                <div className="bg-gray-50 px-4 py-2 border-b text-sm font-medium">
-                  Email Preview (with sample personalization)
-                </div>
-                <div className="p-4">
-                  <div 
-                    className="max-w-none"
-                    dangerouslySetInnerHTML={{ 
-                      __html: personalizeContent(generateHtmlFromElements())
-                    }} 
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Hidden file input for image uploads */}
       <input

@@ -95,7 +95,7 @@ function generateGmailCompatibleHtml(
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
     <tr>
       <td align="center" style="padding: 20px 0;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="${GMAIL_MAX_WIDTH}" style="background-color: ${canvasSettings.backgroundColor || '#ffffff'}; max-width: ${GMAIL_MAX_WIDTH}px; margin: 0 auto;">`
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="${GMAIL_MAX_WIDTH}" style="background-color: ${canvasSettings.backgroundColor || '#ffffff'}; max-width: ${GMAIL_MAX_WIDTH}px; margin: 0 auto; min-height: ${Math.round((canvasSettings.height || 800) * (GMAIL_MAX_WIDTH / (canvasSettings.width || 1000)))}px;">`
 
   // Process each element with simple vertical stacking (no complex positioning)
   sortedElements.forEach((element) => {
@@ -182,8 +182,25 @@ function generateGmailCompatibleHtml(
       case 'video':
         // Gmail doesn't support video - simple clickable thumbnail
         const videoData = element.videoData
-        const thumbnailUrl = videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
-        const videoUrl = videoData?.url || element.content || '#'
+        
+        // Extract proper YouTube thumbnail and URL
+        const videoUrl = videoData?.url || element.content || ''
+        let thumbnailUrl = videoData?.thumbnailUrl
+        
+        // Extract YouTube thumbnail if URL is provided
+        if (videoUrl && !thumbnailUrl) {
+          const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+          if (youtubeMatch) {
+            const videoId = youtubeMatch[1]
+            thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+          }
+        }
+        
+        // Fallback thumbnail if no URL or not YouTube
+        if (!thumbnailUrl) {
+          thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+        }
+        
         const videoTitle = videoData?.title || 'Play Video'
         
         const videoWidth = Math.min(elementWidth, maxElementWidth)

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const emailFormat = searchParams.get('email_format') === 'true'
     
     const result = await sql`
-      SELECT id, name, email, active, created_at, updated_at
+      SELECT id, name, email, "isActive", created_at, updated_at
       FROM staff 
       ORDER BY id ASC
     `
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         name: row.name,
         email: row.email || '',
         role: 'staff',
-        active: row.active,
+        active: row.isActive,
         phone: '',
         position: '',
         department: ''
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         password: '••••••••••••', // Hidden for security
         name: row.name,
         role: 'staff',
-        active: row.active
+        active: row.isActive
       }))
     }
     
@@ -105,9 +105,9 @@ export async function POST(request: NextRequest) {
 
     // Insert new staff member into database
     const result = await sql`
-      INSERT INTO staff (name, email, active, created_at, updated_at)
+      INSERT INTO staff (name, email, "isActive", "createdAt", "updatedAt")
       VALUES (${staffName}, ${email}, true, NOW(), NOW())
-      RETURNING id, name, email, active
+      RETURNING id, name, email, "isActive"
     `
 
     const newStaff = result.rows[0]
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         password: password, // Only return password when creating
         name: newStaff.name,
         role: 'staff',
-        active: newStaff.active
+        active: newStaff.isActive
       }
     })
 
@@ -151,7 +151,7 @@ export async function PUT(request: NextRequest) {
     let updateValues = []
     
     if (active !== undefined) {
-      updateFields.push('active = $' + (updateValues.length + 1))
+      updateFields.push('"isActive" = $' + (updateValues.length + 1))
       updateValues.push(active)
     }
     
@@ -164,10 +164,10 @@ export async function PUT(request: NextRequest) {
       updateValues.push(generateEmail(name.trim()))
     }
     
-    updateFields.push('updated_at = NOW()')
+    updateFields.push('"updatedAt" = NOW()')
     updateValues.push(id) // ID is always the last parameter
 
-    if (updateFields.length === 1) { // Only updated_at, no actual changes
+    if (updateFields.length === 1) { // Only updatedAt, no actual changes
       return NextResponse.json(
         { error: 'No fields to update' },
         { status: 400 }
@@ -178,7 +178,7 @@ export async function PUT(request: NextRequest) {
       UPDATE staff 
       SET ${updateFields.join(', ')}
       WHERE id = $${updateValues.length}
-      RETURNING id, name, email, active
+      RETURNING id, name, email, "isActive"
     `
 
     const result = await sql.query(query, updateValues)
@@ -200,7 +200,7 @@ export async function PUT(request: NextRequest) {
         username: generateUsername(updatedStaff.name),
         name: updatedStaff.name,
         role: 'staff',
-        active: updatedStaff.active
+        active: updatedStaff.isActive
       }
     })
 
@@ -237,7 +237,7 @@ export async function PATCH(request: NextRequest) {
       await sql`
         UPDATE staff 
         SET email = ${email || null}, 
-            updated_at = NOW()
+            "updatedAt" = NOW()
         WHERE id = ${id}
       `
       updatedCount++
@@ -287,9 +287,9 @@ export async function DELETE(request: NextRequest) {
       // Soft delete - just deactivate
       result = await sql`
         UPDATE staff 
-        SET active = false, updated_at = NOW()
+        SET "isActive" = false, "updatedAt" = NOW()
         WHERE id = ${id}
-        RETURNING id, name, active
+        RETURNING id, name, "isActive"
       `
       message = 'Staff member deactivated'
     }

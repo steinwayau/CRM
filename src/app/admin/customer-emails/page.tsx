@@ -37,6 +37,30 @@ interface EmailTemplate {
   }
 }
 
+// Filter constants matching enquiry data system
+const PIANO_MODELS = ["All", "Steinway", "Boston", "Essex", "Yamaha", "Kawai", "Used Piano", "Roland", "Ritmuller", "Ronisch", "Kurzweil", "Other"]
+const CUSTOMER_RATINGS = [
+  "All", "N/A", "Ready to buy", "High Priority", "After Sale Follow Up", 
+  "Very interested but not ready to buy", "Looking for information", 
+  "Just browsing for now", "Cold", "Events"
+]
+const STATUSES = ["All", "New", "In Progress", "Completed", "Follow Up", "Closed"]
+const STATES = [
+  "All", "Australian Capital Territory", "New South Wales", "Northern Territory",
+  "Queensland", "South Australia", "Tasmania", "Victoria", "Western Australia"
+]
+const NATIONALITIES = ["All", "English", "Chinese", "Korean", "Japanese", "Indian", "Other"]
+const HEAR_ABOUT_US = [
+  "All", "Teacher", "Google", "Facebook", "Instagram", "LinkedIn", "WeChat", 
+  "YouTube", "Steinway Website", "Radio", "Magazine/Newspaper", 
+  "Recommended by a friend", "Event Follow Up", "Other"
+]
+const ENQUIRY_SOURCES = [
+  "All", "Events - Steinway Gallery St Leonards", "Events - Steinway Gallery Melbourne", 
+  "Phone Enquiry - Steinway National Information Line", "Phone Enquiry - Steinway Gallery St Leonards",
+  "In-store enquiry - Steinway Gallery St Leonards", "Lunar New Year", "Piano Teacher Calls", "Other"
+]
+
 interface Campaign {
   id: string
   name: string
@@ -76,6 +100,7 @@ export default function CustomerEmailsPage() {
 
   // New campaign form
   const [showNewCampaign, setShowNewCampaign] = useState(false)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [campaignForm, setCampaignForm] = useState({
     name: '',
     templateId: '',
@@ -83,6 +108,21 @@ export default function CustomerEmailsPage() {
     recipientType: 'all', // 'all', 'filtered', 'selected', 'custom'
     customEmails: '', // For custom email list
     scheduledAt: ''
+  })
+  
+  // Campaign filters (same as enquiry data filters)
+  const [campaignFilters, setCampaignFilters] = useState({
+    startDate: '',
+    endDate: '',
+    pianoModel: 'All',
+    customerRating: 'All',
+    status: 'All',
+    state: 'All',
+    suburb: '',
+    nationality: 'All',
+    callTakenBy: 'All',
+    hearAboutUs: 'All',
+    enquirySource: 'All'
   })
 
   // Template management state
@@ -780,14 +820,28 @@ export default function CustomerEmailsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
                 <select
                   value={campaignForm.recipientType}
-                  onChange={(e) => setCampaignForm({...campaignForm, recipientType: e.target.value, customEmails: ''})}
+                  onChange={(e) => {
+                    setCampaignForm({...campaignForm, recipientType: e.target.value, customEmails: ''})
+                    if (e.target.value === 'filtered') {
+                      setShowFilterPanel(true)
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="all">All customers ({filteredCustomers.length})</option>
-                  <option value="filtered">Filtered customers ({filteredCustomers.length})</option>
+                  <option value="filtered">Filtered customers (Click to set filters)</option>
                   <option value="selected">Selected customers ({selectedCustomers.length})</option>
                   <option value="custom">Custom email list</option>
                 </select>
+                {campaignForm.recipientType === 'filtered' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFilterPanel(true)}
+                    className="mt-2 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Set Filters
+                  </button>
+                )}
               </div>
 
               {campaignForm.recipientType === 'custom' && (
@@ -1329,6 +1383,178 @@ export default function CustomerEmailsPage() {
                     Edit Template
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filter Panel Modal */}
+        {showFilterPanel && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold">Customer Filters</h3>
+                  <p className="text-sm text-gray-600">Select criteria to target specific customer segments</p>
+                </div>
+                <button
+                  onClick={() => setShowFilterPanel(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                {/* Date Filters */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={campaignFilters.startDate}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, startDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={campaignFilters.endDate}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, endDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Piano Model</label>
+                  <select
+                    value={campaignFilters.pianoModel}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, pianoModel: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {PIANO_MODELS.map(model => (
+                      <option key={model} value={model}>{model}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Customer Rating</label>
+                  <select
+                    value={campaignFilters.customerRating}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, customerRating: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {CUSTOMER_RATINGS.map(rating => (
+                      <option key={rating} value={rating}>{rating}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={campaignFilters.status}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {STATUSES.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                  <select
+                    value={campaignFilters.state}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, state: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {STATES.map(state => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Suburb</label>
+                  <input
+                    type="text"
+                    value={campaignFilters.suburb}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, suburb: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter suburb..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nationality</label>
+                  <select
+                    value={campaignFilters.nationality}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, nationality: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {NATIONALITIES.map(nationality => (
+                      <option key={nationality} value={nationality}>{nationality}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Where did you hear about us?</label>
+                  <select
+                    value={campaignFilters.hearAboutUs}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, hearAboutUs: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {HEAR_ABOUT_US.map(source => (
+                      <option key={source} value={source}>{source}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry Source</label>
+                  <select
+                    value={campaignFilters.enquirySource}
+                    onChange={(e) => setCampaignFilters({...campaignFilters, enquirySource: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {ENQUIRY_SOURCES.map(source => (
+                      <option key={source} value={source}>{source}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  <strong>Note:</strong> These filters will be applied when sending the campaign to target specific customer segments.
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setCampaignFilters({
+                        startDate: '',
+                        endDate: '',
+                        pianoModel: 'All',
+                        customerRating: 'All',
+                        status: 'All',
+                        state: 'All',
+                        suburb: '',
+                        nationality: 'All',
+                        callTakenBy: 'All',
+                        hearAboutUs: 'All',
+                        enquirySource: 'All'
+                      })
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    onClick={() => setShowFilterPanel(false)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
               </div>
             </div>
           </div>

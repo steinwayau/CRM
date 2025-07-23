@@ -1013,47 +1013,12 @@ export default function TemplateEditorPage() {
     }
   }
 
-  // TRUE EMAIL CLIENT DIFFERENCES - GMAIL GETS SIMPLIFIED VERSION
+  // TRUE EMAIL CLIENT DIFFERENCES - GMAIL GETS PURE CONTENT EXTRACTION
   const generateClientSpecificHtml = (client: 'gmail' | 'outlook' | 'apple' | 'generic') => {
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
-        // GMAIL: Complete rewrite using Mailchimp-style email-safe HTML
+    // GMAIL: TRUE MAILCHIMP APPROACH - Pure content extraction, no layout preservation
     if (client === 'gmail') {
-      const GMAIL_WIDTH = 600 // Gmail max width
-      const CANVAS_WIDTH = canvasSize.width || 1000
-      const SCALE_FACTOR = GMAIL_WIDTH / CANVAS_WIDTH // Scale down to 600px
-      
-      // Scale all elements to Gmail dimensions
-      const scaledElements = sortedElements.map(element => ({
-        ...element,
-        scaledX: Math.round(element.style.position.x * SCALE_FACTOR),
-        scaledY: Math.round(element.style.position.y * SCALE_FACTOR),
-        scaledWidth: Math.round(element.style.width * SCALE_FACTOR),
-        scaledHeight: Math.round(element.style.height * SCALE_FACTOR),
-        scaledFontSize: Math.round((element.style.fontSize || 14) * SCALE_FACTOR)
-      }))
-      
-      // Group elements into rows based on Y position (with scaled tolerance)
-      const rowTolerance = Math.round(15 * SCALE_FACTOR)
-      const emailRows: any[][] = []
-      
-      scaledElements.forEach((element) => {
-        const existingRow = emailRows.find(row => 
-          Math.abs(element.scaledY - row[0].scaledY) <= rowTolerance
-        )
-        
-        if (existingRow) {
-          existingRow.push(element)
-          existingRow.sort((a, b) => a.scaledX - b.scaledX)
-        } else {
-          emailRows.push([element])
-        }
-      })
-      
-      // Sort rows by Y position
-      emailRows.sort((a, b) => a[0].scaledY - b[0].scaledY)
-      
-      // Generate email-safe HTML structure
       let gmailHtml = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -1062,50 +1027,148 @@ export default function TemplateEditorPage() {
   <title>${templateForm.name || 'Email Template'}</title>
 </head>
 <body style="margin: 0; padding: 0; width: 100%; background-color: #f4f4f4; font-family: Arial, sans-serif;">
-  <!-- Gmail Preview Header -->
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
     <tr>
       <td align="center" valign="top" style="padding: 20px 0;">
-        <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: white;">
-          <!-- Header Row -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: ${canvasBackgroundColor}; margin: 0 auto;">
+          <!-- Gmail Preview Header -->
           <tr>
             <td align="center" valign="top" style="background-color: #EA4335; color: white; padding: 12px 20px; font-size: 13px; font-weight: bold; font-family: Arial, sans-serif;">
-              📧 GMAIL PREVIEW - Mailchimp-style rendering (${CANVAS_WIDTH}px → 600px)
+              📧 GMAIL - Mailchimp-style content extraction (no layout preservation)
             </td>
-          </tr>
-          <!-- Content Container -->
-          <tr>
-            <td align="left" valign="top" style="padding: 0; background-color: ${canvasBackgroundColor};">`
+          </tr>`
 
-      if (emailRows.length === 0) {
+      if (sortedElements.length === 0) {
         gmailHtml += `
-              <table border="0" cellpadding="40" cellspacing="0" width="100%">
+          <tr>
+            <td align="center" valign="top" style="padding: 40px; color: #666666; font-family: Arial, sans-serif; font-size: 16px;">
+              Your template is empty<br>
+              <span style="font-size: 14px;">Add elements to see Gmail rendering</span>
+            </td>
+          </tr>`
+      } else {
+        // Process each element in pure vertical order - like reading a document
+        sortedElements.forEach((element) => {
+          const { type, content, style } = element
+          
+          switch (type) {
+            case 'text':
+              gmailHtml += `
+          <tr>
+            <td align="left" valign="top" style="padding: 15px 20px; font-family: Arial, sans-serif; font-size: ${Math.min(style.fontSize || 14, 18)}px; color: ${style.color || '#000000'}; line-height: 1.6;">
+              ${content}
+            </td>
+          </tr>`
+              break
+              
+                         case 'heading':
+               const headingSize = Math.min(style.fontSize || (24 - ((element.headingLevel || 1) - 1) * 2), 28)
+              gmailHtml += `
+          <tr>
+            <td align="left" valign="top" style="padding: 20px 20px 10px 20px; font-family: Arial, sans-serif; font-size: ${headingSize}px; color: ${style.color || '#000000'}; font-weight: bold; line-height: 1.3;">
+              ${content}
+            </td>
+          </tr>`
+              break
+              
+            case 'image':
+              const imgWidth = Math.min(style.width, 560) // Max width for Gmail
+              const imgHeight = Math.round((style.height / style.width) * imgWidth)
+              
+              gmailHtml += `
+          <tr>
+            <td align="center" valign="top" style="padding: 15px 20px;">
+              <img src="${content}" alt="Email Image" width="${imgWidth}" height="${imgHeight}" style="display: block; max-width: 100%; height: auto; border: 0;">
+            </td>
+          </tr>`
+              break
+              
+            case 'video':
+              // Extract proper YouTube thumbnail and URL
+              const videoUrl = element.videoData?.url || content || ''
+              let thumbnailUrl = element.videoData?.thumbnailUrl
+              
+              // Extract YouTube thumbnail if URL is provided
+              if (videoUrl && !thumbnailUrl) {
+                const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+                if (youtubeMatch) {
+                  const videoId = youtubeMatch[1]
+                  thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+                }
+              }
+              
+              // Fallback thumbnail
+              if (!thumbnailUrl) {
+                thumbnailUrl = 'https://via.placeholder.com/560x315/000000/FFFFFF/?text=▶+VIDEO'
+              }
+              
+              const videoTitle = element.videoData?.title || 'Play Video'
+              const videoWidth = Math.min(style.width, 560)
+              const videoHeight = Math.round(videoWidth * 0.5625) // 16:9 aspect ratio
+              
+              gmailHtml += `
+          <tr>
+            <td align="center" valign="top" style="padding: 15px 20px;">
+              <table border="0" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center" valign="top" style="color: #666666; font-family: Arial, sans-serif; font-size: 16px;">
-                    Your template is empty<br>
-                    <span style="font-size: 14px;">Add elements to see Gmail rendering</span>
+                  <td align="center">
+                    <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+                      <img src="${thumbnailUrl}" alt="${videoTitle}" width="${videoWidth}" height="${videoHeight}" style="display: block; border: 3px solid #1a73e8; border-radius: 8px; max-width: 100%; height: auto;">
+                    </a>
                   </td>
                 </tr>
-              </table>`
-      } else {
-        // Generate rows using proper email table structure
-        emailRows.forEach((row, rowIndex) => {
-          if (row.length === 1) {
-            // Single element row
-            const element = row[0]
-            const { type, content, style } = element
-            
-            gmailHtml += generateSingleElementRow(element, GMAIL_WIDTH)
-          } else {
-            // Multiple elements in row
-            gmailHtml += generateMultiElementRow(row, GMAIL_WIDTH)
+                <tr>
+                  <td align="center" style="padding-top: 10px;">
+                    <a href="${videoUrl}" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: #1a73e8; text-decoration: none; font-weight: bold;">
+                      ▶ ${videoTitle}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
+              break
+              
+            case 'button':
+              const buttonBg = style.backgroundColor || '#0073e6'
+              const buttonColor = style.color || '#ffffff'
+              const buttonText = content || 'Click Here'
+              
+              gmailHtml += `
+          <tr>
+            <td align="center" valign="top" style="padding: 15px 20px;">
+              <table border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="background-color: ${buttonBg}; border-radius: 6px; padding: 12px 24px;">
+                    <a href="#" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: ${buttonColor}; text-decoration: none; font-weight: bold; display: inline-block;">
+                      ${buttonText}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
+              break
+              
+            case 'divider':
+              const dividerColor = style.backgroundColor || '#cccccc'
+              
+              gmailHtml += `
+          <tr>
+            <td style="padding: 15px 20px;">
+              <table border="0" cellspacing="0" cellpadding="0" width="100%">
+                <tr>
+                  <td style="border-top: 2px solid ${dividerColor}; font-size: 0; line-height: 0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
+              break
           }
         })
       }
 
       gmailHtml += `
-            </td>
-          </tr>
         </table>
       </td>
     </tr>
@@ -1113,189 +1176,6 @@ export default function TemplateEditorPage() {
 </body>
 </html>`
       return gmailHtml
-    }
-    
-    // Helper function to generate single element row
-    function generateSingleElementRow(element: any, maxWidth: number): string {
-      const { type, content, style } = element
-      const { color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
-      
-      // Calculate positioning within 600px container
-      const leftOffset = element.scaledX
-      const rightOffset = maxWidth - (element.scaledX + element.scaledWidth)
-      
-      let rowHtml = `
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                <tr>`
-      
-      // Add left spacer if needed
-      if (leftOffset > 10) {
-        rowHtml += `
-                  <td width="${leftOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
-      }
-      
-      // Main content cell
-      if (type === 'image') {
-        rowHtml += `
-                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
-                    <img src="${content || '/images.png'}" alt="Image" width="${element.scaledWidth}" height="${element.scaledHeight}" style="display: block; border: none; outline: none; max-width: ${element.scaledWidth}px;">
-                  </td>`
-      } else if (type === 'button') {
-        const buttonText = content || 'Click Here'
-        rowHtml += `
-                  <td width="${element.scaledWidth}" align="${textAlign || 'center'}" valign="top" style="padding: 10px;">
-                    <table border="0" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td align="center" valign="middle" style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 12px 24px;">
-                          <a href="#" style="color: ${color || '#ffffff'}; text-decoration: none; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'bold'}; display: inline-block;">${buttonText}</a>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>`
-      } else if (type === 'text' || type === 'heading') {
-        const textContent = content || '[Empty text]'
-        rowHtml += `
-                  <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 10px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'normal'}; color: ${color || '#000000'}; background-color: ${backgroundColor || 'transparent'};">
-                    ${textContent}
-                  </td>`
-             } else if (type === 'video') {
-         // Convert video to clickable thumbnail with play button (email-safe approach)
-         const videoThumbnail = content || '/images.png' // Use video thumbnail or fallback
-         const videoUrl = style.videoUrl || '#' // External video URL (YouTube, Vimeo, etc.)
-         
-         rowHtml += `
-                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
-                     <table border="0" cellpadding="0" cellspacing="0">
-                       <tr>
-                         <td align="center" valign="middle" style="background-image: url('${videoThumbnail}'); background-size: cover; background-position: center; width: ${element.scaledWidth}px; height: ${element.scaledHeight}px; background-repeat: no-repeat;">
-                           <a href="${videoUrl}" target="_blank" style="display: block; width: ${element.scaledWidth}px; height: ${element.scaledHeight}px; text-decoration: none;">
-                             <table border="0" cellpadding="0" cellspacing="0" width="100%" height="100%">
-                               <tr>
-                                 <td align="center" valign="middle">
-                                   <!-- Email-safe play button using Unicode -->
-                                   <div style="width: 60px; height: 60px; background-color: rgba(0,0,0,0.8); border-radius: 30px; line-height: 60px; text-align: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">▶</div>
-                                 </td>
-                               </tr>
-                             </table>
-                           </a>
-                         </td>
-                       </tr>
-                       <!-- Fallback for clients that don't support background images -->
-                       <tr>
-                         <td align="center" style="font-size: 12px; color: #666666; padding: 5px; font-family: Arial, sans-serif;">
-                           📹 <a href="${videoUrl}" target="_blank" style="color: #1a73e8; text-decoration: none;">Click to play video</a>
-                         </td>
-                       </tr>
-                     </table>
-                   </td>`
-       } else if (type === 'divider') {
-         rowHtml += `
-                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px;">
-                     <table border="0" cellpadding="0" cellspacing="0" width="80%">
-                       <tr>
-                         <td style="border-top: 1px solid #dddddd; font-size: 1px; line-height: 1px;">&nbsp;</td>
-                       </tr>
-                     </table>
-                   </td>`
-       } else {
-         rowHtml += `
-                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 10px; color: #666666; font-family: Arial, sans-serif; font-size: 12px;">
-                     [Unsupported: ${type}]
-                   </td>`
-       }
-      
-      // Add right spacer if needed
-      if (rightOffset > 10) {
-        rowHtml += `
-                  <td width="${rightOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
-      }
-      
-      rowHtml += `
-                </tr>
-              </table>`
-      
-      return rowHtml
-    }
-    
-    // Helper function to generate multi-element row
-    function generateMultiElementRow(row: any[], maxWidth: number): string {
-      let rowHtml = `
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                <tr>`
-      
-      // Calculate total width and spacing
-      const totalElementWidth = row.reduce((sum, el) => sum + el.scaledWidth, 0)
-      const leftOffset = row[0].scaledX
-      
-      // Add left spacer
-      if (leftOffset > 5) {
-        rowHtml += `
-                  <td width="${leftOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
-      }
-      
-      // Add each element
-      row.forEach((element, index) => {
-        const { type, content, style } = element
-        const { color, fontSize, fontWeight, fontFamily, textAlign, backgroundColor } = style
-        
-        if (type === 'image') {
-          rowHtml += `
-                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
-                    <img src="${content || '/images.png'}" alt="Image" width="${element.scaledWidth}" height="${element.scaledHeight}" style="display: block; border: none; max-width: ${element.scaledWidth}px;">
-                  </td>`
-        } else if (type === 'button') {
-          rowHtml += `
-                  <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
-                    <table border="0" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td align="center" style="background-color: ${backgroundColor || '#1a73e8'}; border-radius: 4px; padding: 8px 16px;">
-                          <a href="#" style="color: ${color || '#ffffff'}; text-decoration: none; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; font-weight: ${fontWeight || 'bold'};">${content || 'Click'}</a>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>`
-                 } else if (type === 'video') {
-           // Video in multi-element row - simplified version
-           const videoThumbnail = content || '/images.png'
-           const videoUrl = style.videoUrl || '#'
-           
-           rowHtml += `
-                   <td width="${element.scaledWidth}" align="center" valign="top" style="padding: 5px;">
-                     <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
-                       <img src="${videoThumbnail}" alt="Play Video" width="${element.scaledWidth}" height="${element.scaledHeight}" style="display: block; border: 2px solid #1a73e8; border-radius: 4px;">
-                       <div style="text-align: center; font-size: 12px; color: #1a73e8; padding: 3px; font-family: Arial, sans-serif;">▶ Play Video</div>
-                     </a>
-                   </td>`
-         } else {
-           rowHtml += `
-                   <td width="${element.scaledWidth}" align="${textAlign || 'left'}" valign="top" style="padding: 5px; font-family: ${fontFamily || 'Arial, sans-serif'}; font-size: ${element.scaledFontSize}px; color: ${color || '#000000'};">
-                     ${content || '[Text]'}
-                   </td>`
-         }
-        
-        // Add spacing between elements (except last)
-        if (index < row.length - 1) {
-          const nextElement = row[index + 1]
-          const spacing = nextElement.scaledX - (element.scaledX + element.scaledWidth)
-          if (spacing > 5) {
-            rowHtml += `
-                  <td width="${spacing}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
-          }
-        }
-      })
-      
-      // Add right spacer
-      const rightOffset = maxWidth - (row[row.length - 1].scaledX + row[row.length - 1].scaledWidth)
-      if (rightOffset > 5) {
-        rowHtml += `
-                  <td width="${rightOffset}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>`
-      }
-      
-      rowHtml += `
-                </tr>
-              </table>`
-      
-      return rowHtml
     }
     
     // OTHER CLIENTS: Use actual template design with client header
@@ -1319,8 +1199,6 @@ export default function TemplateEditorPage() {
     
     return actualTemplate
   }
-
-
 
   const handleSave = async () => {
     setSaving(true)

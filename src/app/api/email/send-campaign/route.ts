@@ -71,120 +71,79 @@ interface CampaignRequest {
   }
 }
 
-// CORE FIX: Gmail-Compatible HTML Generation - Simplified Approach
-// This is what Mailchimp does - simple vertical stacking that Gmail can handle reliably
+// CORE FIX: True Mailchimp-Style Gmail HTML Generation
+// Pure content extraction - no layout preservation, just vertical content order
 function generateGmailCompatibleHtml(
   elements: EditorElement[], 
   canvasSettings: CanvasSettings,
   templateName: string = 'Email Template'
 ): string {
-  // Sort elements by Y position to maintain visual order (vertical stacking)
+  // Sort elements by Y position to maintain reading order
   const sortedElements = [...elements].sort((a, b) => a.style.position.y - b.style.position.y)
   
-  // Gmail-safe constraints
-  const GMAIL_MAX_WIDTH = 600 // Gmail's recommended max width
-  
-  let html = `<!DOCTYPE html>
-<html lang="en">
+  let html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${templateName}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; width: 100%; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
     <tr>
-      <td align="center" style="padding: 20px 0;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="${GMAIL_MAX_WIDTH}" style="background-color: ${canvasSettings.backgroundColor || '#ffffff'}; max-width: ${GMAIL_MAX_WIDTH}px; margin: 0 auto; min-height: ${Math.round((canvasSettings.height || 800) * (GMAIL_MAX_WIDTH / (canvasSettings.width || 1000)))}px;">`
+      <td align="center" valign="top" style="padding: 20px 0;">
+        <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: ${canvasSettings.backgroundColor || '#ffffff'}; margin: 0 auto;">`
 
-  // Process each element with simple vertical stacking (no complex positioning)
+  // Process each element in pure vertical order - no positioning, just content
   sortedElements.forEach((element) => {
-    // Calculate max width for element (with padding)
-    const maxElementWidth = GMAIL_MAX_WIDTH - 40 // Leave 20px padding on each side
-    const elementWidth = Math.min(element.style.width, maxElementWidth)
-    
-    // Determine text alignment based on element position
-    let alignment = 'center' // Default to center for Gmail compatibility
-    if (element.style.textAlign) {
-      alignment = element.style.textAlign
-    }
+    const { style, content, type } = element
 
-    html += `
-          <tr>
-            <td align="${alignment}" style="padding: 15px 20px;">`
-
-    switch (element.type) {
+    switch (type) {
       case 'text':
-        const textColor = element.style.color || '#000000'
-        const fontSize = Math.min(element.style.fontSize || 14, 24) // Cap font size for Gmail
-        const fontWeight = element.style.fontWeight || 'normal'
-        const fontStyle = element.style.fontStyle || 'normal'
-        const textDecoration = element.style.textDecoration || 'none'
+        const textColor = style.color || '#000000'
+        const fontSize = Math.min(style.fontSize || 14, 18) // Cap for email safety
         
         html += `
-              <div style="
-                font-family: Arial, sans-serif;
-                font-size: ${fontSize}px;
-                color: ${textColor};
-                font-weight: ${fontWeight};
-                font-style: ${fontStyle};
-                text-decoration: ${textDecoration};
-                line-height: 1.4;
-                margin: 0;
-                padding: 0;
-                text-align: ${alignment};
-                max-width: ${maxElementWidth}px;
-                word-wrap: break-word;
-              ">${element.content}</div>`
+          <tr>
+            <td align="left" valign="top" style="padding: 15px 20px; font-family: Arial, sans-serif; font-size: ${fontSize}px; color: ${textColor}; line-height: 1.6;">
+              ${content}
+            </td>
+          </tr>`
         break
 
       case 'heading':
         const headingLevel = element.headingLevel || 1
-        const headingColor = element.style.color || '#000000'
-        const headingSize = Math.min(element.style.fontSize || (32 - (headingLevel - 1) * 4), 36) // Gmail-safe heading sizes
+        const headingColor = style.color || '#000000'
+        const headingSize = Math.min(style.fontSize || (24 - (headingLevel - 1) * 2), 28)
         
         html += `
-              <h${headingLevel} style="
-                font-family: Arial, sans-serif;
-                font-size: ${headingSize}px;
-                color: ${headingColor};
-                font-weight: bold;
-                margin: 0 0 10px 0;
-                padding: 0;
-                text-align: ${alignment};
-                line-height: 1.2;
-                max-width: ${maxElementWidth}px;
-                word-wrap: break-word;
-              ">${element.content}</h${headingLevel}>`
+          <tr>
+            <td align="left" valign="top" style="padding: 20px 20px 10px 20px; font-family: Arial, sans-serif; font-size: ${headingSize}px; color: ${headingColor}; font-weight: bold; line-height: 1.3;">
+              ${content}
+            </td>
+          </tr>`
         break
 
       case 'image':
-        // Gmail-optimized image handling - simple and reliable
-        const imgWidth = Math.min(elementWidth, maxElementWidth)
-        const imgHeight = Math.round((element.style.height / element.style.width) * imgWidth) // Maintain aspect ratio
+        // Simple responsive image - max width 560px for Gmail
+        const imgWidth = Math.min(style.width, 560)
+        const imgHeight = Math.round((style.height / style.width) * imgWidth)
         
         html += `
-              <img src="${element.content}" alt="Email Image" 
+          <tr>
+            <td align="center" valign="top" style="padding: 15px 20px;">
+              <img src="${content}" alt="Email Image" 
                    width="${imgWidth}" 
                    height="${imgHeight}"
-                   style="
-                     display: block;
-                     width: ${imgWidth}px;
-                     height: ${imgHeight}px;
-                     max-width: 100%;
-                     height: auto;
-                     border: 0;
-                     outline: none;
-                     margin: 0 auto;
-                   " />`
+                   style="display: block; max-width: 100%; height: auto; border: 0;" />
+            </td>
+          </tr>`
         break
 
       case 'video':
-        // Gmail doesn't support video - simple clickable thumbnail
-        const videoData = element.videoData
-        
         // Extract proper YouTube thumbnail and URL
-        const videoUrl = videoData?.url || element.content || ''
+        const videoData = element.videoData
+        const videoUrl = videoData?.url || content || ''
         let thumbnailUrl = videoData?.thumbnailUrl
         
         // Extract YouTube thumbnail if URL is provided
@@ -196,101 +155,78 @@ function generateGmailCompatibleHtml(
           }
         }
         
-        // Fallback thumbnail if no URL or not YouTube
+        // Fallback thumbnail
         if (!thumbnailUrl) {
-          thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+          thumbnailUrl = 'https://via.placeholder.com/560x315/000000/FFFFFF/?text=▶+VIDEO'
         }
         
         const videoTitle = videoData?.title || 'Play Video'
-        
-        const videoWidth = Math.min(elementWidth, maxElementWidth)
-        const videoHeight = Math.round(videoWidth * 0.75) // 4:3 aspect ratio
+        const videoWidth = Math.min(style.width, 560)
+        const videoHeight = Math.round(videoWidth * 0.5625) // 16:9 aspect ratio
         
         html += `
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+          <tr>
+            <td align="center" valign="top" style="padding: 15px 20px;">
+              <table border="0" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td>
+                  <td align="center">
                     <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
                       <img src="${thumbnailUrl}" alt="${videoTitle}" 
                            width="${videoWidth}" 
                            height="${videoHeight}"
-                           style="
-                             display: block;
-                             width: ${videoWidth}px;
-                             height: ${videoHeight}px;
-                             border: 3px solid #1a73e8;
-                             margin: 0;
-                           " />
+                           style="display: block; border: 3px solid #1a73e8; border-radius: 8px; max-width: 100%; height: auto;" />
                     </a>
                   </td>
                 </tr>
                 <tr>
-                  <td style="text-align: center; font-size: 14px; color: #1a73e8; padding: 8px 0; font-family: Arial, sans-serif;">
-                    <strong>▶ ${videoTitle}</strong>
-                  </td>
-                </tr>
-              </table>`
-        break
-
-      case 'button':
-        // Gmail-compatible button using VML for Outlook + regular CSS
-        const buttonBg = element.style.backgroundColor || '#0073e6'
-        const buttonColor = element.style.color || '#ffffff'
-        const buttonText = element.content || 'Click Here'
-        const buttonWidth = Math.min(elementWidth, 300) // Max button width
-        
-        html += `
-              <!--[if mso]>
-              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:40px;v-text-anchor:middle;width:${buttonWidth}px;" arcsize="10%" stroke="f" fillcolor="${buttonBg}">
-                <w:anchorlock/>
-                <center style="color:${buttonColor};font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">${buttonText}</center>
-              </v:roundrect>
-              <![endif]-->
-              <!--[if !mso]><!-->
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
-                <tr>
-                  <td style="
-                    background-color: ${buttonBg};
-                    text-align: center;
-                    padding: 12px 24px;
-                    border-radius: 4px;
-                    min-width: ${buttonWidth - 48}px;
-                  ">
-                    <a href="#" style="
-                      color: ${buttonColor};
-                      text-decoration: none;
-                      font-family: Arial, sans-serif;
-                      font-size: 16px;
-                      font-weight: bold;
-                      display: inline-block;
-                      line-height: 1;
-                    ">${buttonText}</a>
+                  <td align="center" style="padding-top: 10px;">
+                    <a href="${videoUrl}" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: #1a73e8; text-decoration: none; font-weight: bold;">
+                      ▶ ${videoTitle}
+                    </a>
                   </td>
                 </tr>
               </table>
-              <!--<![endif]-->`
+            </td>
+          </tr>`
+        break
+
+      case 'button':
+        // Simple Gmail-compatible button
+        const buttonBg = style.backgroundColor || '#0073e6'
+        const buttonColor = style.color || '#ffffff'
+        const buttonText = content || 'Click Here'
+        
+        html += `
+          <tr>
+            <td align="center" valign="top" style="padding: 15px 20px;">
+              <table border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="background-color: ${buttonBg}; border-radius: 6px; padding: 12px 24px;">
+                    <a href="#" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: ${buttonColor}; text-decoration: none; font-weight: bold; display: inline-block;">
+                      ${buttonText}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
         break
 
       case 'divider':
-        const dividerColor = element.style.backgroundColor || '#cccccc'
+        const dividerColor = style.backgroundColor || '#cccccc'
         
         html += `
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: ${maxElementWidth}px; margin: 0 auto;">
+          <tr>
+            <td style="padding: 15px 20px;">
+              <table border="0" cellspacing="0" cellpadding="0" width="100%">
                 <tr>
-                  <td style="
-                    border-top: 2px solid ${dividerColor};
-                    font-size: 0;
-                    line-height: 0;
-                    margin: 10px 0;
-                  ">&nbsp;</td>
+                  <td style="border-top: 2px solid ${dividerColor}; font-size: 0; line-height: 0;">&nbsp;</td>
                 </tr>
-              </table>`
-        break
-    }
-
-    html += `
+              </table>
             </td>
           </tr>`
+        break
+    }
   })
 
   html += `

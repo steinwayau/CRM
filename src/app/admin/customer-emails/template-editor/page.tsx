@@ -29,6 +29,7 @@ interface EditorElement {
     url: string
     videoId?: string
     thumbnailUrl?: string
+    customThumbnail?: string
     title?: string
   }
   buttonData?: {
@@ -787,7 +788,7 @@ export default function TemplateEditorPage() {
     setSelectedElement(null)
   }
 
-  const handleImageUpload = (elementId?: string) => {
+  const handleImageUpload = (elementId?: string, uploadType?: 'image' | 'thumbnail') => {
     if (fileInputRef.current) {
       fileInputRef.current.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0]
@@ -797,43 +798,56 @@ export default function TemplateEditorPage() {
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string
             
-            // Create a temporary image to get actual dimensions
-            const img = new Image()
-            img.onload = () => {
-              const aspectRatio = img.width / img.height
-              
-              // Calculate dimensions maintaining aspect ratio
-              let width = 300 // default width
-              let height = width / aspectRatio
-              
-              // If height is too large, constrain by height instead
-              if (height > 400) {
-                height = 400
-                width = height * aspectRatio
-              }
-              
-              if (elementId) {
-                // Update existing element
-                updateElement(elementId, { content: imageUrl })
-              } else {
-                // Create new element with proper dimensions and auto-stacking position
-                const position = getNextElementPosition('image')
-                const newElement: EditorElement = {
-                  id: Date.now().toString(),
-                  type: 'image',
-                  content: imageUrl,
-                  style: {
-                    position: position,
-                    width: Math.round(width),
-                    height: Math.round(height)
-                  }
+            if (uploadType === 'thumbnail' && elementId) {
+              // Update video thumbnail
+              const element = editorElements.find(el => el.id === elementId)
+              updateElement(elementId, {
+                videoData: {
+                  platform: element?.videoData?.platform || 'custom',
+                  url: element?.videoData?.url || '',
+                  ...element?.videoData,
+                  customThumbnail: imageUrl
                 }
-                setEditorElements([...editorElements, newElement])
-                // Automatically select the new image to show properties panel
-                setSelectedElement(newElement.id)
+              })
+            } else {
+              // Create a temporary image to get actual dimensions
+              const img = new Image()
+              img.onload = () => {
+                const aspectRatio = img.width / img.height
+                
+                // Calculate dimensions maintaining aspect ratio
+                let width = 300 // default width
+                let height = width / aspectRatio
+                
+                // If height is too large, constrain by height instead
+                if (height > 400) {
+                  height = 400
+                  width = height * aspectRatio
+                }
+                
+                if (elementId) {
+                  // Update existing element
+                  updateElement(elementId, { content: imageUrl })
+                } else {
+                  // Create new element with proper dimensions and auto-stacking position
+                  const position = getNextElementPosition('image')
+                  const newElement: EditorElement = {
+                    id: Date.now().toString(),
+                    type: 'image',
+                    content: imageUrl,
+                    style: {
+                      position: position,
+                      width: Math.round(width),
+                      height: Math.round(height)
+                    }
+                  }
+                  setEditorElements([...editorElements, newElement])
+                  // Automatically select the new image to show properties panel
+                  setSelectedElement(newElement.id)
+                }
               }
+              img.src = imageUrl
             }
-            img.src = imageUrl
           }
           reader.readAsDataURL(file)
         }
@@ -927,7 +941,7 @@ export default function TemplateEditorPage() {
           break
         case 'video':
           const videoData = element.videoData
-          const thumbnailUrl = videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
+          const thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
           html += elementHtml + `
             <a href="${content}" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
               <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
@@ -1104,7 +1118,7 @@ export default function TemplateEditorPage() {
             case 'video':
               // Extract proper YouTube thumbnail and URL
               const videoUrl = element.videoData?.url || content || ''
-              let thumbnailUrl = element.videoData?.thumbnailUrl
+              let thumbnailUrl = element.videoData?.customThumbnail || element.videoData?.thumbnailUrl
               
               // Extract YouTube thumbnail if URL is provided
               if (videoUrl && !thumbnailUrl) {
@@ -2139,10 +2153,10 @@ export default function TemplateEditorPage() {
                         overflow: 'hidden'
                       }}
                     >
-                      {element.videoData?.thumbnailUrl ? (
+                      {(element.videoData?.thumbnailUrl || element.videoData?.customThumbnail) ? (
                         <div className="relative w-full h-full">
                           <img
-                            src={element.videoData.thumbnailUrl}
+                            src={element.videoData.customThumbnail || element.videoData.thumbnailUrl}
                             alt={element.videoData.title}
                             style={{
                               width: '100%',
@@ -2427,16 +2441,62 @@ export default function TemplateEditorPage() {
                               <label className="block text-sm font-medium text-gray-700 mb-1">Video Preview</label>
                               <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
                                 <img
-                                  src={element.videoData.thumbnailUrl}
+                                  src={element.videoData.customThumbnail || element.videoData.thumbnailUrl}
                                   alt="Video thumbnail"
                                   className="w-full h-20 object-cover rounded"
                                 />
                                 <p className="text-xs text-gray-600 mt-1">
                                   {element.videoData.platform?.toUpperCase()} Video
+                                  {element.videoData.customThumbnail && (
+                                    <span className="text-green-600 ml-1">(Custom thumbnail)</span>
+                                  )}
                                 </p>
                               </div>
                             </div>
                           )}
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Custom Thumbnail (Optional)</label>
+                            <div className="space-y-2">
+                              <input
+                                type="url"
+                                value={element.videoData?.customThumbnail || ''}
+                                onChange={(e) => updateElement(element.id, {
+                                  videoData: {
+                                    platform: element.videoData?.platform || 'custom',
+                                    url: element.videoData?.url || '',
+                                    ...element.videoData,
+                                    customThumbnail: e.target.value
+                                  }
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                placeholder="https://example.com/custom-thumbnail.jpg"
+                              />
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleImageUpload(element.id, 'thumbnail')}
+                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                                >
+                                  Upload Image
+                                </button>
+                                {element.videoData?.customThumbnail && (
+                                  <button
+                                    onClick={() => updateElement(element.id, {
+                                      videoData: {
+                                        platform: element.videoData?.platform || 'custom',
+                                        url: element.videoData?.url || '',
+                                        ...element.videoData,
+                                        customThumbnail: undefined
+                                      }
+                                    })}
+                                    className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : null}
                     </div>

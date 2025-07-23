@@ -743,7 +743,14 @@ export default function CustomerEmailsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email Template</label>
                 <select
                   value={campaignForm.templateId}
-                  onChange={(e) => setCampaignForm({...campaignForm, templateId: e.target.value})}
+                  onChange={(e) => {
+                    const selectedTemplate = templates.find(t => t.id === e.target.value)
+                    setCampaignForm({
+                      ...campaignForm, 
+                      templateId: e.target.value,
+                      subject: selectedTemplate?.subject || campaignForm.subject
+                    })
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="">Select template</option>
@@ -754,13 +761,18 @@ export default function CustomerEmailsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subject Line</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Subject Line
+                  {campaignForm.templateId && (
+                    <span className="text-xs text-gray-500 ml-2">(Auto-filled from template)</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={campaignForm.subject}
                   onChange={(e) => setCampaignForm({...campaignForm, subject: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Enter email subject"
+                  placeholder={campaignForm.templateId ? "Subject from template" : "Enter email subject"}
                 />
               </div>
 

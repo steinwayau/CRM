@@ -71,16 +71,34 @@ interface CampaignRequest {
   }
 }
 
-// CORE FIX: True Mailchimp-Style Gmail HTML Generation
-// Pure content extraction - no layout preservation, just vertical content order
-function generateGmailCompatibleHtml(
+// Email HTML Generation - CLIENT-SPECIFIC APPROACH
+// GMAIL: Pure content extraction (no layout preservation)
+// OTHER CLIENTS: Preserve visual layout at original dimensions
+
+function generateEmailHtml(
   elements: EditorElement[], 
   canvasSettings: CanvasSettings,
-  templateName: string = 'Email Template'
+  templateName: string = 'Email Template',
+  forGmail: boolean = false
 ): string {
   // Sort elements by Y position to maintain reading order
   const sortedElements = [...elements].sort((a, b) => a.style.position.y - b.style.position.y)
   
+  if (forGmail) {
+    // GMAIL ONLY: Pure content extraction approach
+    return generateGmailSpecificHtml(sortedElements, canvasSettings, templateName)
+  } else {
+    // ALL OTHER CLIENTS: Preserve original design dimensions
+    return generateStandardEmailHtml(sortedElements, canvasSettings, templateName)
+  }
+}
+
+// GMAIL-SPECIFIC: Content extraction only
+function generateGmailSpecificHtml(
+  sortedElements: EditorElement[],
+  canvasSettings: CanvasSettings,
+  templateName: string
+): string {
   let html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -240,6 +258,200 @@ function generateGmailCompatibleHtml(
   return html
 }
 
+// STANDARD EMAIL CLIENTS: Preserve original design dimensions
+function generateStandardEmailHtml(
+  sortedElements: EditorElement[],
+  canvasSettings: CanvasSettings,
+  templateName: string
+): string {
+  // Use ORIGINAL canvas dimensions - NOT constrained to 600px
+  const canvasWidth = canvasSettings.width || 1000
+  const canvasHeight = canvasSettings.height || 800
+  
+  let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${templateName}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <center>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+      <tr>
+        <td align="center" style="padding: 20px 0;">
+          <div style="
+            position: relative; 
+            width: ${canvasWidth}px; 
+            height: ${canvasHeight}px;
+            max-width: ${canvasWidth}px; 
+            background-color: ${canvasSettings.backgroundColor}; 
+            margin: 0 auto;
+            display: block;
+          ">`
+
+  // Render each element with its EXACT positioning and dimensions
+  sortedElements.forEach((element) => {
+    const { style, content, type } = element
+    
+    // Use exact positioning from the visual editor
+    const elementHtml = `
+            <div style="
+              position: absolute;
+              left: ${style.position.x}px;
+              top: ${style.position.y}px;
+              width: ${style.width}px;
+              height: ${style.height}px;
+              ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
+              ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+              ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+              ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
+              ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
+              ${style.color ? `color: ${style.color};` : ''}
+              ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+              ${style.padding ? `padding: ${style.padding}px;` : ''}
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              ${style.textAlign ? `text-align: ${style.textAlign};` : ''}
+              line-height: 1.4;
+              box-sizing: border-box;
+            ">`
+
+    switch (type) {
+      case 'text':
+        html += elementHtml + content + '</div>'
+        break
+      case 'heading':
+        const headingTag = `h${element.headingLevel || 1}`
+        html += elementHtml + `<${headingTag} style="margin: 0; font-size: inherit; font-weight: inherit; color: inherit;">${content}</${headingTag}></div>`
+        break
+      case 'image':
+        html += elementHtml + `<img src="${content}" alt="Email Image" style="
+          width: ${style.width}px;
+          height: ${style.height}px;
+          display: block;
+          border: 0;
+          outline: none;
+          object-fit: cover;
+          ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+        " width="${style.width}" height="${style.height}" /></div>`
+        break
+      case 'video':
+        const videoData = element.videoData
+        const videoUrl = videoData?.url || content || ''
+        let thumbnailUrl = videoData?.thumbnailUrl
+        
+        // Extract YouTube thumbnail if URL is provided
+        if (videoUrl && !thumbnailUrl) {
+          const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+          if (youtubeMatch) {
+            const videoId = youtubeMatch[1]
+            thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+          }
+        }
+        
+        // Fallback thumbnail
+        if (!thumbnailUrl) {
+          thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+        }
+        
+        const videoTitle = videoData?.title || 'Play Video'
+        
+        html += elementHtml + `
+          <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
+            <img src="${thumbnailUrl}" alt="${videoTitle}" style="
+              width: ${style.width}px;
+              height: ${style.height}px;
+              display: block;
+              border: 0;
+              object-fit: cover;
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            " width="${style.width}" height="${style.height}">
+            <div style="
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 48px;
+              height: 48px;
+              background-color: rgba(0, 0, 0, 0.7);
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <div style="
+                width: 0;
+                height: 0;
+                border-left: 16px solid white;
+                border-top: 10px solid transparent;
+                border-bottom: 10px solid transparent;
+                margin-left: 4px;
+              "></div>
+            </div>
+          </a>
+        </div>`
+        break
+      case 'button':
+        html += elementHtml + `
+          <!--[if mso]>
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
+            <w:anchorlock/>
+            <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
+          </v:roundrect>
+          <![endif]-->
+          <!--[if !mso]><!-->
+          <a href="#" style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background-color: ${style.backgroundColor || '#007BFF'};
+            color: ${style.color || '#FFFFFF'};
+            text-decoration: none;
+            border-radius: ${style.borderRadius || 4}px;
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: inherit;
+            text-align: center;
+            box-sizing: border-box;
+          ">${content}</a>
+          <!--<![endif]-->
+        </div>`
+        break
+      case 'divider':
+        html += elementHtml + `<hr style="
+          border: none; 
+          height: ${style.height || 1}px; 
+          background-color: ${style.backgroundColor || '#CCCCCC'}; 
+          margin: 0;
+          width: 100%;
+        " /></div>`
+        break
+    }
+  })
+
+  html += `
+          </div>
+        </td>
+      </tr>
+    </table>
+  </center>
+</body>
+</html>`
+  
+  return html
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Environment validation
@@ -314,14 +526,22 @@ export async function POST(request: NextRequest) {
     for (const batch of batches) {
       try {
         const batchEmails = batch.map(customer => {
-          // CORE FIX: Use Gmail-compatible HTML generation instead of template htmlContent
-          // This is what Mailchimp does - separate email-safe HTML for actual delivery
+          // INTELLIGENT EMAIL GENERATION: Use client-appropriate HTML
           let emailHtml = htmlContent // Fallback to original if no elements available
           
           if (templateElements && templateElements.length > 0 && canvasSettings) {
-            // Generate Gmail-compatible HTML from template elements
-            emailHtml = generateGmailCompatibleHtml(templateElements, canvasSettings, templateName || name)
-            console.log(`Generated Gmail-compatible HTML for customer ${customer.email}`)
+            // Detect email client from email address domain (simple heuristic)
+            const isGmailUser = customer.email.toLowerCase().includes('@gmail.com')
+            
+            // Generate appropriate HTML for email client
+            emailHtml = generateEmailHtml(
+              templateElements, 
+              canvasSettings, 
+              templateName || name,
+              isGmailUser // Only use Gmail generation for Gmail users
+            )
+            
+            console.log(`Generated ${isGmailUser ? 'Gmail-specific' : 'standard'} HTML for ${customer.email}`)
           } else {
             console.log(`Using fallback htmlContent for customer ${customer.email} - template elements not provided`)
           }

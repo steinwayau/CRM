@@ -31,6 +31,10 @@ interface EditorElement {
     thumbnailUrl?: string
     title?: string
   }
+  buttonData?: {
+    url: string
+    openInNewTab: boolean
+  }
   style: {
     position: { x: number; y: number }
     width: number
@@ -255,7 +259,7 @@ export default function TemplateEditorPage() {
         url,
         videoId: youtubeMatch[1],
         thumbnailUrl: `https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg`,
-        title: 'YouTube Video'
+        title: ''
       }
     }
 
@@ -268,7 +272,7 @@ export default function TemplateEditorPage() {
         url,
         videoId: vimeoMatch[1],
         thumbnailUrl: `https://vumbnail.com/${vimeoMatch[1]}.jpg`,
-        title: 'Vimeo Video'
+        title: ''
       }
     }
 
@@ -280,7 +284,7 @@ export default function TemplateEditorPage() {
         platform: 'facebook' as const,
         url,
         videoId: facebookMatch[1],
-        title: 'Facebook Video'
+        title: ''
       }
     }
 
@@ -288,13 +292,13 @@ export default function TemplateEditorPage() {
     return {
       platform: 'custom' as const,
       url,
-      title: 'Custom Video'
+      title: ''
     }
   }
 
   const updateVideoElement = (elementId: string, videoUrl: string, platform?: 'youtube' | 'vimeo' | 'facebook' | 'custom') => {
     const videoData = platform ? 
-      { platform, url: videoUrl, title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video` } :
+      { platform, url: videoUrl, title: '' } :
       extractVideoData(videoUrl)
     
     updateElement(elementId, {
@@ -303,18 +307,30 @@ export default function TemplateEditorPage() {
     })
   }
 
-  // Auto-stacking function to position new elements
+  // Context-aware positioning function to position new elements
   const getNextElementPosition = (elementType: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading') => {
+    const defaultWidth = elementType === 'divider' ? 500 : elementType === 'button' ? 200 : 300
+    
     if (editorElements.length === 0) {
       // First element - center horizontally, start at top with margin
-      const defaultWidth = elementType === 'divider' ? 500 : elementType === 'button' ? 200 : 300
       return {
         x: (canvasSize.width - defaultWidth) / 2,
         y: 30
       }
     }
 
-    // Find the lowest element (highest y + height value)
+    // If an element is selected, position below it
+    if (selectedElement) {
+      const selectedEl = editorElements.find(el => el.id === selectedElement)
+      if (selectedEl) {
+        return {
+          x: (canvasSize.width - defaultWidth) / 2,
+          y: selectedEl.style.position.y + selectedEl.style.height + 20
+        }
+      }
+    }
+
+    // Fallback: Find the lowest element (highest y + height value)
     let lowestY = 0
     editorElements.forEach(element => {
       const elementBottom = element.style.position.y + element.style.height
@@ -324,7 +340,6 @@ export default function TemplateEditorPage() {
     })
 
     // Position new element 20px below the lowest element, centered horizontally
-    const defaultWidth = elementType === 'divider' ? 500 : elementType === 'button' ? 200 : 300
     return {
       x: (canvasSize.width - defaultWidth) / 2,
       y: lowestY + 20
@@ -714,6 +729,7 @@ export default function TemplateEditorPage() {
       type,
       content: getDefaultContent(type),
       headingLevel: type === 'heading' ? 1 : undefined,
+      buttonData: type === 'button' ? { url: '#', openInNewTab: true } : undefined,
       style: {
         position: position,
         width: type === 'divider' ? 500 : type === 'button' ? 200 : 300,
@@ -948,15 +964,17 @@ export default function TemplateEditorPage() {
           </div>`
           break
         case 'button':
+          const buttonUrl = element.buttonData?.url || '#'
+          const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
           html += elementHtml + `
             <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${buttonUrl}" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
               <w:anchorlock/>
               <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
             </v:roundrect>
             <![endif]-->
             <!--[if !mso]><!-->
-            <a href="#" style="
+            <a href="${buttonUrl}" target="${buttonTarget}" style="
               display: flex;
               align-items: center;
               justify-content: center;
@@ -1102,29 +1120,15 @@ export default function TemplateEditorPage() {
                 thumbnailUrl = 'https://via.placeholder.com/560x315/000000/FFFFFF/?text=▶+VIDEO'
               }
               
-              const videoTitle = element.videoData?.title || 'Play Video'
               const videoWidth = Math.min(style.width, 560)
               const videoHeight = Math.round(videoWidth * 0.5625) // 16:9 aspect ratio
               
               gmailHtml += `
           <tr>
             <td align="center" valign="top" style="padding: 15px 20px;">
-              <table border="0" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-                    <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
-                      <img src="${thumbnailUrl}" alt="${videoTitle}" width="${videoWidth}" height="${videoHeight}" style="display: block; border: 3px solid #1a73e8; border-radius: 8px; max-width: 100%; height: auto;">
-                    </a>
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding-top: 10px;">
-                    <a href="${videoUrl}" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: #1a73e8; text-decoration: none; font-weight: bold;">
-                      ▶ ${videoTitle}
-                    </a>
-                  </td>
-                </tr>
-              </table>
+              <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+                <img src="${thumbnailUrl}" alt="Video" width="${videoWidth}" height="${videoHeight}" style="display: block; border: 3px solid #1a73e8; border-radius: 8px; max-width: 100%; height: auto;">
+              </a>
             </td>
           </tr>`
               break
@@ -1133,6 +1137,8 @@ export default function TemplateEditorPage() {
               const buttonBg = style.backgroundColor || '#0073e6'
               const buttonColor = style.color || '#ffffff'
               const buttonText = content || 'Click Here'
+              const buttonUrl = element.buttonData?.url || '#'
+              const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
               
               gmailHtml += `
           <tr>
@@ -1140,7 +1146,7 @@ export default function TemplateEditorPage() {
               <table border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="center" style="background-color: ${buttonBg}; border-radius: 6px; padding: 12px 24px;">
-                    <a href="#" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: ${buttonColor}; text-decoration: none; font-weight: bold; display: inline-block;">
+                    <a href="${buttonUrl}" target="${buttonTarget}" style="font-family: Arial, sans-serif; font-size: 16px; color: ${buttonColor}; text-decoration: none; font-weight: bold; display: inline-block;">
                       ${buttonText}
                     </a>
                   </td>
@@ -2152,11 +2158,7 @@ export default function TemplateEditorPage() {
                               </svg>
                             </div>
                           </div>
-                          <div className="absolute bottom-2 left-2 right-2">
-                            <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-                              {element.videoData.platform?.toUpperCase()} • {element.videoData.title}
-                            </div>
-                          </div>
+                          {/* Removed video platform/title labels */}
                         </div>
                       ) : (
                         <div className="text-center">
@@ -2344,12 +2346,20 @@ export default function TemplateEditorPage() {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                      {element.type === 'text' || element.type === 'heading' || element.type === 'button' ? (
+                      {element.type === 'text' || element.type === 'heading' ? (
                         <textarea
                           value={element.content}
                           onChange={(e) => updateElement(element.id, { content: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           rows={3}
+                        />
+                      ) : element.type === 'button' ? (
+                        <input
+                          type="text"
+                          value={element.content}
+                          onChange={(e) => updateElement(element.id, { content: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          placeholder="Button text"
                         />
                       ) : element.type === 'image' ? (
                         <div className="space-y-2">
@@ -2422,7 +2432,7 @@ export default function TemplateEditorPage() {
                                   className="w-full h-20 object-cover rounded"
                                 />
                                 <p className="text-xs text-gray-600 mt-1">
-                                  {element.videoData.platform?.toUpperCase()} • {element.videoData.title}
+                                  {element.videoData.platform?.toUpperCase()} Video
                                 </p>
                               </div>
                             </div>
@@ -2430,6 +2440,44 @@ export default function TemplateEditorPage() {
                         </div>
                       ) : null}
                     </div>
+                    
+                    {/* Button Link Properties */}
+                    {element.type === 'button' && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Button URL</label>
+                          <input
+                            type="url"
+                            value={element.buttonData?.url || ''}
+                            onChange={(e) => updateElement(element.id, { 
+                              buttonData: { 
+                                ...element.buttonData,
+                                url: e.target.value,
+                                openInNewTab: element.buttonData?.openInNewTab ?? true
+                              } 
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            placeholder="https://example.com"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={element.buttonData?.openInNewTab ?? true}
+                            onChange={(e) => updateElement(element.id, { 
+                              buttonData: { 
+                                ...element.buttonData,
+                                url: element.buttonData?.url || '#',
+                                openInNewTab: e.target.checked
+                              } 
+                            })}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                          <label className="ml-2 text-sm text-gray-700">Open in new tab</label>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="grid grid-cols-2 gap-2">
                       <div>

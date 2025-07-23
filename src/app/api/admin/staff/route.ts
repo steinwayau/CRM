@@ -29,11 +29,67 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const emailFormat = searchParams.get('email_format') === 'true'
     
+    console.log('Staff API: Attempting to query staff table...')
+    
+    // First, let's check if the table exists
+    const tableCheck = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'staff'
+      )
+    `
+    
+    console.log('Staff table exists:', tableCheck.rows[0]?.exists)
+    
+    if (!tableCheck.rows[0]?.exists) {
+      console.log('Staff table does not exist, creating it...')
+      
+      // Create the staff table based on Prisma schema
+      await sql`
+        CREATE TABLE staff (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) UNIQUE NOT NULL,
+          email VARCHAR(255) UNIQUE,
+          role VARCHAR(100),
+          "isActive" BOOLEAN DEFAULT true,
+          phone VARCHAR(50),
+          position VARCHAR(100),
+          department VARCHAR(100),
+          "startDate" TIMESTAMP,
+          "endDate" TIMESTAMP,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          "updatedAt" TIMESTAMP DEFAULT NOW()
+        )
+      `
+      
+      console.log('Staff table created successfully')
+      
+      // Insert default staff members from the hardcoded list
+      const defaultStaff = [
+        'June', 'Chris', 'Mike', 'Alison', 'Angela', 
+        'Olivia', 'Mark', 'Louie', 'Day', 'Hendra'
+      ]
+      
+      for (const staffName of defaultStaff) {
+        const email = staffName.toLowerCase() + '@epgpianos.com.au'
+        await sql`
+          INSERT INTO staff (name, email, role, "isActive", "createdAt", "updatedAt")
+          VALUES (${staffName}, ${email}, 'staff', true, NOW(), NOW())
+          ON CONFLICT (name) DO NOTHING
+        `
+      }
+      
+      console.log(`Inserted ${defaultStaff.length} default staff members`)
+    }
+    
     const result = await sql`
-      SELECT id, name, email, "isActive", created_at, updated_at
+      SELECT id, name, email, "isActive", "createdAt", "updatedAt"
       FROM staff 
       ORDER BY id ASC
     `
+    
+    console.log(`Found ${result.rows.length} staff members`)
     
     let staffList
     
@@ -66,9 +122,12 @@ export async function GET(request: NextRequest) {
       staff: staffList
     })
   } catch (error) {
-    console.error('Database error:', error)
+    console.error('Staff API Database error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch staff from database' },
+      { 
+        error: 'Failed to fetch staff from database',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

@@ -174,34 +174,8 @@ export default function CustomerEmailsPage() {
       // Load templates from localStorage
       const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
       
-      // If no saved templates, create sample ones
-      if (savedTemplates.length === 0) {
-        const sampleTemplates: EmailTemplate[] = [
-          {
-            id: '1',
-            name: 'Welcome Newsletter',
-            subject: 'Welcome to Exclusive Piano Group',
-            htmlContent: '<h1>Welcome!</h1><p>Thank you for your interest in our pianos...</p>',
-            textContent: 'Welcome! Thank you for your interest in our pianos...',
-            type: 'newsletter',
-            createdAt: '2024-01-15T10:00:00Z'
-          },
-          {
-            id: '2',
-            name: 'New Arrivals Promotion',
-            subject: 'New Steinway & Sons Pianos Just Arrived',
-            htmlContent: '<h1>New Arrivals</h1><p>Discover our latest piano collection...</p>',
-            textContent: 'New Arrivals: Discover our latest piano collection...',
-            type: 'promotional',
-            createdAt: '2024-01-10T14:30:00Z'
-          }
-        ]
-        
-        localStorage.setItem('emailTemplates', JSON.stringify(sampleTemplates))
-        setTemplates(sampleTemplates)
-      } else {
-        setTemplates(savedTemplates)
-      }
+      // Set templates from localStorage (no auto-creation of defaults)
+      setTemplates(savedTemplates)
       
           // Load campaigns from localStorage - no more fake data
       const savedCampaigns = JSON.parse(localStorage.getItem('emailCampaigns') || '[]')

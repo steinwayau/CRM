@@ -37,6 +37,11 @@ export default function StaffManagementPage() {
   const [activeTab, setActiveTab] = useState<'credentials' | 'emails'>('credentials')
   const [emailData, setEmailData] = useState<{[key: number]: string}>({})
   const [isUpdatingEmails, setIsUpdatingEmails] = useState(false)
+  
+  // Bulk selection state
+  const [selectedStaff, setSelectedStaff] = useState<Set<number>>(new Set())
+  const [selectAll, setSelectAll] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     fetchStaff()
@@ -253,6 +258,70 @@ export default function StaffManagementPage() {
     }
   }
 
+  // Bulk selection functions
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedStaff(new Set())
+    } else {
+      setSelectedStaff(new Set(staff.map(member => member.id)))
+    }
+    setSelectAll(!selectAll)
+  }
+
+  const toggleSelectStaff = (id: number) => {
+    const newSelected = new Set(selectedStaff)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedStaff(newSelected)
+    setSelectAll(newSelected.size === staff.length)
+  }
+
+  const bulkDeleteStaff = async (permanent: boolean = false) => {
+    if (selectedStaff.size === 0) return
+
+    const action = permanent ? 'permanently delete' : 'deactivate'
+    const warning = permanent 
+      ? `This will PERMANENTLY REMOVE ${selectedStaff.size} staff members from the database. This action cannot be undone!`
+      : `This will deactivate ${selectedStaff.size} staff accounts but preserve all their data.`
+    
+    if (!confirm(`Are you sure you want to ${action} ${selectedStaff.size} staff members? ${warning}`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    setError('')
+
+    try {
+      const deletePromises = Array.from(selectedStaff).map(id => {
+        const url = permanent 
+          ? `/api/admin/staff?id=${id}&permanent=true`
+          : `/api/admin/staff?id=${id}`
+        
+        return fetch(url, { method: 'DELETE' })
+      })
+
+      const results = await Promise.all(deletePromises)
+      const successCount = results.filter(r => r.ok).length
+      const failureCount = results.length - successCount
+
+      if (successCount > 0) {
+        alert(`Successfully ${permanent ? 'deleted' : 'deactivated'} ${successCount} staff members${failureCount > 0 ? `. ${failureCount} failed.` : '.'}`)
+        setSelectedStaff(new Set())
+        setSelectAll(false)
+        fetchStaff() // Refresh the list
+      } else {
+        setError(`Failed to ${action} staff members`)
+      }
+    } catch (error) {
+      setError(`Network error ${action.replace('ing', '')}ing staff`)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const togglePasswordVisibility = (id: number) => {
     const newVisiblePasswords = new Set(visiblePasswords)
     if (newVisiblePasswords.has(id)) {
@@ -387,14 +456,38 @@ export default function StaffManagementPage() {
         {/* Staff List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {activeTab === 'credentials' ? 'Staff Credentials' : 'Staff Email Addresses'}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {activeTab === 'credentials' 
-                ? `Total: ${staff.length} staff members` 
-                : `Manage email addresses for ${staff.length} staff members`}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {activeTab === 'credentials' ? 'Staff Credentials' : 'Staff Email Addresses'}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {activeTab === 'credentials' 
+                    ? `Total: ${staff.length} staff members${selectedStaff.size > 0 ? ` (${selectedStaff.size} selected)` : ''}` 
+                    : `Manage email addresses for ${staff.length} staff members`}
+                </p>
+              </div>
+              
+              {/* Bulk Actions */}
+              {activeTab === 'credentials' && selectedStaff.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => bulkDeleteStaff(false)}
+                    disabled={isDeleting}
+                    className="px-3 py-2 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deactivating...' : `Deactivate ${selectedStaff.size}`}
+                  </button>
+                  <button
+                    onClick={() => bulkDeleteStaff(true)}
+                    disabled={isDeleting}
+                    className="px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting...' : `Delete ${selectedStaff.size}`}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Credential Management View */}
@@ -403,6 +496,14 @@ export default function StaffManagementPage() {
               <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Staff Member
                   </th>
@@ -426,6 +527,14 @@ export default function StaffManagementPage() {
               <tbody className="divide-y divide-gray-200">
                 {staff.map((member) => (
                   <tr key={member.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedStaff.has(member.id)}
+                        onChange={() => toggleSelectStaff(member.id)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     
     // Check if tables exist and have data
     const [campaigns, opens, clicks] = await Promise.all([
-      sql`SELECT id, name, sent_count, status, created_at FROM email_campaigns LIMIT 10`.catch((e: any) => ({ error: 'EmailCampaign table error', details: e.message })),
+      sql`SELECT id, name, "sentCount", status, "createdAt" FROM email_campaigns LIMIT 10`.catch((e: any) => ({ error: 'EmailCampaign table error', details: e.message })),
       
       // Use raw SQL since Prisma schema may not match database
       sql`SELECT id, campaign_id, recipient_email, opened_at FROM email_opens LIMIT 10`.catch((e: any) => ({ error: 'EmailOpen table error', details: e.message })),

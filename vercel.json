@@ -4,7 +4,7 @@
   "installCommand": "npm install",
   "github": {
     "enabled": true,
-    "autoAlias": false
+    "autoAlias": true
   },
   "git": {
     "deploymentEnabled": {

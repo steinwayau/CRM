@@ -12,16 +12,16 @@ export async function GET(request: NextRequest) {
     const recipientId = searchParams.get('r')
     const linkId = searchParams.get('l')
     const url = searchParams.get('url')
+    const linkType = searchParams.get('type') || 'text-link'
     const timestamp = new Date().toISOString()
     
-    // Process tracking data asynchronously before redirect
+    // SYNC FIX: Process tracking synchronously before redirect
     if (campaignId && recipientId) {
-      setImmediate(async () => {
-        try {
-          // Get recipient email from customer database
-          let recipientEmail = ''
-          if (recipientId && recipientId !== '-1') {
-            // Query customer database for real recipients
+      try {
+        // Get recipient email from customer database
+        let recipientEmail = ''
+        if (recipientId && recipientId !== '-1') {
+          try {
             const customerResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'}/api/enquiries`)
             if (customerResponse.ok) {
               const customers = await customerResponse.json()
@@ -30,50 +30,65 @@ export async function GET(request: NextRequest) {
                 recipientEmail = customer.email
               }
             }
+          } catch (error) {
+            console.error('Error fetching customer data for click tracking:', error)
           }
-          
-          // If no email found, it might be a custom email recipient, skip database tracking
-          if (!recipientEmail) {
-            console.log('Email click tracked (no database record - custom recipient):', {
-              campaignId,
-              recipientId,
-              url,
-              timestamp,
-              userAgent: request.headers.get('user-agent'),
-              ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')
-            })
-            return
+        }
+        
+        // TRACKING FIX: For custom recipients, get email from campaign data
+        if (!recipientEmail) {
+          try {
+            const campaignResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'}/api/admin/campaigns`)
+            if (campaignResponse.ok) {
+              const campaigns = await campaignResponse.json()
+              const campaign = campaigns.find((c: any) => c.id === campaignId)
+              if (campaign && campaign.textContent) {
+                // For custom campaigns, textContent contains the email addresses
+                const emails = campaign.textContent.split(',').map((e: string) => e.trim())
+                if (emails.length > 0) {
+                  recipientEmail = emails[0] // Use first email for tracking
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching campaign for custom recipient email:', error)
           }
-
-          // Save email click to database (simplified for now)
-          console.log(`Email click would be saved to database:`, {
-            campaignId,
-            recipientEmail,
-            targetUrl: url,
-            timestamp
-          })
-
-          console.log(`Email click tracked and saved to database:`, {
-            campaignId,
-            recipientId,
-            recipientEmail,
-            targetUrl: url,
-            timestamp
-          })
-
-        } catch (error) {
-          console.error('Error saving email click to database:', error)
-          // Log the tracking event even if database save fails
-          console.log(`Email click tracked (database save failed):`, {
+        }
+        
+        // If still no email found, skip tracking but log clearly
+        if (!recipientEmail) {
+          console.log('❌ Email click tracking SKIPPED - no recipient email found:', {
             campaignId,
             recipientId,
             url,
-            timestamp,
-            userAgent: request.headers.get('user-agent'),
-            ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')
+            timestamp
+          })
+        } else {
+          // Save email click to database - NOW SYNCHRONOUS
+          await prisma.emailClick.create({
+            data: {
+              campaignId: campaignId,
+              recipientEmail: recipientEmail,
+              targetUrl: url || '',
+              userAgent: request.headers.get('user-agent') || '',
+              ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''
+            }
+          })
+
+          console.log(`✅ Email click tracked and saved to database:`, {
+            campaignId,
+            recipientId,
+            recipientEmail,
+            targetUrl: url,
+            linkType,
+            timestamp
           })
         }
-      })
+
+      } catch (error) {
+        console.error('❌ CRITICAL: Email click tracking database error:', error)
+        console.error('Full error details:', JSON.stringify(error, null, 2))
+      }
     }
 
     // Redirect to the intended URL
@@ -110,7 +125,7 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('Click tracking error:', error)
+    console.error('❌ CRITICAL: Click tracking endpoint error:', error)
     
     // Try to redirect anyway if URL is provided
     const { searchParams } = new URL(request.url)

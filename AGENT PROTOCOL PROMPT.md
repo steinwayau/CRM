@@ -46,8 +46,12 @@ WAIT FOR EXPLICIT "YES" BEFORE DOING ANYTHING
   Task: [Brief description of what was implemented/fixed in this task]
   ```
 
-🚨 CRITICAL: VERCEL CLI USAGE - USE NPX VERCEL --PROD 🚨
-- ALWAYS use `npx vercel --prod` for deployments (NOT just GitHub integration)
+🚨 CRITICAL: DEPLOYMENT PROTOCOL - READ DEPLOYMENT_PROTOCOL.md 🚨
+- BEFORE ANY DEPLOYMENT: Read DEPLOYMENT_PROTOCOL.md for complete instructions
+- ONLY COMMAND ALLOWED: `npx vercel --prod` 
+- ANY OTHER DEPLOYMENT METHOD = INSTANT TERMINATION
+- Previous agents deployed to wrong accounts, wrong environments - DON'T REPEAT
+- VERIFY deployment shows "Production: https://crm.steinway.com.au" or IT FAILED
 - NEVER attempt global Vercel CLI installation (`npm install -g vercel`)
 - The command `vercel` without `npx` will fail with "command not found"
 - This is the CORRECT deployment command: `npx vercel --prod`
@@ -197,6 +201,75 @@ Signs you're running out of memory:
 
 If you notice these signs, tell me immediately so I can start a new agent. 
 
+🔧 SYSTEMATIC DEBUGGING METHODOLOGY - MANDATORY FOR ALL ISSUES 🔧
+
+⚠️ CRITICAL LESSON FROM AGENT #49 ANALYTICS FAILURE ⚠️
+Agent #49 spent HOURS trying to "patch" symptoms instead of diagnosing root causes.
+DO NOT REPEAT THESE MISTAKES:
+
+🚫 FAILED APPROACH - DO NOT USE:
+- ❌ Making assumptions about existing code working correctly
+- ❌ Trying to "fix" symptoms without understanding root cause  
+- ❌ Deploying changes without validating they actually work
+- ❌ Patching individual components without understanding data flow
+- ❌ Using Prisma queries when database schema might be wrong
+- ❌ Building on broken foundations
+
+✅ CORRECT DEBUGGING METHODOLOGY - MANDATORY:
+
+1. **📋 COMPLETE SYSTEM AUDIT FIRST**
+   - Create debug endpoints to check database state
+   - Verify database schema matches Prisma schema  
+   - Test each API endpoint individually
+   - Check environment variables are correct
+   - Verify all required tables/columns exist
+
+2. **🔍 TRACE COMPLETE DATA FLOW**
+   - Map out entire user journey step by step
+   - Follow data from input → processing → storage → retrieval → display
+   - Identify WHERE in the flow the break occurs
+   - Use console.log at each step to track data transformation
+
+3. **🧪 BUILD DEBUG TOOLS FIRST**
+   - Create debug endpoints that show raw database state
+   - Add extensive logging to track data through each step
+   - Test with simplest possible scenarios first
+   - Validate each component works in isolation
+
+4. **✅ VALIDATE EVERY ASSUMPTION**
+   - NEVER assume existing code works correctly
+   - NEVER assume database schema is correct
+   - NEVER assume environment variables are set
+   - NEVER assume APIs are saving data properly
+   - TEST each assumption independently
+
+5. **🎯 FIX ROOT CAUSE, NOT SYMPTOMS**
+   - If analytics don't show data, don't just fix the display
+   - Find out WHY there's no data (creation? storage? retrieval?)
+   - Fix the actual broken component, not the UI showing the break
+   - Start from the beginning of the data flow, not the end
+
+6. **🔄 TEST SYSTEMATICALLY**
+   - Fix ONE component at a time
+   - Test each fix thoroughly before moving to next
+   - Use debug endpoints to verify fixes work
+   - Don't combine multiple fixes in one deployment
+
+EXAMPLE - ANALYTICS DEBUGGING WORKFLOW:
+1. ✅ Check if database tables exist and have correct schema
+2. ✅ Check if campaigns are being saved to database properly  
+3. ✅ Check if campaign sending updates database status
+4. ✅ Check if tracking URLs are generating correctly
+5. ✅ Check if opens/clicks are being saved to database
+6. ✅ Check if analytics API retrieves data correctly
+7. ✅ Check if frontend displays data correctly
+
+EVIDENCE REQUIRED FOR "IT'S FIXED" CLAIMS:
+- ✅ Debug endpoint showing correct database state
+- ✅ Console logs showing successful data flow
+- ✅ End-to-end user test showing working functionality
+- ✅ Data persists after page refresh/browser restart
+
 ❗ REMEMBER: 
 Previous agents broke systems by: 
 - Corrupting database data 
@@ -204,7 +277,8 @@ Previous agents broke systems by:
 - Never testing on live system 
 - Providing wrong commit information 
 - Breaking working features 
-- DOING SHALLOW AUDITS instead of comprehensive user testing 
+- DOING SHALLOW AUDITS instead of comprehensive user testing
+- **PATCHING SYMPTOMS INSTEAD OF FIXING ROOT CAUSES**
 
 Don't be another failed agent. Follow this protocol exactly. 
 

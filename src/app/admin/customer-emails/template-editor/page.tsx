@@ -77,6 +77,9 @@ export default function TemplateEditorPage() {
 
   const [previewMode, setPreviewMode] = useState(false)
   const [selectedEmailClient, setSelectedEmailClient] = useState<'gmail' | 'outlook' | 'apple' | 'generic'>('gmail')
+  const [showGmailConstraints, setShowGmailConstraints] = useState(true)
+  const [gmailSafeMode, setGmailSafeMode] = useState(true)
+  const [designWarnings, setDesignWarnings] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState<{elementId: string, property: string} | null>(null)
   const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(() => {
@@ -98,6 +101,39 @@ export default function TemplateEditorPage() {
   // Add state for in-line text editing
   const [editingTextElement, setEditingTextElement] = useState<string | null>(null)
   const [tempTextContent, setTempTextContent] = useState<string>('')
+
+  // Gmail design validation - Only show warnings when Gmail Safe Mode is enabled
+  const validateGmailDesign = () => {
+    if (!gmailSafeMode) {
+      setDesignWarnings([])
+      return
+    }
+    
+    const warnings: string[] = []
+    
+    // Only check for side-by-side elements when Gmail Safe Mode is enabled
+    const elementsByRow: { [key: number]: EditorElement[] } = {}
+    editorElements.forEach(element => {
+      const y = Math.round(element.style.position.y / 50) * 50 // Group by 50px rows
+      if (!elementsByRow[y]) elementsByRow[y] = []
+      elementsByRow[y].push(element)
+    })
+    
+    Object.entries(elementsByRow).forEach(([y, elements]) => {
+      if (elements.length > 1) {
+        warnings.push(`${elements.length} elements side-by-side will stack vertically in Gmail`)
+      }
+    })
+    
+    setDesignWarnings(warnings)
+  }
+
+  // Run validation when elements or canvas change
+  useEffect(() => {
+    if (gmailSafeMode) {
+      validateGmailDesign()
+    }
+  }, [editorElements, canvasSize, gmailSafeMode])
   
   // Use refs for drag state to avoid timing issues with state updates
   const dragStateRef = useRef({
@@ -689,35 +725,76 @@ export default function TemplateEditorPage() {
   // Load existing template if editing
   useEffect(() => {
     if (isEditing && templateId) {
-      // In a real app, you'd fetch from your API
-      // For now, we'll use localStorage to simulate
-      const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-      const template = savedTemplates.find((t: EmailTemplate) => t.id === templateId)
-      
-      if (template) {
-        setTemplateForm({
-          name: template.name,
-          subject: template.subject,
-          type: template.type
-        })
-        
-        // Load elements directly if available, otherwise fallback to HTML parsing
-        if (template.elements && Array.isArray(template.elements)) {
-          setEditorElements(template.elements)
-          
-          // Load canvas settings if available
-          if (template.canvasSettings) {
-            setCanvasSize({
-              width: template.canvasSettings.width,
-              height: template.canvasSettings.height
-            })
-            setCanvasBackgroundColor(template.canvasSettings.backgroundColor)
+      // Load template from database first, fallback to localStorage
+      const loadTemplate = async () => {
+        try {
+          // Try database first
+          const response = await fetch('/api/admin/templates')
+          if (response.ok) {
+            const dbTemplates = await response.json()
+            const template = dbTemplates.find((t: EmailTemplate) => t.id === templateId)
+            
+            if (template) {
+              setTemplateForm({
+                name: template.name,
+                subject: template.subject,
+                type: template.type
+              })
+              
+              // Load elements directly if available, otherwise fallback to HTML parsing
+              if (template.elements && Array.isArray(template.elements)) {
+                setEditorElements(template.elements)
+                
+                // Load canvas settings if available
+                if (template.canvasSettings) {
+                  setCanvasSize({
+                    width: template.canvasSettings.width,
+                    height: template.canvasSettings.height
+                  })
+                  setCanvasBackgroundColor(template.canvasSettings.backgroundColor)
+                }
+              } else {
+                // Fallback to HTML parsing for older templates
+                loadElementsFromHtml(template.htmlContent)
+              }
+              return
+            }
           }
-        } else {
-          // Fallback to HTML parsing for older templates
-          loadElementsFromHtml(template.htmlContent)
+        } catch (error) {
+          console.error('Error loading template from database:', error)
+        }
+        
+        // Fallback to localStorage if database fails
+        const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+        const template = savedTemplates.find((t: EmailTemplate) => t.id === templateId)
+        
+        if (template) {
+          setTemplateForm({
+            name: template.name,
+            subject: template.subject,
+            type: template.type
+          })
+          
+          // Load elements directly if available, otherwise fallback to HTML parsing
+          if (template.elements && Array.isArray(template.elements)) {
+            setEditorElements(template.elements)
+            
+            // Load canvas settings if available
+            if (template.canvasSettings) {
+              setCanvasSize({
+                width: template.canvasSettings.width,
+                height: template.canvasSettings.height
+              })
+              setCanvasBackgroundColor(template.canvasSettings.backgroundColor)
+            }
+          } else {
+            // Fallback to HTML parsing for older templates
+            loadElementsFromHtml(template.htmlContent)
+          }
         }
       }
+      
+      loadTemplate()
     }
   }, [isEditing, templateId])
 
@@ -788,15 +865,27 @@ export default function TemplateEditorPage() {
     setSelectedElement(null)
   }
 
-  const handleImageUpload = (elementId?: string, uploadType?: 'image' | 'thumbnail') => {
+  const handleImageUpload = async (elementId?: string, uploadType?: 'image' | 'thumbnail') => {
     if (fileInputRef.current) {
-      fileInputRef.current.onchange = (e) => {
+      fileInputRef.current.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0]
         if (file) {
-          // Create a data URL for the image
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string
+          try {
+            // Upload to Cloudinary instead of creating data URLs
+            const formData = new FormData()
+            formData.append('image', file)
+            
+            const response = await fetch('/api/upload/image', {
+              method: 'POST',
+              body: formData
+            })
+            
+            if (!response.ok) {
+              throw new Error('Upload failed')
+            }
+            
+            const result = await response.json()
+            const imageUrl = result.url // This is now a Cloudinary HTTPS URL!
             
             if (uploadType === 'thumbnail' && elementId) {
               // Update video thumbnail
@@ -810,46 +899,103 @@ export default function TemplateEditorPage() {
                 }
               })
             } else {
-              // Create a temporary image to get actual dimensions
-              const img = new Image()
-              img.onload = () => {
-                const aspectRatio = img.width / img.height
-                
-                // Calculate dimensions maintaining aspect ratio
-                let width = 300 // default width
-                let height = width / aspectRatio
-                
-                // If height is too large, constrain by height instead
-                if (height > 400) {
-                  height = 400
-                  width = height * aspectRatio
+              // Use Cloudinary dimensions or calculate from aspect ratio
+              let width = result.width || 300
+              let height = result.height || 200
+              
+              // Scale down if too large for editor
+              const maxWidth = 400
+              const maxHeight = 400
+              
+              if (width > maxWidth || height > maxHeight) {
+                const scaleX = maxWidth / width
+                const scaleY = maxHeight / height
+                const scale = Math.min(scaleX, scaleY)
+                width = Math.round(width * scale)
+                height = Math.round(height * scale)
+              }
+              
+              if (elementId) {
+                // Update existing element
+                updateElement(elementId, { content: imageUrl })
+              } else {
+                // Create new element with proper dimensions and FIXED centering
+                const position = getNextElementPosition('image')
+                const newElement: EditorElement = {
+                  id: Date.now().toString(),
+                  type: 'image',
+                  content: imageUrl,
+                  style: {
+                    position: {
+                      x: Math.round((canvasSize.width - width) / 2), // PROPERLY CENTERED
+                      y: position.y
+                    },
+                    width: width,
+                    height: height
+                  }
                 }
+                setEditorElements([...editorElements, newElement])
+                // Automatically select the new image to show properties panel
+                setSelectedElement(newElement.id)
+              }
+            }
+                      } catch (error) {
+              console.error('Cloudinary upload failed, using fallback:', error)
+              // FALLBACK: Use data URL if Cloudinary fails
+              const reader = new FileReader()
+              reader.onload = (e) => {
+                const imageUrl = e.target?.result as string
+                console.log('📁 Using data URL fallback (temporary)')
                 
-                if (elementId) {
-                  // Update existing element
-                  updateElement(elementId, { content: imageUrl })
+                if (uploadType === 'thumbnail' && elementId) {
+                  const element = editorElements.find(el => el.id === elementId)
+                  updateElement(elementId, {
+                    videoData: {
+                      platform: element?.videoData?.platform || 'custom',
+                      url: element?.videoData?.url || '',
+                      ...element?.videoData,
+                      customThumbnail: imageUrl
+                    }
+                  })
                 } else {
-                  // Create new element with proper dimensions and auto-stacking position
-                  const position = getNextElementPosition('image')
-                  const newElement: EditorElement = {
-                    id: Date.now().toString(),
-                    type: 'image',
-                    content: imageUrl,
-                    style: {
-                      position: position,
-                      width: Math.round(width),
-                      height: Math.round(height)
+                  // Create a temporary image to get actual dimensions
+                  const img = new Image()
+                  img.onload = () => {
+                    const aspectRatio = img.width / img.height
+                    let width = 300
+                    let height = width / aspectRatio
+                    
+                    if (height > 400) {
+                      height = 400
+                      width = height * aspectRatio
+                    }
+                    
+                    if (elementId) {
+                      updateElement(elementId, { content: imageUrl })
+                    } else {
+                      const position = getNextElementPosition('image')
+                      const newElement: EditorElement = {
+                        id: Date.now().toString(),
+                        type: 'image',
+                        content: imageUrl,
+                        style: {
+                          position: {
+                            x: Math.round((canvasSize.width - Math.round(width)) / 2), // PROPERLY CENTERED
+                            y: position.y
+                          },
+                          width: Math.round(width),
+                          height: Math.round(height)
+                        }
+                      }
+                      setEditorElements([...editorElements, newElement])
+                      setSelectedElement(newElement.id)
                     }
                   }
-                  setEditorElements([...editorElements, newElement])
-                  // Automatically select the new image to show properties panel
-                  setSelectedElement(newElement.id)
+                  img.src = imageUrl
                 }
               }
-              img.src = imageUrl
+              reader.readAsDataURL(file)
             }
-          }
-          reader.readAsDataURL(file)
         }
       }
       fileInputRef.current.click()
@@ -1239,16 +1385,34 @@ export default function TemplateEditorPage() {
         createdAt: new Date().toISOString()
       }
 
-      // Save to localStorage (in real app, you'd save to your API)
-      const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-      
-      if (isEditing) {
-        const updatedTemplates = savedTemplates.map((t: EmailTemplate) => 
-          t.id === templateId ? templateData : t
-        )
-        localStorage.setItem('emailTemplates', JSON.stringify(updatedTemplates))
-      } else {
-        localStorage.setItem('emailTemplates', JSON.stringify([templateData, ...savedTemplates]))
+      // Save to database first
+      try {
+        const method = isEditing ? 'PUT' : 'POST'
+        const response = await fetch('/api/admin/templates', {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(templateData)
+        })
+
+        if (!response.ok) {
+          throw new Error('Database save failed')
+        }
+      } catch (dbError) {
+        console.error('Database save failed, falling back to localStorage:', dbError)
+        
+        // Fallback to localStorage if database fails
+        const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+        
+        if (isEditing) {
+          const updatedTemplates = savedTemplates.map((t: EmailTemplate) => 
+            t.id === templateId ? templateData : t
+          )
+          localStorage.setItem('emailTemplates', JSON.stringify(updatedTemplates))
+        } else {
+          localStorage.setItem('emailTemplates', JSON.stringify([templateData, ...savedTemplates]))
+        }
       }
 
       // Redirect back to templates page
@@ -1608,9 +1772,9 @@ export default function TemplateEditorPage() {
                       onChange={(e) => setCanvasSize({...canvasSize, width: parseInt(e.target.value)})}
                       className="px-2 py-1 border border-gray-300 rounded text-sm"
                     >
-                      <option value="600">600px (Mobile)</option>
-                      <option value="800">800px (Tablet)</option>
-                      <option value="1000">1000px (Desktop)</option>
+                      <option value="600">600px (Compact)</option>
+                      <option value="800">800px (Standard)</option>
+                      <option value="1000">1000px (Professional)</option>
                     </select>
                   </div>
                   <div className="flex items-center space-x-1">
@@ -1629,9 +1793,43 @@ export default function TemplateEditorPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Gmail Constraints Toggle */}
+                <div className="flex items-center space-x-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={showGmailConstraints}
+                      onChange={(e) => setShowGmailConstraints(e.target.checked)}
+                      className="rounded"
+                    />
+                                         <span className="text-sm text-gray-600">Gmail Preview Zone</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={gmailSafeMode}
+                      onChange={(e) => setGmailSafeMode(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-gray-600">Gmail Safe Mode</span>
+                  </label>
+                </div>
               </div>
               
               <div className="flex items-center space-x-4">
+                {/* Design Warnings */}
+                {designWarnings.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <div className="text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs border border-orange-200">
+                      ⚠️ {designWarnings.length} Gmail issue{designWarnings.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center space-x-2 relative">
                   <span className="text-sm text-gray-600">Background:</span>
                   <button
@@ -1772,6 +1970,49 @@ export default function TemplateEditorPage() {
                     backgroundSize: `${gridSize}px ${gridSize}px`
                   }}
                 />
+              )}
+
+              {/* Gmail 600px Constraint Overlay */}
+              {showGmailConstraints && canvasSize.width > 600 && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Gmail Safe Zone (600px centered) */}
+                  <div 
+                    className="absolute top-0 bg-blue-100 bg-opacity-30 border-2 border-blue-400 border-dashed"
+                    style={{
+                      left: `${(canvasSize.width - 600) / 2}px`,
+                      width: '600px',
+                      height: `${canvasSize.height}px`
+                    }}
+                  >
+                                         <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                       Gmail Preview Zone (Auto-scales to 600px)
+                     </div>
+                  </div>
+                  
+                  {/* Side margins that will auto-scale in Gmail */}
+                  <div 
+                    className="absolute top-0 left-0 bg-green-100 bg-opacity-30"
+                    style={{
+                      width: `${(canvasSize.width - 600) / 2}px`,
+                      height: `${canvasSize.height}px`
+                    }}
+                  >
+                                         <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded rotate-90 origin-bottom-left">
+                       Auto-scales to fit
+                     </div>
+                  </div>
+                  <div 
+                    className="absolute top-0 right-0 bg-green-100 bg-opacity-30"
+                    style={{
+                      width: `${(canvasSize.width - 600) / 2}px`,
+                      height: `${canvasSize.height}px`
+                    }}
+                  >
+                                         <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
+                       Auto-scales to fit
+                     </div>
+                  </div>
+                </div>
               )}
               
               {/* Alignment guides */}
@@ -2302,7 +2543,8 @@ export default function TemplateEditorPage() {
         )}
 
         {/* Properties Panel */}
-        {(selectedElement || previewMode) && (
+        {/* Always show properties panel */}
+        {true && (
           <div 
             className="bg-white border-l flex-shrink-0 overflow-hidden"
             style={{ width: propertiesPanelWidth }}
@@ -2315,6 +2557,38 @@ export default function TemplateEditorPage() {
                 </div>
               </div>
               <div className="p-4">
+                {/* Gmail Design Warnings Panel */}
+                {gmailSafeMode && designWarnings.length > 0 && (
+                  <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h5 className="font-medium text-orange-800 mb-2 flex items-center">
+                      ⚠️ Gmail Compatibility Issues
+                    </h5>
+                    <div className="space-y-2">
+                      {designWarnings.map((warning, index) => (
+                        <div key={index} className="text-sm text-orange-700 flex items-start">
+                          <span className="text-orange-500 mr-2">•</span>
+                          <span>{warning}</span>
+                        </div>
+                      ))}
+                    </div>
+                                         <div className="mt-3 text-xs text-orange-600">
+                       💡 Tip: Side-by-side elements will stack vertically in Gmail. Consider vertical layouts for critical content.
+                     </div>
+                  </div>
+                )}
+
+                {/* Gmail Safe Design Tips */}
+                {gmailSafeMode && designWarnings.length === 0 && (
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h5 className="font-medium text-green-800 mb-2 flex items-center">
+                      ✅ Gmail-Safe Design
+                    </h5>
+                    <div className="text-sm text-green-700">
+                      Your template follows Gmail-friendly design patterns!
+                    </div>
+                  </div>
+                )}
+
               {previewMode ? (
                 /* Email Client Selection in Preview Mode */
                 <div>
@@ -2352,7 +2626,7 @@ export default function TemplateEditorPage() {
                     </div>
                   </div>
                 </div>
-              ) : (() => {
+              ) : selectedElement ? (() => {
                 const element = editorElements.find(el => el.id === selectedElement)
                 if (!element) return null
                 
@@ -2943,7 +3217,24 @@ export default function TemplateEditorPage() {
                     </div>
                   </div>
                 )
-              })()}
+              })() : (
+                /* Empty state when no element is selected */
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">No Element Selected</h4>
+                  <p className="text-sm text-gray-500 mb-4 max-w-xs">
+                    Click on any element in the canvas to view and edit its properties.
+                  </p>
+                  <div className="text-xs text-gray-400">
+                    <p>Available elements:</p>
+                    <p>Text • Heading • Image • Video • Button • Divider</p>
+                  </div>
+                </div>
+              )}
               </div>
             </div>
           </div>

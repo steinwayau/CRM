@@ -41,51 +41,35 @@ export async function GET(request: NextRequest) {
           }).catch(() => 0) // Fallback to 0 if table doesn't exist yet
         ])
 
-        // Get campaign data from localStorage-based campaigns
-        // In future, this would come from EmailCampaign table
-        const totalSent = 1250 // Default for existing campaigns
+        // Try to get real campaign data from database
+        let totalSent = 0
+        try {
+          const campaign = await prisma.emailCampaign.findUnique({
+            where: { id: campaignId },
+            select: { sentCount: true }
+          })
+          totalSent = campaign?.sentCount || 0
+        } catch (error) {
+          console.log(`Could not fetch campaign sentCount for ${campaignId}, using 0`)
+          totalSent = 0
+        }
         
         // Calculate real metrics
         const openRate = totalSent > 0 ? (opens / totalSent) * 100 : 0
         const clickRate = totalSent > 0 ? (clicks / totalSent) * 100 : 0
         const clickToOpenRate = opens > 0 ? (clicks / opens) * 100 : 0
 
+        // Return simple format expected by frontend
         const campaignAnalytics = {
           campaignId,
-          metrics: {
-            totalSent: totalSent,
-            totalOpened: opens,
-            totalClicked: clicks,
-            openRate: Math.round(openRate * 10) / 10,
-            clickRate: Math.round(clickRate * 10) / 10,
-            clickToOpenRate: Math.round(clickToOpenRate * 10) / 10,
-            bounceRate: 2.1, // TODO: Calculate from EmailBounce table
-            unsubscribeRate: 0.8 // TODO: Implement unsubscribe tracking
-          },
-          timeline: [
-            // TODO: Group opens/clicks by hour/day for real timeline
-            { date: new Date().toISOString(), opens: opens, clicks: clicks }
-          ],
-          topLinks: [
-            // TODO: Group clicks by targetUrl to show top links
-            { url: 'https://steinway.com.au/events', clicks: Math.floor(clicks * 0.5), label: 'Event Registration' },
-            { url: 'https://steinway.com.au/pianos', clicks: Math.floor(clicks * 0.3), label: 'Piano Gallery' },
-            { url: 'https://steinway.com.au/contact', clicks: Math.floor(clicks * 0.2), label: 'Contact Us' }
-          ],
-          deviceBreakdown: {
-            desktop: 68.5, // TODO: Calculate from userAgent data
-            mobile: 28.2,
-            tablet: 3.3
-          },
-          geographicData: {
-            'Melbourne': 35.2, // TODO: Calculate from IP geolocation
-            'Sydney': 28.7,
-            'Brisbane': 15.3,
-            'Perth': 12.1,
-            'Adelaide': 8.7
-          }
+          opens: opens,
+          clicks: clicks,
+          totalSent: totalSent,
+          openRate: Math.round(openRate * 10) / 10,
+          clickRate: Math.round(clickRate * 10) / 10
         }
         
+        console.log(`Analytics for campaign ${campaignId}:`, campaignAnalytics)
         return NextResponse.json(campaignAnalytics)
         
       } catch (error) {

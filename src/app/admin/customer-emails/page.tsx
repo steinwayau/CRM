@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 interface Customer {
@@ -74,13 +75,18 @@ interface Campaign {
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused'
   recipientType: 'all' | 'filtered' | 'selected' | 'custom'
   customEmails?: string
+  textContent?: string // Temporary storage for custom emails
   scheduledAt?: string
   sentAt?: string
   createdAt: string
 }
 
 export default function CustomerEmailsPage() {
-  const [activeTab, setActiveTab] = useState('campaigns')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get('tab')
+    return ['campaigns', 'customers', 'templates', 'analytics'].includes(tabParam || '') ? tabParam : 'campaigns'
+  })
   const [customers, setCustomers] = useState<Customer[]>([])
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -142,6 +148,57 @@ export default function CustomerEmailsPage() {
     customEmails: '',
     scheduledAt: ''
   })
+  const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number}}>({})
+
+  // Load real analytics data for campaigns
+  const loadCampaignAnalytics = async () => {
+    try {
+      console.log('🔄 Loading campaign analytics for campaigns:', campaigns.map(c => ({ id: c.id, name: c.name, status: c.status, sentCount: c.sentCount })))
+      const analyticsData: {[key: string]: {opens: number, clicks: number}} = {}
+      
+      for (const campaign of campaigns) {
+        // ANALYTICS FIX: Fetch analytics for any campaign with 'sent' status
+        // Previous logic required sentCount > 0, but database campaigns may have sentCount = 0
+        if (campaign.status === 'sent') {
+          console.log(`📊 Fetching analytics for sent campaign: ${campaign.id} (${campaign.name})`)
+          const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`📈 Analytics data for ${campaign.id}:`, data)
+            analyticsData[campaign.id] = {
+              opens: data.opens || 0,
+              clicks: data.clicks || 0
+            }
+          } else {
+            console.error(`❌ Failed to fetch analytics for campaign ${campaign.id}:`, response.status, response.statusText)
+          }
+        } else {
+          console.log(`⏭️ Skipping campaign ${campaign.id} - status: ${campaign.status} (not sent)`)
+        }
+      }
+      
+      console.log('📊 Final analytics data:', analyticsData)
+      setCampaignAnalytics(analyticsData)
+    } catch (error) {
+      console.error('❌ Failed to load campaign analytics:', error)
+    }
+  }
+
+  // Auto-refresh analytics every 30 seconds for real-time updates
+  useEffect(() => {
+    if (campaigns.length > 0) {
+      // Initial load
+      loadCampaignAnalytics()
+      
+      // Set up interval for auto-refresh
+      const interval = setInterval(() => {
+        console.log('Auto-refreshing campaign analytics...')
+        loadCampaignAnalytics()
+      }, 30000) // 30 seconds
+      
+      return () => clearInterval(interval)
+    }
+  }, [campaigns])
   const [templateForm, setTemplateForm] = useState({
     name: '',
     subject: '',
@@ -159,10 +216,141 @@ export default function CustomerEmailsPage() {
     loadData()
   }, [])
 
-  // Helper function to update campaigns with localStorage persistence
-  const updateCampaigns = (newCampaigns: Campaign[]) => {
+  // Update activeTab when URL changes (handles page refresh)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam && ['campaigns', 'customers', 'templates', 'analytics'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams])
+
+
+
+  // Helper function to update campaigns (now using database)
+  const updateCampaigns = async (newCampaigns: Campaign[]) => {
     setCampaigns(newCampaigns)
-    localStorage.setItem('emailCampaigns', JSON.stringify(newCampaigns))
+    
+    // ANALYTICS FIX: Also persist campaign updates to database
+    // This ensures sent campaigns with sentCount are saved permanently
+    try {
+      for (const campaign of newCampaigns) {
+        // Only update campaigns that have been sent (have sentCount > 0 or status 'sent')
+        if (campaign.status === 'sent' || campaign.sentCount > 0) {
+          console.log(`📊 Persisting sent campaign to database: ${campaign.name} (sentCount: ${campaign.sentCount})`)
+          
+          const response = await fetch('/api/admin/campaigns', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: campaign.id,
+              status: campaign.status,
+              sentCount: campaign.sentCount,
+              recipientCount: campaign.recipientCount,
+              sentAt: campaign.sentAt
+            })
+          })
+          
+          if (!response.ok) {
+            console.error(`Failed to persist campaign ${campaign.id} to database`)
+          } else {
+            console.log(`✅ Campaign ${campaign.name} persisted to database`)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error persisting campaign updates to database:', error)
+    }
+  }
+
+  // Migration function to move localStorage campaigns to database
+  const migrateCampaigns = async () => {
+    try {
+      const savedCampaigns = JSON.parse(localStorage.getItem('emailCampaigns') || '[]')
+      if (savedCampaigns.length === 0) {
+        alert('No campaigns found in localStorage to migrate')
+        return
+      }
+
+      let migrated = 0
+      for (const campaign of savedCampaigns) {
+        try {
+          const response = await fetch('/api/admin/campaigns', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: campaign.name || 'Migrated Campaign',
+              subject: campaign.subject || 'Migrated Subject',
+              templateId: campaign.templateId || 'default',
+              templateName: campaign.templateName || 'Migrated Template',
+              recipientType: campaign.recipientType || 'all',
+              status: campaign.status || 'draft',
+              scheduledAt: campaign.scheduledAt || null
+            })
+          })
+          
+          if (response.ok) {
+            migrated++
+          }
+        } catch (error) {
+          console.error('Error migrating campaign:', campaign.name, error)
+        }
+      }
+
+      if (migrated > 0) {
+        alert(`Successfully migrated ${migrated} campaigns to database!`)
+        localStorage.removeItem('emailCampaigns') // Clear localStorage
+        loadData() // Reload from database
+      } else {
+        alert('Failed to migrate campaigns')
+      }
+    } catch (error) {
+      console.error('Migration error:', error)
+      alert('Migration failed')
+    }
+  }
+
+  // Template migration function
+  const migrateTemplatesFromLocalStorage = async () => {
+    try {
+      const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+      
+      let migrated = 0
+      for (const template of savedTemplates) {
+        try {
+          const response = await fetch('/api/admin/templates', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(template)
+          })
+          
+          if (response.ok) {
+            migrated++
+          }
+        } catch (error) {
+          console.error('Error migrating template:', template.name, error)
+        }
+      }
+
+      if (migrated > 0) {
+        console.log(`Successfully migrated ${migrated} templates to database!`)
+        localStorage.removeItem('emailTemplates') // Clear localStorage
+        
+        // Reload templates from database
+        const templateResponse = await fetch('/api/admin/templates')
+        if (templateResponse.ok) {
+          const dbTemplates = await templateResponse.json()
+          setTemplates(dbTemplates)
+        }
+      }
+    } catch (error) {
+      console.error('Template migration error:', error)
+    }
   }
 
   const loadData = async () => {
@@ -211,15 +399,44 @@ export default function CustomerEmailsPage() {
       console.log('Transformed customers:', transformedCustomers.length, 'customers')
       setCustomers(transformedCustomers)
       
-      // Load templates from localStorage
-      const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-      
-      // Set templates from localStorage (no auto-creation of defaults)
-      setTemplates(savedTemplates)
-      
-          // Load campaigns from localStorage - no more fake data
-      const savedCampaigns = JSON.parse(localStorage.getItem('emailCampaigns') || '[]')
-      setCampaigns(savedCampaigns)
+            // Load templates from database first, fallback to localStorage
+      try {
+        const templateResponse = await fetch('/api/admin/templates')
+        if (templateResponse.ok) {
+          const dbTemplates = await templateResponse.json()
+          setTemplates(dbTemplates)
+          
+          // Check if we need to migrate localStorage templates
+          if (dbTemplates.length === 0) {
+            const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+            if (savedTemplates.length > 0) {
+              console.log('Migrating templates from localStorage to database...')
+              await migrateTemplatesFromLocalStorage()
+            }
+          }
+        } else {
+          throw new Error('Failed to load templates from database')
+        }
+      } catch (error) {
+        console.error('Error loading templates, falling back to localStorage:', error)
+        const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+        setTemplates(savedTemplates)
+      }
+        
+        // Load campaigns from database
+      const campaignResponse = await fetch('/api/admin/campaigns')
+      if (campaignResponse.ok) {
+        const campaignData = await campaignResponse.json()
+        // Map textContent back to customEmails for campaigns with custom recipient type
+        const campaignsWithCustomEmails = campaignData.map((campaign: any) => ({
+          ...campaign,
+          customEmails: campaign.textContent || ''
+        }))
+        setCampaigns(campaignsWithCustomEmails)
+      } else {
+        console.error('Failed to load campaigns')
+        setCampaigns([])
+      }
       
     } catch (error) {
       console.error('Error loading data:', error)
@@ -273,22 +490,40 @@ export default function CustomerEmailsPage() {
         recipients = emailList.length
       }
 
-      const newCampaign: Campaign = {
-        id: Date.now().toString(),
-        name: campaignForm.name,
-        templateId: campaignForm.templateId,
-        templateName: templates.find(t => t.id === campaignForm.templateId)?.name || '',
-        subject: campaignForm.subject,
-        recipientCount: recipients,
-        sentCount: 0,
-        recipientType: campaignForm.recipientType as 'all' | 'filtered' | 'selected' | 'custom',
-        customEmails: campaignForm.recipientType === 'custom' ? campaignForm.customEmails : undefined,
-        status: campaignForm.scheduledAt ? 'scheduled' : 'draft',
-        scheduledAt: campaignForm.scheduledAt || undefined,
-        createdAt: new Date().toISOString()
-      }
+      // Create campaign in database
+      const response = await fetch('/api/admin/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: campaignForm.name,
+          templateId: campaignForm.templateId,
+          templateName: templates.find(t => t.id === campaignForm.templateId)?.name || '',
+          subject: campaignForm.subject,
+          recipientType: campaignForm.recipientType,
+          customEmails: campaignForm.customEmails, // FIXED: Include custom emails
+          status: campaignForm.scheduledAt ? 'scheduled' : 'draft',
+          scheduledAt: campaignForm.scheduledAt || undefined,
+        })
+      })
 
-      updateCampaigns([newCampaign, ...campaigns])
+      if (response.ok) {
+        const newCampaign = await response.json()
+        setCampaigns([newCampaign, ...campaigns])
+        console.log('Campaign created successfully:', newCampaign)
+      } else {
+        const errorData = await response.text()
+        console.error('API Error:', response.status, errorData)
+        
+        // If it's a template validation error, reload templates to sync
+        if (errorData.includes('templateId') && errorData.includes('does not exist')) {
+          console.log('Template validation error detected, reloading templates...')
+          loadData() // Reload templates to sync with database
+        }
+        
+        throw new Error(`Failed to create campaign: ${response.status} - ${errorData}`)
+      }
       setShowNewCampaign(false)
       setCampaignForm({
         name: '',
@@ -300,6 +535,7 @@ export default function CustomerEmailsPage() {
       })
     } catch (error) {
       console.error('Error creating campaign:', error)
+      alert(`Failed to create campaign: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -331,10 +567,8 @@ export default function CustomerEmailsPage() {
       } else if (campaign.recipientType === 'filtered') {
         recipientFilters = filters
       } else if (campaign.recipientType === 'custom') {
-        // For custom email lists, we'll need to handle this differently
-        // For now, we'll send to selected customers
-        console.log('Custom email lists not yet implemented, using selected customers')
-        customerIds = selectedCustomers
+        // Custom emails are handled in the API - no customerIds needed
+        console.log('Using custom email list from campaign:', campaign.customEmails)
       }
 
       // CORE FIX: Pass template elements and canvas settings for Gmail-compatible HTML generation
@@ -352,6 +586,7 @@ export default function CustomerEmailsPage() {
         },
         body: JSON.stringify({
           name: campaign.name,
+          campaignId: campaign.id, // FIXED: Use campaign ID instead of template ID
           templateId: campaign.templateId,
           templateName: campaign.templateName,
           subject: campaign.subject,
@@ -359,7 +594,7 @@ export default function CustomerEmailsPage() {
           textContent: template.textContent,
           recipientType: campaign.recipientType,
           customerIds: customerIds.length > 0 ? customerIds : undefined,
-          customEmails: campaign.recipientType === 'custom' ? campaign.customEmails : undefined,
+          customEmails: campaign.recipientType === 'custom' ? (campaign.customEmails || campaign.textContent) : undefined,
           filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined,
           // NEW: Template elements and canvas settings for Gmail-compatible HTML generation
           templateElements: templateElements,
@@ -370,8 +605,8 @@ export default function CustomerEmailsPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Update campaign with actual results and start tracking
-        updateCampaigns(campaigns.map(c => 
+        // Update campaign with actual results and reload from database
+        await updateCampaigns(campaigns.map(c => 
           c.id === campaignId 
             ? { 
                 ...c, 
@@ -384,6 +619,14 @@ export default function CustomerEmailsPage() {
               }
             : c
         ))
+
+        // Reload campaigns from database to get the updated status
+        loadData()
+        
+        // Load analytics data for the sent campaign
+        setTimeout(() => {
+          loadCampaignAnalytics()
+        }, 1000)
         
         // Start polling for tracking updates every 30 seconds
         const trackingInterval = setInterval(async () => {
@@ -612,11 +855,31 @@ export default function CustomerEmailsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Email Campaigns</h2>
           <p className="text-gray-600">Create and manage customer email campaigns</p>
         </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowNewCampaign(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + New Campaign
+          </button>
+
+        </div>
+      </div>
+
+      {/* Campaign Stats Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Campaign Performance</h3>
+          <p className="text-sm text-gray-600">Auto-refreshes every 30 seconds</p>
+        </div>
         <button
-          onClick={() => setShowNewCampaign(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={loadCampaignAnalytics}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
         >
-          + New Campaign
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh Now
         </button>
       </div>
 
@@ -661,9 +924,13 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Open Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {campaigns.length > 0 
-                  ? (campaigns.reduce((sum, c) => sum + (c.openRate || 0), 0) / campaigns.length).toFixed(1)
-                  : '0'}%
+                {(() => {
+                  const sentCampaigns = campaigns.filter(c => c.sentCount > 0)
+                  if (sentCampaigns.length === 0) return '0'
+                  const totalSent = sentCampaigns.reduce((sum, c) => sum + c.sentCount, 0)
+                  const totalOpens = sentCampaigns.reduce((sum, c) => sum + (campaignAnalytics[c.id]?.opens || 0), 0)
+                  return totalSent > 0 ? ((totalOpens / totalSent) * 100).toFixed(1) : '0'
+                })()}%
               </p>
             </div>
           </div>
@@ -679,9 +946,13 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Click Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {campaigns.length > 0 
-                  ? (campaigns.reduce((sum, c) => sum + (c.clickRate || 0), 0) / campaigns.length).toFixed(1)
-                  : '0'}%
+                {(() => {
+                  const sentCampaigns = campaigns.filter(c => c.sentCount > 0)
+                  if (sentCampaigns.length === 0) return '0'
+                  const totalSent = sentCampaigns.reduce((sum, c) => sum + c.sentCount, 0)
+                  const totalClicks = sentCampaigns.reduce((sum, c) => sum + (campaignAnalytics[c.id]?.clicks || 0), 0)
+                  return totalSent > 0 ? ((totalClicks / totalSent) * 100).toFixed(1) : '0'
+                })()}%
               </p>
             </div>
           </div>
@@ -785,10 +1056,11 @@ export default function CustomerEmailsPage() {
                   value={campaignForm.templateId}
                   onChange={(e) => {
                     const selectedTemplate = templates.find(t => t.id === e.target.value)
+                    console.log('Selected template:', selectedTemplate)
                     setCampaignForm({
                       ...campaignForm, 
                       templateId: e.target.value,
-                      subject: selectedTemplate?.subject || campaignForm.subject
+                      subject: selectedTemplate?.subject || campaignForm.subject || ''
                     })
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1740,7 +2012,7 @@ export default function CustomerEmailsPage() {
                           Cancel
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             // Update campaign with new details
                             if (viewingCampaign) {
                               let recipients = 0
@@ -1759,22 +2031,44 @@ export default function CustomerEmailsPage() {
                                 recipients = emailList.length
                               }
 
-                              const updatedCampaign = {
-                                ...viewingCampaign,
-                                name: editCampaignForm.name,
-                                templateId: editCampaignForm.templateId,
-                                templateName: templates.find(t => t.id === editCampaignForm.templateId)?.name || '',
-                                subject: editCampaignForm.subject,
-                                recipientType: editCampaignForm.recipientType as 'all' | 'filtered' | 'selected' | 'custom',
-                                customEmails: editCampaignForm.recipientType === 'custom' ? editCampaignForm.customEmails : undefined,
-                                recipientCount: recipients
+                              // Save campaign changes to database
+                              try {
+                                const response = await fetch('/api/admin/campaigns', {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    id: viewingCampaign.id,
+                                    name: editCampaignForm.name,
+                                    templateId: editCampaignForm.templateId,
+                                    templateName: templates.find(t => t.id === editCampaignForm.templateId)?.name || '',
+                                    subject: editCampaignForm.subject,
+                                    recipientType: editCampaignForm.recipientType,
+                                    textContent: editCampaignForm.recipientType === 'custom' ? editCampaignForm.customEmails : '',
+                                  })
+                                })
+
+                                if (response.ok) {
+                                  const updatedCampaignFromDB = await response.json()
+                                  const updatedCampaign = {
+                                    ...updatedCampaignFromDB,
+                                    customEmails: updatedCampaignFromDB.textContent || '',
+                                    recipientCount: recipients
+                                  }
+                                  
+                                  setCampaigns(campaigns.map(c => 
+                                    c.id === viewingCampaign.id ? updatedCampaign : c
+                                  ))
+                                  setViewingCampaign(updatedCampaign)
+                                  setEditingCampaign(false)
+                                } else {
+                                  throw new Error('Failed to save campaign changes')
+                                }
+                              } catch (error) {
+                                console.error('Error saving campaign:', error)
+                                alert('Failed to save campaign changes. Please try again.')
                               }
-                              
-                              setCampaigns(campaigns.map(c => 
-                                c.id === viewingCampaign.id ? updatedCampaign : c
-                              ))
-                              setViewingCampaign(updatedCampaign)
-                              setEditingCampaign(false)
                             }
                           }}
                           className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -1879,10 +2173,23 @@ export default function CustomerEmailsPage() {
                   {!editingCampaign && (
                     <>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-                            updateCampaigns(campaigns.filter(c => c.id !== viewingCampaign.id))
-                            setShowCampaignView(false)
+                            try {
+                              const response = await fetch(`/api/admin/campaigns?id=${viewingCampaign.id}`, {
+                                method: 'DELETE'
+                              })
+                              
+                              if (response.ok) {
+                                setCampaigns(campaigns.filter(c => c.id !== viewingCampaign.id))
+                                setShowCampaignView(false)
+                              } else {
+                                alert('Failed to delete campaign')
+                              }
+                            } catch (error) {
+                              console.error('Error deleting campaign:', error)
+                              alert('Failed to delete campaign')
+                            }
                           }
                         }}
                         className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { PrismaClient } from '@prisma/client'
 
-// Initialize Resend
+// Initialize Resend and Prisma
 const resend = new Resend(process.env.RESEND_API_KEY)
+const prisma = new PrismaClient()
 
 interface EmailRecipient {
   id: number
@@ -23,7 +25,12 @@ interface EditorElement {
     url?: string
     videoId?: string
     thumbnailUrl?: string
+    customThumbnail?: string
     title?: string
+  }
+  buttonData?: {
+    url: string
+    openInNewTab: boolean
   }
   style: {
     position: { x: number; y: number }
@@ -93,12 +100,16 @@ function generateEmailHtml(
   }
 }
 
-// GMAIL-SPECIFIC: Content extraction only
+// GMAIL-SPECIFIC: ICONSCOUT TABLE METHOD - Simple table rows, no positioning
 function generateGmailSpecificHtml(
   sortedElements: EditorElement[],
   canvasSettings: CanvasSettings,
   templateName: string
 ): string {
+  // GMAIL OPTIMIZATION: 750px width for better desktop viewing (like Elementor)
+  const emailWidth = 750  // Optimized email width for larger Gmail display
+  const emailHeight = canvasSettings.height || 800
+  
   let html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -107,145 +118,73 @@ function generateGmailSpecificHtml(
   <title>${templateName}</title>
 </head>
 <body style="margin: 0; padding: 0; width: 100%; background-color: #f4f4f4; font-family: Arial, sans-serif;">
-  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; min-height: ${emailHeight}px;">
     <tr>
       <td align="center" valign="top" style="padding: 20px 0;">
-        <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: ${canvasSettings.backgroundColor || '#ffffff'}; margin: 0 auto;">`
+        <!-- Main email container - ICONSCOUT METHOD with full height -->
+        <table border="0" cellpadding="0" cellspacing="0" width="${emailWidth}" style="margin: 0 auto; background-color: ${canvasSettings.backgroundColor || '#ffffff'}; min-height: ${emailHeight}px;">
+`
 
-  // Process each element in pure vertical order - no positioning, just content
+  // IMPROVED APPROACH: Group elements by Y position for side-by-side layout
+  html += `
+          <tr>
+            <td style="padding: 0; margin: 0; line-height: 1;" align="center" valign="top">`
+            
+  // Group elements by approximate Y position (increased tolerance for videos)
+  const elementGroups: EditorElement[][] = []
+  const rowTolerance = 30 // Conservative tolerance - only group truly side-by-side elements
+  
   sortedElements.forEach((element) => {
-    const { style, content, type } = element
-
-    switch (type) {
-      case 'text':
-        const textColor = style.color || '#000000'
-        const fontSize = Math.min(style.fontSize || 14, 18) // Cap for email safety
-        
-        html += `
-          <tr>
-            <td align="left" valign="top" style="padding: 15px 20px; font-family: Arial, sans-serif; font-size: ${fontSize}px; color: ${textColor}; line-height: 1.6;">
-              ${content}
-            </td>
-          </tr>`
+    let foundGroup = false
+    for (let i = 0; i < elementGroups.length; i++) {
+      const groupY = elementGroups[i][0].style.position.y
+      if (Math.abs(element.style.position.y - groupY) <= rowTolerance) {
+        elementGroups[i].push(element)
+        foundGroup = true
         break
-
-      case 'heading':
-        const headingLevel = element.headingLevel || 1
-        const headingColor = style.color || '#000000'
-        const headingSize = Math.min(style.fontSize || (24 - (headingLevel - 1) * 2), 28)
-        
-        html += `
-          <tr>
-            <td align="left" valign="top" style="padding: 20px 20px 10px 20px; font-family: Arial, sans-serif; font-size: ${headingSize}px; color: ${headingColor}; font-weight: bold; line-height: 1.3;">
-              ${content}
-            </td>
-          </tr>`
-        break
-
-      case 'image':
-        // Simple responsive image - max width 560px for Gmail
-        const imgWidth = Math.min(style.width, 560)
-        const imgHeight = Math.round((style.height / style.width) * imgWidth)
-        
-        html += `
-          <tr>
-            <td align="center" valign="top" style="padding: 15px 20px;">
-              <img src="${content}" alt="Email Image" 
-                   width="${imgWidth}" 
-                   height="${imgHeight}"
-                   style="display: block; max-width: 100%; height: auto; border: 0;" />
-            </td>
-          </tr>`
-        break
-
-      case 'video':
-        // Extract proper YouTube thumbnail and URL
-        const videoData = element.videoData
-        const videoUrl = videoData?.url || content || ''
-        let thumbnailUrl = videoData?.thumbnailUrl
-        
-        // Extract YouTube thumbnail if URL is provided
-        if (videoUrl && !thumbnailUrl) {
-          const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
-          if (youtubeMatch) {
-            const videoId = youtubeMatch[1]
-            thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-          }
-        }
-        
-        // Fallback thumbnail
-        if (!thumbnailUrl) {
-          thumbnailUrl = 'https://via.placeholder.com/560x315/000000/FFFFFF/?text=▶+VIDEO'
-        }
-        
-        const videoTitle = videoData?.title || 'Play Video'
-        const videoWidth = Math.min(style.width, 560)
-        const videoHeight = Math.round(videoWidth * 0.5625) // 16:9 aspect ratio
-        
-        html += `
-          <tr>
-            <td align="center" valign="top" style="padding: 15px 20px;">
-              <table border="0" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-                    <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
-                      <img src="${thumbnailUrl}" alt="${videoTitle}" 
-                           width="${videoWidth}" 
-                           height="${videoHeight}"
-                           style="display: block; border: 3px solid #1a73e8; border-radius: 8px; max-width: 100%; height: auto;" />
-                    </a>
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding-top: 10px;">
-                    <a href="${videoUrl}" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: #1a73e8; text-decoration: none; font-weight: bold;">
-                      ▶ ${videoTitle}
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>`
-        break
-
-      case 'button':
-        // Simple Gmail-compatible button
-        const buttonBg = style.backgroundColor || '#0073e6'
-        const buttonColor = style.color || '#ffffff'
-        const buttonText = content || 'Click Here'
-        
-        html += `
-          <tr>
-            <td align="center" valign="top" style="padding: 15px 20px;">
-              <table border="0" cellspacing="0" cellpadding="0">
-                <tr>
-                  <td align="center" style="background-color: ${buttonBg}; border-radius: 6px; padding: 12px 24px;">
-                    <a href="#" target="_blank" style="font-family: Arial, sans-serif; font-size: 16px; color: ${buttonColor}; text-decoration: none; font-weight: bold; display: inline-block;">
-                      ${buttonText}
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>`
-        break
-
-      case 'divider':
-        const dividerColor = style.backgroundColor || '#cccccc'
-        
-        html += `
-          <tr>
-            <td style="padding: 15px 20px;">
-              <table border="0" cellspacing="0" cellpadding="0" width="100%">
-                <tr>
-                  <td style="border-top: 2px solid ${dividerColor}; font-size: 0; line-height: 0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>`
-        break
+      }
+    }
+    if (!foundGroup) {
+      elementGroups.push([element])
     }
   })
+  
+  // SMART SIDE-BY-SIDE: Use the row groups we calculated above
+  elementGroups.forEach((group, groupIndex) => {
+    console.log(`Gmail Group ${groupIndex + 1}: ${group.length} elements`)
+    
+    if (group.length === 1) {
+      // Single element: render normally
+      const element = group[0]
+      let elementMaxWidth = emailWidth
+      if (element.type === 'button' || element.type === 'text' || element.type === 'heading') {
+        const scaleRatio = emailWidth / 1000
+        elementMaxWidth = Math.min(emailWidth, Math.round(element.style.width * scaleRatio))
+      }
+      
+      html += `<div style="margin: 0; padding: 0; margin-bottom: 15px; width: 100%; text-align: center;">`
+      html += generateGmailElementHtml(element, elementMaxWidth)
+      html += `</div>`
+    } else {
+      // Multiple elements: render side-by-side using table cells
+      html += `<table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 15px;">
+        <tr>`
+      
+      const cellWidth = Math.floor(emailWidth / group.length)
+      group.forEach((element) => {
+        html += `<td style="width: ${cellWidth}px; text-align: center; vertical-align: top; padding: 0 10px;">`
+        html += generateGmailElementHtml(element, cellWidth - 20) // -20 for proper spacing like template
+        html += `</td>`
+      })
+      
+      html += `</tr>
+      </table>`
+    }
+  })
+  
+  html += `
+            </td>
+          </tr>`
 
   html += `
         </table>
@@ -256,6 +195,93 @@ function generateGmailSpecificHtml(
 </html>`
 
   return html
+}
+
+// Generate individual element HTML for Gmail table cells with CONSISTENT SCALING
+function generateGmailElementHtml(element: EditorElement, maxWidth: number): string {
+  const { content, type } = element
+  
+  // PROPORTIONAL SCALING: Scale from 1000px template to 750px Gmail
+  const scaleRatio = 750 / 1000 // 75% scaling for optimal Gmail display
+  const scaledWidth = Math.round(element.style.width * scaleRatio)
+  const scaledHeight = Math.round(element.style.height * scaleRatio)
+  const scaledFontSize = element.style.fontSize ? Math.round(element.style.fontSize * scaleRatio) : undefined
+  
+  switch (type) {
+    case 'text':
+      const textColor = element.style.color || '#000000'
+      const fontSize = scaledFontSize || 14
+      
+      return `<div style="font-family: Arial, sans-serif; font-size: ${fontSize}px; color: ${textColor}; line-height: 1.4; text-align: ${element.style.textAlign || 'left'}; margin: 0; padding: 0; width: ${scaledWidth}px; ${element.style.fontWeight ? `font-weight: ${element.style.fontWeight};` : ''}">${content}</div>`
+
+    case 'heading':
+      const headingColor = element.style.color || '#000000'
+      const headingSize = scaledFontSize || (24 - ((element.headingLevel || 1) - 1) * 2)
+      
+      return `<div style="font-family: Arial, sans-serif; font-size: ${headingSize}px; color: ${headingColor}; font-weight: bold; line-height: 1.2; text-align: ${element.style.textAlign || 'left'}; margin: 0; padding: 0; width: ${scaledWidth}px;">${content}</div>`
+
+    case 'image':
+      // CONSISTENT IMAGE SCALING - Apply to ALL images including logos
+      let imageSrc = content
+      if (content.startsWith('data:')) {
+        console.log('WARNING: Legacy data URL detected, using fallback')
+        imageSrc = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=LEGACY+IMAGE'
+      }
+      
+      return `<img src="${imageSrc}" alt="Email Image" style="width: ${scaledWidth}px; height: ${scaledHeight}px; display: block; border: 0; margin: 0 auto; padding: 0;" width="${scaledWidth}" height="${scaledHeight}" />`
+
+    case 'video':
+      // CONSISTENT VIDEO SCALING - Videos now scale properly
+      const videoData = element.videoData
+      const videoUrl = videoData?.url || content || ''
+      let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
+      
+      if (thumbnailUrl && thumbnailUrl.startsWith('data:')) {
+        console.log('WARNING: Legacy data URL detected in video thumbnail')
+        thumbnailUrl = undefined
+      }
+      
+      if (!thumbnailUrl) {
+        thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+      }
+      
+      return `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0 auto; padding: 0; width: ${scaledWidth}px; height: ${scaledHeight}px; overflow: hidden; border-radius: ${element.style.borderRadius || 0}px; position: relative;">
+        <img src="${thumbnailUrl}" alt="Video" style="width: ${scaledWidth}px; height: ${scaledHeight}px; display: block; border: 0; margin: 0; padding: 0; object-fit: cover; object-position: center;" width="${scaledWidth}" height="${scaledHeight}" />
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+          <div style="width: ${Math.round(48 * scaleRatio)}px; height: ${Math.round(48 * scaleRatio)}px; background-color: rgba(255,255,255,0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            <div style="width: 0; height: 0; border-left: ${Math.round(16 * scaleRatio)}px solid #333; border-top: ${Math.round(12 * scaleRatio)}px solid transparent; border-bottom: ${Math.round(12 * scaleRatio)}px solid transparent; margin-left: ${Math.round(4 * scaleRatio)}px;"></div>
+          </div>
+        </div>
+      </a>`
+
+    case 'button':
+      // BUTTON OPTIMIZATION - Less aggressive scaling for better readability
+      const buttonBg = element.style.backgroundColor || '#0073e6'
+      const buttonColor = element.style.color || '#ffffff'
+      const buttonText = content || 'Click Here'
+      const buttonUrl = element.buttonData?.url || '#'
+      const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
+      // Use larger font size for buttons - minimal scaling for readability
+      const buttonFontSize = element.style.fontSize ? Math.max(Math.round(element.style.fontSize * 0.9), 16) : 16
+      
+      return `<table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td style="background-color: ${buttonBg}; border-radius: ${element.style.borderRadius || 4}px; padding: 14px 28px; margin: 0; text-align: center;">
+            <a href="${buttonUrl}" target="${buttonTarget}" style="color: ${buttonColor}; text-decoration: none; font-family: Arial, sans-serif; font-size: ${buttonFontSize}px; font-weight: ${element.style.fontWeight || 'normal'}; display: block; text-align: center; width: 100%;">${buttonText}</a>
+          </td>
+        </tr>
+      </table>`
+
+    case 'divider':
+      // CONSISTENT DIVIDER SCALING
+      const dividerColor = element.style.backgroundColor || '#cccccc'
+      const dividerHeight = Math.max(Math.round(element.style.height * scaleRatio), 1)
+      
+      return `<div style="width: ${scaledWidth}px; height: ${dividerHeight}px; background-color: ${dividerColor}; border-radius: ${element.style.borderRadius || 0}px; margin: 0 auto; padding: 0;"></div>`
+
+    default:
+      return ''
+  }
 }
 
 // STANDARD EMAIL CLIENTS: Preserve original design dimensions
@@ -334,7 +360,17 @@ function generateStandardEmailHtml(
         html += elementHtml + `<${headingTag} style="margin: 0; font-size: inherit; font-weight: inherit; color: inherit;">${content}</${headingTag}></div>`
         break
       case 'image':
-        html += elementHtml + `<img src="${content}" alt="Email Image" style="
+        // APPLE MAIL: Allow data URLs (they work perfectly!)
+        // GMAIL: Force external URLs only
+        let imageSrc = content
+        
+        // Only force fallback for Gmail users - Apple Mail handles data URLs fine!
+        if (content.startsWith('data:')) {
+          console.log('INFO: Data URL detected in Apple Mail - this is fine!')
+          imageSrc = content // Keep original data URL for Apple Mail
+        }
+        
+        html += elementHtml + `<img src="${imageSrc}" alt="Email Image" style="
           width: ${style.width}px;
           height: ${style.height}px;
           display: block;
@@ -347,9 +383,9 @@ function generateStandardEmailHtml(
       case 'video':
         const videoData = element.videoData
         const videoUrl = videoData?.url || content || ''
-        let thumbnailUrl = videoData?.thumbnailUrl
+        let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
         
-        // Extract YouTube thumbnail if URL is provided
+        // Extract YouTube thumbnail if URL is provided and no custom thumbnail
         if (videoUrl && !thumbnailUrl) {
           const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
           if (youtubeMatch) {
@@ -363,11 +399,9 @@ function generateStandardEmailHtml(
           thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
         }
         
-        const videoTitle = videoData?.title || 'Play Video'
-        
         html += elementHtml + `
           <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
-            <img src="${thumbnailUrl}" alt="${videoTitle}" style="
+            <img src="${thumbnailUrl}" alt="Video" style="
               width: ${style.width}px;
               height: ${style.height}px;
               display: block;
@@ -401,15 +435,17 @@ function generateStandardEmailHtml(
         </div>`
         break
       case 'button':
+        const buttonUrl = element.buttonData?.url || '#'
+        const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
         html += elementHtml + `
           <!--[if mso]>
-          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${buttonUrl}" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
             <w:anchorlock/>
             <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
           </v:roundrect>
           <![endif]-->
           <!--[if !mso]><!-->
-          <a href="#" style="
+          <a href="${buttonUrl}" target="${buttonTarget}" style="
             display: flex;
             align-items: center;
             justify-content: center;
@@ -465,6 +501,7 @@ export async function POST(request: NextRequest) {
 
     const { 
       name, 
+      campaignId,
       templateId, 
       templateName, 
       subject, 
@@ -485,6 +522,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Use campaignId if provided, otherwise fall back to templateId (for backwards compatibility)
+    const updateCampaignId = campaignId || templateId
 
     // Get customers from database based on recipient type
     const customers = await getCustomersForCampaign(recipientType, customerIds, filters, customEmails)
@@ -533,24 +573,41 @@ export async function POST(request: NextRequest) {
             // Detect email client from email address domain (simple heuristic)
             const isGmailUser = customer.email.toLowerCase().includes('@gmail.com')
             
-            // Generate appropriate HTML for email client
-            emailHtml = generateEmailHtml(
-              templateElements, 
-              canvasSettings, 
-              templateName || name,
-              isGmailUser // Only use Gmail generation for Gmail users
+            // CRITICAL: Validate template elements have required data
+            const validElements = templateElements.filter((el: EditorElement) => 
+              el.type && el.style && el.style.position && 
+              el.style.width > 0 && el.style.height > 0
             )
             
+            if (validElements.length === 0) {
+              console.log(`WARNING: No valid elements found for ${customer.email}, using fallback HTML`)
+              emailHtml = htmlContent
+            } else {
+              // Generate appropriate HTML for email client
+              emailHtml = generateEmailHtml(
+                validElements, 
+                canvasSettings, 
+                templateName || name,
+                isGmailUser // Only use Gmail generation for Gmail users
+              )
+            }
+            
             console.log(`Generated ${isGmailUser ? 'Gmail-specific' : 'standard'} HTML for ${customer.email}`)
+            
+            // DEBUG: Log first 1000 characters of generated HTML for Gmail users
+            if (isGmailUser) {
+              console.log(`Gmail HTML Preview for ${customer.email}:`, emailHtml.substring(0, 1000) + '...')
+            }
           } else {
             console.log(`Using fallback htmlContent for customer ${customer.email} - template elements not provided`)
+            console.log(`Fallback HTML Preview for ${customer.email}:`, htmlContent.substring(0, 500) + '...')
           }
           
           const personalizedHtml = personalizeContent(emailHtml, customer)
           const personalizedText = personalizeContent(textContent, customer)
           
-          // Add tracking to HTML email
-          const trackedHtml = addEmailTracking(personalizedHtml, templateId, customer.id)
+          // Add tracking to HTML email  
+          const trackedHtml = addEmailTracking(personalizedHtml, updateCampaignId, customer.id)
           
           return {
             to: customer.email,
@@ -609,8 +666,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log campaign results (in production, store in database)
-    console.log(`Campaign ${templateId} sent:`, results)
+    // Update campaign sentCount in database
+    try {
+      await prisma.emailCampaign.update({
+        where: { id: updateCampaignId },
+        data: { 
+          sentCount: results.successCount,
+          sentAt: new Date(),
+          status: 'sent'
+        }
+      })
+      console.log(`Campaign ${updateCampaignId} sentCount updated: ${results.successCount}`)
+    } catch (dbError) {
+      console.warn('Failed to update campaign sentCount:', dbError)
+    }
+
+    // Log campaign results
+    console.log(`Campaign ${updateCampaignId} sent:`, results)
 
     return NextResponse.json({
       success: true,
@@ -684,7 +756,7 @@ async function getCustomersForCampaign(
   }
 }
 
-// Helper function to add email tracking (open pixel + click tracking)
+// Helper function to add email tracking (open pixel + enhanced click tracking)
 function addEmailTracking(htmlContent: string, campaignId: string, recipientId: number): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'
   
@@ -692,18 +764,30 @@ function addEmailTracking(htmlContent: string, campaignId: string, recipientId: 
   const trackingPixelUrl = `${baseUrl}/api/email/tracking/open?c=${campaignId}&r=${recipientId}&t=${Date.now()}`
   const trackingPixel = `<img src="${trackingPixelUrl}" alt="" width="1" height="1" style="display:block;border:none;outline:none;text-decoration:none;" />`
   
-  // 2. Convert all links to tracked links
+  // 2. Convert all links to tracked links with enhanced type detection
   let trackedHtml = htmlContent.replace(
     /href=["']([^"']+)["']/gi,
-    (match, url) => {
+    (match, url, offset) => {
       // Skip already tracked links and tracking pixels
       if (url.includes('/api/email/tracking/') || url.includes('mailto:') || url.startsWith('#')) {
         return match
       }
       
-      // Create tracked link
+      // Detect link type based on context
+      let linkType = 'text-link' // default
+      const surroundingHtml = htmlContent.substring(Math.max(0, offset - 200), offset + 200)
+      
+      if (surroundingHtml.includes('<table') && surroundingHtml.includes('padding') && surroundingHtml.includes('border-radius')) {
+        linkType = 'button'
+      } else if (surroundingHtml.includes('youtube.com') || surroundingHtml.includes('youtu.be') || surroundingHtml.includes('play')) {
+        linkType = 'video'
+      } else if (url.includes('website') || url.includes('home') || url.includes('.com.au')) {
+        linkType = 'website'
+      }
+      
+      // Create enhanced tracked link
       const encodedUrl = encodeURIComponent(url)
-      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&r=${recipientId}&url=${encodedUrl}&t=${Date.now()}`
+      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&r=${recipientId}&url=${encodedUrl}&type=${linkType}&t=${Date.now()}`
       return `href="${trackedUrl}"`
     }
   )

@@ -740,7 +740,10 @@ export default function CustomerEmailsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          name: editCampaignForm.name,
+          campaignId: viewingCampaign.id,
           templateId: editCampaignForm.templateId,
+          templateName: template.name,
           subject: editCampaignForm.subject,
           htmlContent: template.htmlContent,
           textContent: template.textContent,

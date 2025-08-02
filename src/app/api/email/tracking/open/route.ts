@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { sql } from '@vercel/postgres'
 
 // Email Open Tracking API
 // Called when tracking pixel is loaded in email clients
@@ -82,15 +80,11 @@ export async function GET(request: NextRequest) {
         })
         trackingResult = 'skipped_no_email'
       } else {
-        // Save email open to database - NOW SYNCHRONOUS
-        await prisma.emailOpen.create({
-          data: {
-            campaignId: campaignId,
-            recipientEmail: recipientEmail,
-            userAgent: request.headers.get('user-agent') || '',
-            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''
-          }
-        })
+        // FIXED: Use raw SQL with snake_case columns to match actual database schema
+        await sql`
+          INSERT INTO email_opens (campaign_id, recipient_email, user_agent, ip_address, opened_at)
+          VALUES (${campaignId}, ${recipientEmail}, ${request.headers.get('user-agent') || ''}, ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''}, NOW())
+        `
 
         console.log(`✅ Email open tracked and saved to database:`, {
           campaignId,
@@ -104,7 +98,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       console.error('❌ CRITICAL: Email open tracking database error:', error)
       console.error('Full error details:', JSON.stringify(error, null, 2))
-      trackingResult = `failed_${error instanceof Error ? error.message : 'unknown'}`
+      trackingResult = `database_error`
     }
 
     // Always return pixel with tracking result in headers for debugging

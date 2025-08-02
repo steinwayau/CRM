@@ -606,8 +606,8 @@ export async function POST(request: NextRequest) {
           const personalizedHtml = personalizeContent(emailHtml, customer)
           const personalizedText = personalizeContent(textContent, customer)
           
-          // Add tracking to HTML email  
-          const trackedHtml = addEmailTracking(personalizedHtml, updateCampaignId, customer.id)
+          // Add tracking to HTML email - NEW SYSTEM: Use email address directly
+          const trackedHtml = addEmailTracking(personalizedHtml, updateCampaignId, customer.email)
           
           return {
             to: customer.email,
@@ -756,12 +756,13 @@ async function getCustomersForCampaign(
   }
 }
 
-// Helper function to add email tracking (open pixel + enhanced click tracking)
-function addEmailTracking(htmlContent: string, campaignId: string, recipientId: number): string {
+// Helper function to add email tracking (NEW SYSTEM - Uses email addresses directly)
+function addEmailTracking(htmlContent: string, campaignId: string, recipientEmail: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'
   
-  // 1. Add tracking pixel for email opens
-  const trackingPixelUrl = `${baseUrl}/api/email/tracking/open?c=${campaignId}&r=${recipientId}&t=${Date.now()}`
+  // 1. Add tracking pixel for email opens - NEW: Direct email parameter
+  const encodedEmail = encodeURIComponent(recipientEmail)
+  const trackingPixelUrl = `${baseUrl}/api/email/tracking/open?c=${campaignId}&e=${encodedEmail}`
   const trackingPixel = `<img src="${trackingPixelUrl}" alt="" width="1" height="1" style="display:block;border:none;outline:none;text-decoration:none;" />`
   
   // 2. Convert all links to tracked links with enhanced type detection
@@ -774,7 +775,7 @@ function addEmailTracking(htmlContent: string, campaignId: string, recipientId: 
       }
       
       // Detect link type based on context
-      let linkType = 'text-link' // default
+      let linkType = 'link' // default
       const surroundingHtml = htmlContent.substring(Math.max(0, offset - 200), offset + 200)
       
       if (surroundingHtml.includes('<table') && surroundingHtml.includes('padding') && surroundingHtml.includes('border-radius')) {
@@ -785,9 +786,9 @@ function addEmailTracking(htmlContent: string, campaignId: string, recipientId: 
         linkType = 'website'
       }
       
-      // Create enhanced tracked link
+      // Create enhanced tracked link - NEW: Direct email parameter
       const encodedUrl = encodeURIComponent(url)
-      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&r=${recipientId}&url=${encodedUrl}&type=${linkType}&t=${Date.now()}`
+      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&e=${encodedEmail}&url=${encodedUrl}&type=${linkType}`
       return `href="${trackedUrl}"`
     }
   )

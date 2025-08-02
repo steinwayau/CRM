@@ -10,8 +10,9 @@ export async function POST(request: NextRequest) {
     await sql`DROP TABLE IF EXISTS email_opens CASCADE;`
     await sql`DROP TABLE IF EXISTS email_clicks CASCADE;`
     await sql`DROP TABLE IF EXISTS email_bounces CASCADE;`
+    await sql`DROP TABLE IF EXISTS email_tracking CASCADE;`
     
-    console.log('✅ Removed old broken tracking tables')
+    console.log('✅ Removed old tracking tables')
     
     // Create new unified tracking table - SIMPLE AND BULLETPROOF
     await sql`
@@ -32,11 +33,16 @@ export async function POST(request: NextRequest) {
       );
     `
     
-    // Create indexes separately with proper PostgreSQL syntax
-    await sql`CREATE INDEX idx_campaign_tracking ON email_tracking (campaign_id, event_type);`
-    await sql`CREATE INDEX idx_recipient_tracking ON email_tracking (recipient_email, event_type);`
-    
     console.log('✅ Created unified email_tracking table')
+    
+    // Create indexes for fast lookups
+    try {
+      await sql`CREATE INDEX idx_campaign_tracking ON email_tracking (campaign_id, event_type);`
+      await sql`CREATE INDEX idx_recipient_tracking ON email_tracking (recipient_email, event_type);`
+      console.log('✅ Created tracking indexes')
+    } catch (indexError) {
+      console.log('⚠️ Index creation warning (may already exist):', indexError)
+    }
     
     // Verify table exists and structure
     const tableCheck = await sql`

@@ -965,7 +965,14 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Open Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {overallAnalytics?.summary?.overallOpenRate || '0'}%
+                {(() => {
+                  const sentCampaigns = campaigns.filter(c => c.status === 'sent')
+                  if (sentCampaigns.length === 0) return '0'
+                  const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
+                  const analytics = campaignAnalytics[latestCampaign.id]
+                  if (!analytics || latestCampaign.sentCount === 0) return '0'
+                  return ((analytics.opens / latestCampaign.sentCount) * 100).toFixed(1)
+                })()}%
               </p>
             </div>
           </div>
@@ -981,7 +988,14 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Click Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {overallAnalytics?.summary?.overallClickRate || '0'}%
+                {(() => {
+                  const sentCampaigns = campaigns.filter(c => c.status === 'sent')
+                  if (sentCampaigns.length === 0) return '0'
+                  const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
+                  const analytics = campaignAnalytics[latestCampaign.id]
+                  if (!analytics || latestCampaign.sentCount === 0) return '0'
+                  return ((analytics.clicks / latestCampaign.sentCount) * 100).toFixed(1)
+                })()}%
               </p>
             </div>
           </div>

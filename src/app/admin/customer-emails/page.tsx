@@ -150,6 +150,7 @@ export default function CustomerEmailsPage() {
   })
   const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number}}>({})
   const [overallAnalytics, setOverallAnalytics] = useState<any>(null)
+  const [detailedAnalytics, setDetailedAnalytics] = useState<any>(null)
 
   // Load overall analytics data from working API
   const loadOverallAnalytics = async () => {
@@ -161,6 +162,19 @@ export default function CustomerEmailsPage() {
       }
     } catch (error) {
       console.error('Failed to load overall analytics:', error)
+    }
+  }
+
+  // Load detailed analytics data with click breakdowns
+  const loadDetailedAnalytics = async () => {
+    try {
+      const response = await fetch('/api/email/analytics/detailed')
+      if (response.ok) {
+        const data = await response.json()
+        setDetailedAnalytics(data)
+      }
+    } catch (error) {
+      console.error('Failed to load detailed analytics:', error)
     }
   }
 
@@ -194,8 +208,9 @@ export default function CustomerEmailsPage() {
       console.log('📊 Final analytics data:', analyticsData)
       setCampaignAnalytics(analyticsData)
       
-      // Also load overall analytics
+      // Also load overall analytics and detailed analytics
       loadOverallAnalytics()
+      loadDetailedAnalytics()
     } catch (error) {
       console.error('❌ Failed to load campaign analytics:', error)
     }
@@ -896,6 +911,7 @@ export default function CustomerEmailsPage() {
           onClick={() => {
             loadCampaignAnalytics()
             loadOverallAnalytics()
+            loadDetailedAnalytics()
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
         >
@@ -1536,6 +1552,135 @@ export default function CustomerEmailsPage() {
           <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
             <p className="text-gray-500">Engagement metrics coming soon</p>
           </div>
+        </div>
+      </div>
+
+      {/* Detailed Click Analytics */}
+      {detailedAnalytics?.summary?.clickBreakdown?.length > 0 && (
+        <div className="bg-white rounded-lg shadow border">
+          <div className="px-6 py-4 border-b">
+            <h3 className="text-lg font-semibold">Click Analytics Breakdown</h3>
+            <p className="text-sm text-gray-600">Detailed analysis of link clicks by type</p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {detailedAnalytics.summary.clickBreakdown.map((breakdown: any, index: number) => (
+                <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600 capitalize">
+                      {breakdown.linkType.replace('-', ' ')} Links
+                    </span>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      {breakdown.campaignsWithType} campaign{breakdown.campaignsWithType !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                    {breakdown.totalClicks}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {breakdown.uniqueUsers} unique user{breakdown.uniqueUsers !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Top Clicked URLs */}
+            {detailedAnalytics.summary.topUrls?.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-md font-semibold mb-3">Most Clicked Links</h4>
+                <div className="space-y-2">
+                  {detailedAnalytics.summary.topUrls.slice(0, 5).map((urlData: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {urlData.url}
+                        </div>
+                        <div className="text-xs text-gray-500 capitalize">
+                          {urlData.linkType} • {urlData.uniqueUsers} unique user{urlData.uniqueUsers !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <div className="text-lg font-semibold text-blue-600">
+                        {urlData.clicks}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Campaigns List */}
+      <div className="bg-white rounded-lg shadow border">
+        <div className="px-6 py-4 border-b">
+          <h3 className="text-lg font-semibold">Recent Campaigns</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Template</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Performance</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {campaigns.map((campaign) => (
+                <tr key={campaign.id}>
+                  <td className="px-6 py-4">
+                    <div>
+                      <p className="font-medium text-gray-900">{campaign.name}</p>
+                      <p className="text-sm text-gray-500">{campaign.subject}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{campaign.templateName}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{campaign.recipientCount.toLocaleString()}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      campaign.status === 'sent' ? 'bg-green-100 text-green-800' :
+                      campaign.status === 'sending' ? 'bg-yellow-100 text-yellow-800' :
+                      campaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {campaign.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {campaign.openRate && campaign.clickRate ? (
+                      <div>
+                        <p>Open: {campaign.openRate}%</p>
+                        <p>Click: {campaign.clickRate}%</p>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">Pending</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex space-x-2">
+                      {campaign.status === 'draft' && (
+                        <button
+                          onClick={() => handleSendCampaign(campaign.id)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Send Now
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => handleViewCampaign(campaign)}
+                        className="text-gray-600 hover:text-gray-800 text-sm"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

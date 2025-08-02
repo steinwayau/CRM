@@ -149,6 +149,20 @@ export default function CustomerEmailsPage() {
     scheduledAt: ''
   })
   const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number}}>({})
+  const [overallAnalytics, setOverallAnalytics] = useState<any>(null)
+
+  // Load overall analytics data from working API
+  const loadOverallAnalytics = async () => {
+    try {
+      const response = await fetch('/api/email/analytics')
+      if (response.ok) {
+        const data = await response.json()
+        setOverallAnalytics(data)
+      }
+    } catch (error) {
+      console.error('Failed to load overall analytics:', error)
+    }
+  }
 
   // Load real analytics data for campaigns
   const loadCampaignAnalytics = async () => {
@@ -179,6 +193,9 @@ export default function CustomerEmailsPage() {
       
       console.log('📊 Final analytics data:', analyticsData)
       setCampaignAnalytics(analyticsData)
+      
+      // Also load overall analytics
+      loadOverallAnalytics()
     } catch (error) {
       console.error('❌ Failed to load campaign analytics:', error)
     }
@@ -876,7 +893,10 @@ export default function CustomerEmailsPage() {
           <p className="text-sm text-gray-600">Auto-refreshes every 30 seconds</p>
         </div>
         <button
-          onClick={loadCampaignAnalytics}
+          onClick={() => {
+            loadCampaignAnalytics()
+            loadOverallAnalytics()
+          }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -911,7 +931,9 @@ export default function CustomerEmailsPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">Emails Sent</p>
-              <p className="text-3xl font-bold text-gray-900">{campaigns.reduce((sum, c) => sum + c.sentCount, 0)}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {overallAnalytics?.summary?.totalEmailsSent || campaigns.reduce((sum, c) => sum + c.sentCount, 0)}
+              </p>
             </div>
           </div>
         </div>
@@ -927,13 +949,7 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Open Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {(() => {
-                  const sentCampaigns = campaigns.filter(c => c.sentCount > 0)
-                  if (sentCampaigns.length === 0) return '0'
-                  const totalSent = sentCampaigns.reduce((sum, c) => sum + c.sentCount, 0)
-                  const totalOpens = sentCampaigns.reduce((sum, c) => sum + (campaignAnalytics[c.id]?.opens || 0), 0)
-                  return totalSent > 0 ? ((totalOpens / totalSent) * 100).toFixed(1) : '0'
-                })()}%
+                {overallAnalytics?.summary?.overallOpenRate || '0'}%
               </p>
             </div>
           </div>
@@ -949,13 +965,7 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Click Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {(() => {
-                  const sentCampaigns = campaigns.filter(c => c.sentCount > 0)
-                  if (sentCampaigns.length === 0) return '0'
-                  const totalSent = sentCampaigns.reduce((sum, c) => sum + c.sentCount, 0)
-                  const totalClicks = sentCampaigns.reduce((sum, c) => sum + (campaignAnalytics[c.id]?.clicks || 0), 0)
-                  return totalSent > 0 ? ((totalClicks / totalSent) * 100).toFixed(1) : '0'
-                })()}%
+                {overallAnalytics?.summary?.overallClickRate || '0'}%
               </p>
             </div>
           </div>

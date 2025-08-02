@@ -28,13 +28,13 @@ export async function POST(request: NextRequest) {
         -- Tracking metadata
         user_agent TEXT,
         ip_address TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        
-        -- Create index for fast lookups
-        INDEX idx_campaign_tracking (campaign_id, event_type),
-        INDEX idx_recipient_tracking (recipient_email, event_type)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `
+    
+    // Create indexes separately with proper PostgreSQL syntax
+    await sql`CREATE INDEX idx_campaign_tracking ON email_tracking (campaign_id, event_type);`
+    await sql`CREATE INDEX idx_recipient_tracking ON email_tracking (recipient_email, event_type);`
     
     console.log('✅ Created unified email_tracking table')
     

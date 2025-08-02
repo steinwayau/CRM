@@ -17,6 +17,18 @@ export async function GET(request: NextRequest) {
     // FIXED: Synchronous tracking - save before returning pixel
     if (campaignId && recipientEmail) {
       try {
+        const decodedEmail = decodeURIComponent(recipientEmail)
+        const userAgent = request.headers.get('user-agent') || ''
+        const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''
+        
+        console.log('🔍 OPEN TRACKING: Parameters received:', {
+          campaignId,
+          recipientEmail,
+          decodedEmail,
+          userAgent: userAgent.substring(0, 50),
+          ipAddress
+        })
+        
         await sql`
           INSERT INTO email_tracking (
             campaign_id, 
@@ -26,20 +38,26 @@ export async function GET(request: NextRequest) {
             ip_address
           ) VALUES (
             ${campaignId}, 
-            ${decodeURIComponent(recipientEmail)}, 
+            ${decodedEmail}, 
             'open',
-            ${request.headers.get('user-agent') || ''},
-            ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''}
+            ${userAgent},
+            ${ipAddress}
           )
         `
         
-        console.log(`✅ NEW TRACKING: Email open recorded - Campaign: ${campaignId}, Email: ${decodeURIComponent(recipientEmail)}`)
+        console.log(`✅ NEW TRACKING: Email open recorded - Campaign: ${campaignId}, Email: ${decodedEmail}`)
         
       } catch (error) {
         console.error('❌ NEW TRACKING: Open tracking failed:', error)
+        console.error('Error details:', {
+          campaignId,
+          recipientEmail,
+          decodedEmail: decodeURIComponent(recipientEmail),
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
       }
     } else {
-      console.log('❌ NEW TRACKING: Missing campaignId or recipientEmail')
+      console.log('❌ NEW TRACKING: Missing parameters:', { campaignId, recipientEmail })
     }
     
     // Return pixel after tracking is complete

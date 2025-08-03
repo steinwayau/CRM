@@ -75,6 +75,9 @@ async function getCampaignAnalytics(campaignId: string) {
     
     const totalSent = campaign.sentCount || 0
     
+    const openRate = totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0
+    const clickRate = totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
+
     return {
       campaignId,
       campaignName: campaign.name,
@@ -83,8 +86,8 @@ async function getCampaignAnalytics(campaignId: string) {
       clicks,
       uniqueOpens,
       uniqueClicks,
-      openRate: totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0,
-      clickRate: totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0,
+      openRate,
+      clickRate,
       status: campaign.status,
       sentAt: campaign.sentAt,
       found: true

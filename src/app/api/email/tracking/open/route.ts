@@ -14,53 +14,50 @@ export async function GET(request: NextRequest) {
       'base64'
     )
     
-    // ASYNC TRACKING: Use setTimeout approach (same as working click tracking)
+    // SYNCHRONOUS TRACKING: Direct database insert (like professional email services)
     if (campaignId && recipientEmail) {
-      // Use setTimeout to process tracking async - don't block pixel response
-      setTimeout(async () => {
-        try {
-          const decodedEmail = decodeURIComponent(recipientEmail)
-          const userAgent = request.headers.get('user-agent') || ''
-          const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''
-          
-          console.log('🔍 ASYNC OPEN TRACKING: Parameters received:', {
-            campaignId,
-            recipientEmail,
-            decodedEmail,
-            userAgent: userAgent.substring(0, 50),
-            ipAddress
-          })
-          
-          await sql`
-            INSERT INTO email_tracking (
-              campaign_id, 
-              recipient_email, 
-              event_type, 
-              user_agent, 
-              ip_address
-            ) VALUES (
-              ${campaignId}, 
-              ${decodedEmail}, 
-              'open',
-              ${userAgent},
-              ${ipAddress}
-            )
-          `
-          
-          console.log(`✅ ASYNC TRACKING: Email open recorded - Campaign: ${campaignId}, Email: ${decodedEmail}`)
-          
-        } catch (error) {
-          console.error('❌ ASYNC TRACKING: Open tracking failed:', error)
-          console.error('Error details:', {
-            campaignId,
-            recipientEmail,
-            decodedEmail: decodeURIComponent(recipientEmail),
-            errorMessage: error instanceof Error ? error.message : 'Unknown error'
-          })
-        }
-      }, 0)
+      try {
+        const decodedEmail = decodeURIComponent(recipientEmail)
+        const userAgent = request.headers.get('user-agent') || ''
+        const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''
+        
+        console.log('🔍 SYNC OPEN TRACKING: Parameters received:', {
+          campaignId,
+          recipientEmail,
+          decodedEmail,
+          userAgent: userAgent.substring(0, 50),
+          ipAddress
+        })
+        
+        await sql`
+          INSERT INTO email_tracking (
+            campaign_id, 
+            recipient_email, 
+            event_type, 
+            user_agent, 
+            ip_address
+          ) VALUES (
+            ${campaignId}, 
+            ${decodedEmail}, 
+            'open',
+            ${userAgent},
+            ${ipAddress}
+          )
+        `
+        
+        console.log(`✅ SYNC TRACKING: Email open recorded - Campaign: ${campaignId}, Email: ${decodedEmail}`)
+        
+      } catch (error) {
+        console.error('❌ SYNC TRACKING: Open tracking failed:', error)
+        console.error('Error details:', {
+          campaignId,
+          recipientEmail,
+          decodedEmail: decodeURIComponent(recipientEmail),
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
+      }
     } else {
-      console.log('❌ ASYNC TRACKING: Missing parameters:', { campaignId, recipientEmail })
+      console.log('❌ SYNC TRACKING: Missing parameters:', { campaignId, recipientEmail })
     }
     
     // Return pixel immediately (tracking happens asynchronously)

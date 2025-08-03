@@ -83,8 +83,8 @@ async function getCampaignAnalytics(campaignId: string) {
       clicks,
       uniqueOpens,
       uniqueClicks,
-      openRate: totalSent > 0 ? ((uniqueOpens / totalSent) * 100).toFixed(1) : '0.0',
-      clickRate: totalSent > 0 ? ((uniqueClicks / totalSent) * 100).toFixed(1) : '0.0',
+      openRate: totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0,
+      clickRate: totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0,
       status: campaign.status,
       sentAt: campaign.sentAt,
       found: true

@@ -774,16 +774,17 @@ function addEmailTracking(htmlContent: string, campaignId: string, recipientEmai
         return match
       }
       
-      // Detect link type based on context
+      // Detect link type based on URL and context
       let linkType = 'link' // default
       const surroundingHtml = htmlContent.substring(Math.max(0, offset - 200), offset + 200)
       
-      if (surroundingHtml.includes('<table') && surroundingHtml.includes('padding') && surroundingHtml.includes('border-radius')) {
-        linkType = 'button'
-      } else if (surroundingHtml.includes('youtube.com') || surroundingHtml.includes('youtu.be') || surroundingHtml.includes('play')) {
+      // Check URL first for specific patterns
+      if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.includes('video')) {
         linkType = 'video'
-      } else if (url.includes('website') || url.includes('home') || url.includes('.com.au')) {
+      } else if (url.includes('.com.au') || url.includes('steinway.com') || url.includes('website') || url.includes('home')) {
         linkType = 'website'
+      } else if (surroundingHtml.includes('<table') && surroundingHtml.includes('padding') && surroundingHtml.includes('border-radius')) {
+        linkType = 'button'
       }
       
       // Create enhanced tracked link - NEW: Direct email parameter

@@ -53,7 +53,7 @@ async function getCampaignAnalytics(campaignId: string) {
         COUNT(*) as count,
         COUNT(DISTINCT recipient_email) as unique_recipients
       FROM email_tracking 
-      WHERE campaign_id = ${campaignId}
+      WHERE campaign_id = ${campaignId} AND recipient_email <> ''
       GROUP BY event_type
     `
     

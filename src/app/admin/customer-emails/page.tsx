@@ -670,8 +670,8 @@ export default function CustomerEmailsPage() {
                 c.id === campaignId 
                   ? { 
                       ...c, 
-                      openRate: analytics.metrics?.openRate || c.openRate,
-                      clickRate: analytics.metrics?.clickRate || c.clickRate
+                      openRate: analytics.openRate || c.openRate,
+                      clickRate: analytics.clickRate || c.clickRate
                     }
                   : c
               ))

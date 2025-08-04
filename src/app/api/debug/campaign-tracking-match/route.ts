@@ -26,9 +26,9 @@ export async function GET() {
     const campaigns = campaignsResult.rows
     const trackingByCampaign = trackingResult.rows
     
-    const matches = []
-    const orphanedTracking = []
-    const campaignsWithoutTracking = []
+    const matches: any[] = []
+    const orphanedTracking: any[] = []
+    const campaignsWithoutTracking: any[] = []
     
     // Check each campaign for tracking data
     campaigns.forEach(campaign => {

@@ -148,7 +148,7 @@ export default function CustomerEmailsPage() {
     customEmails: '',
     scheduledAt: ''
   })
-  const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number}}>({})
+  const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}}>({})
   const [overallAnalytics, setOverallAnalytics] = useState<any>(null)
   const [detailedAnalytics, setDetailedAnalytics] = useState<any>(null)
 
@@ -182,7 +182,7 @@ export default function CustomerEmailsPage() {
   const loadCampaignAnalytics = async () => {
     try {
       console.log('🔄 Loading campaign analytics for campaigns:', campaigns.map(c => ({ id: c.id, name: c.name, status: c.status, sentCount: c.sentCount })))
-      const analyticsData: {[key: string]: {opens: number, clicks: number}} = {}
+      const analyticsData: {[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}} = {}
       
       for (const campaign of campaigns) {
         // ANALYTICS FIX: Fetch analytics for any campaign with 'sent' status
@@ -195,7 +195,9 @@ export default function CustomerEmailsPage() {
             console.log(`📈 Analytics data for ${campaign.id}:`, data)
             analyticsData[campaign.id] = {
               opens: data.opens || 0,
-              clicks: data.clicks || 0
+              clicks: data.clicks || 0,
+              openRate: data.openRate || 0,
+              clickRate: data.clickRate || 0
             }
           } else {
             console.error(`❌ Failed to fetch analytics for campaign ${campaign.id}:`, response.status, response.statusText)
@@ -988,8 +990,8 @@ export default function CustomerEmailsPage() {
                   if (sentCampaigns.length === 0) return '0'
                   const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
                   const analytics = campaignAnalytics[latestCampaign.id]
-                  if (analytics && latestCampaign.sentCount > 0) {
-                    return ((analytics.opens / latestCampaign.sentCount) * 100).toFixed(1)
+                  if (analytics) {
+                    return analytics.openRate.toFixed(1)
                   }
                   // Fallback to overall analytics if campaign analytics not loaded
                   return overallAnalytics?.summary?.overallOpenRate || '0'
@@ -1014,8 +1016,8 @@ export default function CustomerEmailsPage() {
                   if (sentCampaigns.length === 0) return '0'
                   const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
                   const analytics = campaignAnalytics[latestCampaign.id]
-                  if (analytics && latestCampaign.sentCount > 0) {
-                    return ((analytics.clicks / latestCampaign.sentCount) * 100).toFixed(1)
+                  if (analytics) {
+                    return analytics.clickRate.toFixed(1)
                   }
                   // Fallback to overall analytics if campaign analytics not loaded  
                   return overallAnalytics?.summary?.overallClickRate || '0'
@@ -2318,29 +2320,29 @@ export default function CustomerEmailsPage() {
 
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h4>
-                  {viewingCampaign.status === 'sent' && viewingCampaign.openRate && viewingCampaign.clickRate ? (
+                  {viewingCampaign.status === 'sent' && (viewingCampaign.openRate !== undefined || viewingCampaign.clickRate !== undefined) ? (
                     <div className="space-y-4">
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Open Rate</span>
-                          <span>{viewingCampaign.openRate.toFixed(1)}%</span>
+                          <span>{(viewingCampaign.openRate || 0).toFixed(1)}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-purple-600 h-2 rounded-full" 
-                            style={{ width: `${Math.min(viewingCampaign.openRate, 100)}%` }}
+                            style={{ width: `${Math.min(viewingCampaign.openRate || 0, 100)}%` }}
                           ></div>
                         </div>
                       </div>
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Click Rate</span>
-                          <span>{viewingCampaign.clickRate.toFixed(1)}%</span>
+                          <span>{(viewingCampaign.clickRate || 0).toFixed(1)}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-orange-600 h-2 rounded-full" 
-                            style={{ width: `${Math.min(viewingCampaign.clickRate * 5, 100)}%` }}
+                            style={{ width: `${Math.min((viewingCampaign.clickRate || 0) * 5, 100)}%` }}
                           ></div>
                         </div>
                       </div>

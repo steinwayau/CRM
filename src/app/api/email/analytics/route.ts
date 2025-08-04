@@ -174,8 +174,8 @@ async function getOverallAnalytics() {
         totalClicks,
         uniqueOpens,
         uniqueClicks,
-        overallOpenRate: totalSent > 0 ? ((uniqueOpens / totalSent) * 100).toFixed(1) : '0.0',
-        overallClickRate: totalSent > 0 ? ((uniqueClicks / totalSent) * 100).toFixed(1) : '0.0'
+        overallOpenRate: totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0,
+        overallClickRate: totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
       },
       recent: {
         opensLast7Days: recentOpens,

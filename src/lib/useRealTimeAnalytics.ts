@@ -62,7 +62,22 @@ export function useRealTimeAnalytics(
       })
     }
 
-    console.log('🔌 REAL-TIME: Connected to Pusher for live analytics updates')
+    console.log('🔌 REAL-TIME: Initializing Pusher connection...')
+    
+    // Add connection state logging
+    pusherRef.current.connection.bind('connected', () => {
+      console.log('✅ REAL-TIME: Successfully connected to Pusher!')
+    })
+    
+    pusherRef.current.connection.bind('disconnected', () => {
+      console.log('❌ REAL-TIME: Disconnected from Pusher')
+    })
+    
+    pusherRef.current.connection.bind('failed', () => {
+      console.log('❌ REAL-TIME: Failed to connect to Pusher')
+    })
+    
+    console.log('🔌 REAL-TIME: Pusher initialized, waiting for connection...')
 
     // Cleanup function
     return () => {

@@ -977,7 +977,15 @@ export default function CustomerEmailsPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Campaign Performance</h3>
-          <p className="text-sm text-gray-600">Auto-refreshes every 30 seconds</p>
+          <div className="flex items-center space-x-4">
+            <p className="text-sm text-gray-600">Auto-refreshes every 30 seconds</p>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Real-time connected' : 'Connecting...'}
+              </span>
+            </div>
+          </div>
         </div>
         <button
           onClick={() => {

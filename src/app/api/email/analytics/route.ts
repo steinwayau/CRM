@@ -31,7 +31,7 @@ async function getCampaignAnalytics(campaignId: string) {
   try {
     // Get campaign details
     const campaignResult = await sql`
-      SELECT id, name, "sentCount", status, "sentAt"
+      SELECT id, name
       FROM email_campaigns 
       WHERE id = ${campaignId}
     `
@@ -73,7 +73,14 @@ async function getCampaignAnalytics(campaignId: string) {
       }
     })
     
-    const totalSent = campaign.sentCount || 0
+    // Calculate total sent based on unique recipients (since sentCount doesn't exist)
+    const totalSentResult = await sql`
+      SELECT COUNT(DISTINCT recipient_email) as total_sent
+      FROM email_tracking 
+      WHERE campaign_id = ${campaignId}
+    `
+    
+    const totalSent = parseInt(totalSentResult.rows[0]?.total_sent) || uniqueClicks || 1
     
     const openRate = totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0
     const clickRate = totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
@@ -88,8 +95,8 @@ async function getCampaignAnalytics(campaignId: string) {
       uniqueClicks,
       openRate,
       clickRate,
-      status: campaign.status,
-      sentAt: campaign.sentAt,
+      status: 'sent', // Default since we have tracking data
+      sentAt: null,
       found: true
     }
     

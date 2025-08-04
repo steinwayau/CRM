@@ -717,6 +717,7 @@ export default function CustomerEmailsPage() {
     setViewingCampaign(campaign)
     setShowCampaignView(true)
     setEditingCampaign(false) // Ensure editing is off when viewing
+    setDetailedAnalytics(null) // Clear previous detailed analytics
     
     // Load analytics data if campaign is sent
     if (campaign.status === 'sent') {
@@ -726,20 +727,28 @@ export default function CustomerEmailsPage() {
           fetch(`/api/email/analytics/detailed?campaignId=${campaign.id}`)
         ])
         
+        let updatedCampaign = campaign
+        let detailedData = null
+        
         if (analyticsResponse.ok) {
           const analytics = await analyticsResponse.json()
-          const updatedCampaign = {
+          updatedCampaign = {
             ...campaign,
             openRate: analytics.openRate || 0,
             clickRate: analytics.clickRate || 0
           }
-          setViewingCampaign(updatedCampaign)
         }
         
         if (detailedResponse.ok) {
-          const detailed = await detailedResponse.json()
-          setDetailedAnalytics(detailed)
+          detailedData = await detailedResponse.json()
         }
+        
+        // 🎯 SURGICAL FIX: Set both campaign and detailed analytics together to prevent overwriting
+        setViewingCampaign(updatedCampaign)
+        if (detailedData) {
+          setDetailedAnalytics(detailedData)
+        }
+        
       } catch (error) {
         console.error('Error loading campaign analytics:', error)
       }

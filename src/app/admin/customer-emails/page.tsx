@@ -711,10 +711,28 @@ export default function CustomerEmailsPage() {
   }
 
   // Campaign management functions
-  const handleViewCampaign = (campaign: Campaign) => {
+  const handleViewCampaign = async (campaign: Campaign) => {
     setViewingCampaign(campaign)
     setShowCampaignView(true)
     setEditingCampaign(false) // Ensure editing is off when viewing
+    
+    // Load analytics data if campaign is sent
+    if (campaign.status === 'sent') {
+      try {
+        const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
+        if (response.ok) {
+          const analytics = await response.json()
+          const updatedCampaign = {
+            ...campaign,
+            openRate: analytics.openRate || 0,
+            clickRate: analytics.clickRate || 0
+          }
+          setViewingCampaign(updatedCampaign)
+        }
+      } catch (error) {
+        console.error('Error loading campaign analytics:', error)
+      }
+    }
   }
 
   const handleEditCampaign = () => {

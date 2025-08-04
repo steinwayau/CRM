@@ -165,18 +165,8 @@ export default function CustomerEmailsPage() {
     }
   }
 
-  // Load detailed analytics data with click breakdowns
-  const loadDetailedAnalytics = async () => {
-    try {
-      const response = await fetch('/api/email/analytics/detailed')
-      if (response.ok) {
-        const data = await response.json()
-        setDetailedAnalytics(data)
-      }
-    } catch (error) {
-      console.error('Failed to load detailed analytics:', error)
-    }
-  }
+  // 🚫 REMOVED: loadDetailedAnalytics() - was causing campaign-specific data to be overwritten
+  // Detailed analytics are now loaded campaign-specifically in handleViewCampaign()
 
   // Load real analytics data for campaigns
   const loadCampaignAnalytics = async () => {
@@ -210,9 +200,8 @@ export default function CustomerEmailsPage() {
       console.log('📊 Final analytics data:', analyticsData)
       setCampaignAnalytics(analyticsData)
       
-      // Also load overall analytics and detailed analytics
+      // Also load overall analytics (but NOT detailed analytics - that's campaign-specific)
       loadOverallAnalytics()
-      loadDetailedAnalytics()
     } catch (error) {
       console.error('❌ Failed to load campaign analytics:', error)
     }
@@ -949,7 +938,7 @@ export default function CustomerEmailsPage() {
           onClick={() => {
             loadCampaignAnalytics()
             loadOverallAnalytics()
-            loadDetailedAnalytics()
+            // 🎯 DON'T reload detailed analytics here - it overwrites campaign-specific data
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
         >

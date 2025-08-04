@@ -110,7 +110,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const { status } = await request.json()
+    const updateData = await request.json()
     
     if (!id) {
       return NextResponse.json(
@@ -121,14 +121,14 @@ export async function PATCH(request: NextRequest) {
 
     const campaign = await prisma.emailCampaign.update({
       where: { id },
-      data: { status }
+      data: updateData
     })
 
     return NextResponse.json(campaign)
   } catch (error) {
-    console.error('Error updating campaign status:', error)
+    console.error('Error updating campaign:', error)
     return NextResponse.json(
-      { error: 'Failed to update campaign status' },
+      { error: 'Failed to update campaign', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

@@ -105,3 +105,31 @@ export async function DELETE(request: NextRequest) {
     )
   }
 } 
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    const { status } = await request.json()
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Campaign ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const campaign = await prisma.emailCampaign.update({
+      where: { id },
+      data: { status }
+    })
+
+    return NextResponse.json(campaign)
+  } catch (error) {
+    console.error('Error updating campaign status:', error)
+    return NextResponse.json(
+      { error: 'Failed to update campaign status' },
+      { status: 500 }
+    )
+  }
+} 

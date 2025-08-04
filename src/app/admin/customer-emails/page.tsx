@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface Customer {
@@ -83,6 +83,7 @@ interface Campaign {
 
 export default function CustomerEmailsPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get('tab')
     return ['campaigns', 'customers', 'templates', 'analytics'].includes(tabParam || '') ? tabParam : 'campaigns'
@@ -244,10 +245,22 @@ export default function CustomerEmailsPage() {
     const tabParam = searchParams.get('tab')
     if (tabParam && ['campaigns', 'customers', 'templates', 'analytics'].includes(tabParam)) {
       setActiveTab(tabParam)
+    } else if (!tabParam) {
+      // 🎯 If no tab parameter, set URL to show campaigns as default
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', 'campaigns')
+      router.push(url.pathname + url.search, { scroll: false })
     }
-  }, [searchParams])
+  }, [searchParams, router])
 
-
+  // 🎯 Handle tab changes with URL synchronization
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab)
+    // Update URL to maintain state on refresh
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', newTab)
+    router.push(url.pathname + url.search, { scroll: false })
+  }
 
   // Helper function to update campaigns (now using database)
   const updateCampaigns = async (newCampaigns: Campaign[]) => {
@@ -1772,7 +1785,7 @@ export default function CustomerEmailsPage() {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'

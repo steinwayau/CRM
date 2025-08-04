@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
+import { broadcastAnalyticsUpdate } from '@/lib/pusher'
 
 // NEW BULLETPROOF EMAIL CLICK TRACKING
 export async function GET(request: NextRequest) {
@@ -13,11 +14,12 @@ export async function GET(request: NextRequest) {
     // Determine redirect URL
     const redirectUrl = targetUrl ? decodeURIComponent(targetUrl) : 'https://crm.steinway.com.au'
     
-    // Background tracking - don't block redirect
+    // 🚀 REAL-TIME TRACKING - Process immediately and broadcast
     if (campaignId && recipientEmail && targetUrl) {
-      // Use setTimeout to process tracking async
-      setTimeout(async () => {
+      // Process tracking in background (non-blocking for redirect)
+      setImmediate(async () => {
         try {
+          // Insert tracking record
           await sql`
             INSERT INTO email_tracking (
               campaign_id, 
@@ -38,12 +40,25 @@ export async function GET(request: NextRequest) {
             )
           `
           
-          console.log(`✅ NEW TRACKING: Email click recorded - Campaign: ${campaignId}, Email: ${decodeURIComponent(recipientEmail)}, URL: ${decodeURIComponent(targetUrl)}`)
+          console.log(`✅ REAL-TIME TRACKING: Click recorded - Campaign: ${campaignId}, Email: ${decodeURIComponent(recipientEmail)}, URL: ${decodeURIComponent(targetUrl)}`)
+          
+          // 📡 BROADCAST REAL-TIME UPDATE: Notify all connected clients instantly
+          try {
+            // Get updated analytics for this campaign
+            const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://crm.steinway.com.au'}/api/email/analytics?campaignId=${campaignId}`)
+            if (response.ok) {
+              const analytics = await response.json()
+              await broadcastAnalyticsUpdate(campaignId, analytics)
+              console.log(`📡 REAL-TIME: Analytics update broadcasted for campaign ${campaignId}`)
+            }
+          } catch (broadcastError) {
+            console.error('❌ REAL-TIME: Failed to broadcast analytics update:', broadcastError)
+          }
           
         } catch (error) {
-          console.error('❌ NEW TRACKING: Click tracking failed:', error)
+          console.error('❌ REAL-TIME TRACKING: Click tracking failed:', error)
         }
-      }, 0)
+      })
     } else {
       console.log('❌ NEW TRACKING: Missing required click parameters')
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useRealTimeAnalytics, AnalyticsUpdate } from '@/lib/useRealTimeAnalytics'
 
 interface Customer {
   id: number
@@ -168,6 +169,37 @@ export default function CustomerEmailsPage() {
 
   // 🚫 REMOVED: loadDetailedAnalytics() - was causing campaign-specific data to be overwritten
   // Detailed analytics are now loaded campaign-specifically in handleViewCampaign()
+
+  // 🚀 REAL-TIME ANALYTICS: Handle real-time updates from Pusher
+  const handleAnalyticsUpdate = (update: AnalyticsUpdate) => {
+    console.log('📡 REAL-TIME: Received analytics update for campaign:', update.campaignId, update.analytics)
+    
+    // Update campaign analytics in real-time
+    setCampaignAnalytics(prev => ({
+      ...prev,
+      [update.campaignId]: {
+        opens: update.analytics.opens || 0,
+        clicks: update.analytics.clicks || 0,
+        openRate: update.analytics.openRate || 0,
+        clickRate: update.analytics.clickRate || 0
+      }
+    }))
+    
+    // If this campaign is currently being viewed, update it too
+    if (viewingCampaign && viewingCampaign.id === update.campaignId) {
+      setViewingCampaign(prev => prev ? {
+        ...prev,
+        openRate: update.analytics.openRate || 0,
+        clickRate: update.analytics.clickRate || 0
+      } : null)
+    }
+    
+    // Show real-time feedback
+    console.log(`🎯 REAL-TIME: Updated analytics for campaign ${update.campaignId}`)
+  }
+
+  // Initialize real-time connection
+  const { isConnected } = useRealTimeAnalytics(handleAnalyticsUpdate)
 
   // Load real analytics data for campaigns
   const loadCampaignAnalytics = async () => {

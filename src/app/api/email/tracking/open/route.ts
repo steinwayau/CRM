@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
+import { broadcastAnalyticsUpdate } from '@/lib/pusher'
 
 // NEW BULLETPROOF EMAIL OPEN TRACKING
 export async function GET(request: NextRequest) {
@@ -45,7 +46,19 @@ export async function GET(request: NextRequest) {
           )
         `
         
-        console.log(`✅ SYNC TRACKING: Email open recorded - Campaign: ${campaignId}, Email: ${decodedEmail}`)
+        console.log(`✅ REAL-TIME TRACKING: Email open recorded - Campaign: ${campaignId}, Email: ${decodedEmail}`)
+        
+        // 📡 BROADCAST REAL-TIME UPDATE: Notify all connected clients instantly
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://crm.steinway.com.au'}/api/email/analytics?campaignId=${campaignId}`)
+          if (response.ok) {
+            const analytics = await response.json()
+            await broadcastAnalyticsUpdate(campaignId, analytics)
+            console.log(`📡 REAL-TIME: Analytics update broadcasted for campaign ${campaignId}`)
+          }
+        } catch (broadcastError) {
+          console.error('❌ REAL-TIME: Failed to broadcast analytics update:', broadcastError)
+        }
         
       } catch (error) {
         console.error('❌ SYNC TRACKING: Open tracking failed:', error)

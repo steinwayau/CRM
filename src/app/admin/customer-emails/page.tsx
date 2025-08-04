@@ -969,8 +969,12 @@ export default function CustomerEmailsPage() {
                   const sentCampaigns = campaigns.filter(c => c.status === 'sent')
                   if (sentCampaigns.length === 0) return '0'
                   const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
-                  // Use the campaign's direct openRate from analytics API
-                  return latestCampaign.openRate?.toFixed(1) || '0'
+                  const analytics = campaignAnalytics[latestCampaign.id]
+                  if (analytics && latestCampaign.sentCount > 0) {
+                    return ((analytics.opens / latestCampaign.sentCount) * 100).toFixed(1)
+                  }
+                  // Fallback to overall analytics if campaign analytics not loaded
+                  return overallAnalytics?.summary?.overallOpenRate || '0'
                 })()}%
               </p>
             </div>
@@ -991,8 +995,12 @@ export default function CustomerEmailsPage() {
                   const sentCampaigns = campaigns.filter(c => c.status === 'sent')
                   if (sentCampaigns.length === 0) return '0'
                   const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
-                  // Use the campaign's direct clickRate from analytics API
-                  return latestCampaign.clickRate?.toFixed(1) || '0'
+                  const analytics = campaignAnalytics[latestCampaign.id]
+                  if (analytics && latestCampaign.sentCount > 0) {
+                    return ((analytics.clicks / latestCampaign.sentCount) * 100).toFixed(1)
+                  }
+                  // Fallback to overall analytics if campaign analytics not loaded  
+                  return overallAnalytics?.summary?.overallClickRate || '0'
                 })()}%
               </p>
             </div>

@@ -721,15 +721,24 @@ export default function CustomerEmailsPage() {
     // Load analytics data if campaign is sent
     if (campaign.status === 'sent') {
       try {
-        const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
-        if (response.ok) {
-          const analytics = await response.json()
+        const [analyticsResponse, detailedResponse] = await Promise.all([
+          fetch(`/api/email/analytics?campaignId=${campaign.id}`),
+          fetch(`/api/email/analytics/detailed?campaignId=${campaign.id}`)
+        ])
+        
+        if (analyticsResponse.ok) {
+          const analytics = await analyticsResponse.json()
           const updatedCampaign = {
             ...campaign,
             openRate: analytics.openRate || 0,
             clickRate: analytics.clickRate || 0
           }
           setViewingCampaign(updatedCampaign)
+        }
+        
+        if (detailedResponse.ok) {
+          const detailed = await detailedResponse.json()
+          setDetailedAnalytics(detailed)
         }
       } catch (error) {
         console.error('Error loading campaign analytics:', error)
@@ -2350,6 +2359,41 @@ export default function CustomerEmailsPage() {
                         <p className="text-sm text-gray-600">
                           <strong>Success Rate:</strong> {((viewingCampaign.sentCount / viewingCampaign.recipientCount) * 100).toFixed(1)}% delivered successfully
                         </p>
+                        
+                        {/* Detailed Click Analytics */}
+                        {detailedAnalytics && detailedAnalytics.clickBreakdown && detailedAnalytics.clickBreakdown.length > 0 && (
+                          <div className="mt-4">
+                            <h5 className="text-sm font-semibold text-gray-900 mb-2">Click Breakdown by Type</h5>
+                            <div className="space-y-2">
+                              {detailedAnalytics.clickBreakdown.map((breakdown: any, index: number) => (
+                                <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
+                                  <div className="flex items-center space-x-2">
+                                    {breakdown.linkType === 'video' && (
+                                      <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
+                                      </svg>
+                                    )}
+                                    {breakdown.linkType === 'website' && (
+                                      <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                    {breakdown.linkType === 'button' && (
+                                      <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 4a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8zm5 2a1 1 0 000 2h4a1 1 0 100-2H8z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                    <span className="text-sm font-medium text-gray-900 capitalize">{breakdown.linkType}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-sm text-gray-900">{breakdown.clicks} clicks</span>
+                                    <div className="text-xs text-gray-500">{breakdown.uniqueUsers} unique users</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (

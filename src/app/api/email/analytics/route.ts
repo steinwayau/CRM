@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
-// NEW BULLETPROOF EMAIL ANALYTICS API
+// NEW BULLETPROOF EMAIL ANALYTICS API - WITH CLICK-BASED OPEN FALLBACK
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -58,15 +58,15 @@ async function getCampaignAnalytics(campaignId: string) {
     `
     
     // Process stats
-    let opens = 0
+    let traditionalOpens = 0
     let clicks = 0
-    let uniqueOpens = 0
+    let uniqueTraditionalOpens = 0
     let uniqueClicks = 0
     
     trackingStats.rows.forEach(row => {
       if (row.event_type === 'open') {
-        opens = parseInt(row.count)
-        uniqueOpens = parseInt(row.unique_recipients)
+        traditionalOpens = parseInt(row.count)
+        uniqueTraditionalOpens = parseInt(row.unique_recipients)
       } else if (row.event_type === 'click') {
         clicks = parseInt(row.count)
         uniqueClicks = parseInt(row.unique_recipients)
@@ -82,20 +82,43 @@ async function getCampaignAnalytics(campaignId: string) {
     
     const totalSent = parseInt(totalSentResult.rows[0]?.total_sent) || uniqueClicks || 1
     
-    const openRate = totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0
+    // 🎯 CLICK-BASED OPEN LOGIC: Use clicks as engagement indicator
+    // If someone clicked any link, they definitely "opened" the email
+    const clickBasedOpens = uniqueClicks
+    const traditionalOpenRate = totalSent > 0 ? parseFloat(((uniqueTraditionalOpens / totalSent) * 100).toFixed(1)) : 0
+    const clickBasedOpenRate = totalSent > 0 ? parseFloat(((clickBasedOpens / totalSent) * 100).toFixed(1)) : 0
     const clickRate = totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
+
+    // Use click-based opens as the primary metric (stronger engagement signal)
+    const openRate = clickBasedOpenRate
+    const opens = clickBasedOpens
+    const uniqueOpens = clickBasedOpens
+
+    console.log(`📊 CLICK-BASED ANALYTICS for ${campaignId}:`, {
+      totalSent,
+      traditionalOpens: uniqueTraditionalOpens,
+      clickBasedOpens,
+      traditionalOpenRate,
+      clickBasedOpenRate: openRate,
+      clickRate
+    })
 
     return {
       campaignId,
       campaignName: campaign.name,
       totalSent,
-      opens,
+      opens, // Now using click-based opens
       clicks,
-      uniqueOpens,
+      uniqueOpens, // Now using click-based opens
       uniqueClicks,
-      openRate,
+      openRate, // Now using click-based open rate
       clickRate,
-      status: 'sent', // Default since we have tracking data
+      // Additional metrics for debugging/transparency
+      traditionalOpens: uniqueTraditionalOpens,
+      traditionalOpenRate,
+      clickBasedOpens,
+      clickBasedOpenRate,
+      status: 'sent',
       sentAt: null,
       found: true
     }
@@ -145,17 +168,17 @@ async function getOverallAnalytics() {
     
     // Process data
     const campaignData = campaignStats.rows[0]
-    let totalOpens = 0
+    let totalTraditionalOpens = 0
     let totalClicks = 0
-    let uniqueOpens = 0
+    let uniqueTraditionalOpens = 0
     let uniqueClicks = 0
     let recentOpens = 0
     let recentClicks = 0
     
     trackingStats.rows.forEach(row => {
       if (row.event_type === 'open') {
-        totalOpens = parseInt(row.total_events)
-        uniqueOpens = parseInt(row.unique_recipients)
+        totalTraditionalOpens = parseInt(row.total_events)
+        uniqueTraditionalOpens = parseInt(row.unique_recipients)
       } else if (row.event_type === 'click') {
         totalClicks = parseInt(row.total_events)
         uniqueClicks = parseInt(row.unique_recipients)
@@ -172,17 +195,35 @@ async function getOverallAnalytics() {
     
     const totalSent = parseInt(campaignData.total_sent) || 0
     
+    // 🎯 CLICK-BASED OVERALL ANALYTICS
+    const clickBasedOpens = uniqueClicks
+    const traditionalOpenRate = totalSent > 0 ? parseFloat(((uniqueTraditionalOpens / totalSent) * 100).toFixed(1)) : 0
+    const clickBasedOpenRate = totalSent > 0 ? parseFloat(((clickBasedOpens / totalSent) * 100).toFixed(1)) : 0
+    
+    console.log(`📊 OVERALL CLICK-BASED ANALYTICS:`, {
+      totalSent,
+      traditionalOpens: uniqueTraditionalOpens,
+      clickBasedOpens,
+      traditionalOpenRate,
+      clickBasedOpenRate
+    })
+    
     return {
       summary: {
         totalCampaigns: parseInt(campaignData.total_campaigns),
         sentCampaigns: parseInt(campaignData.sent_campaigns),
         totalEmailsSent: totalSent,
-        totalOpens,
+        totalOpens: clickBasedOpens, // Now using click-based opens
         totalClicks,
-        uniqueOpens,
+        uniqueOpens: clickBasedOpens, // Now using click-based opens
         uniqueClicks,
-        overallOpenRate: totalSent > 0 ? parseFloat(((uniqueOpens / totalSent) * 100).toFixed(1)) : 0,
-        overallClickRate: totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
+        overallOpenRate: clickBasedOpenRate, // Now using click-based open rate
+        overallClickRate: totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0,
+        // Additional metrics for transparency
+        traditionalOpens: uniqueTraditionalOpens,
+        traditionalOpenRate,
+        clickBasedOpens,
+        clickBasedOpenRate
       },
       recent: {
         opensLast7Days: recentOpens,

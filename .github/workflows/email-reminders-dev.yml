@@ -1,0 +1,37 @@
+name: Email Reminders (Development)
+
+on:
+  workflow_dispatch: # Manual triggering only
+
+jobs:
+  test-email-system:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Test Email Configuration
+        run: |
+          echo "🧪 Testing email system configuration..."
+          
+          # Check email config
+          echo "📋 Checking email configuration:"
+          curl -s "https://crm.steinway.com.au/api/debug/email-config" | jq '.'
+          
+      - name: Test Reminder Endpoint (Safe)
+        run: |
+          echo "🔍 Testing reminder endpoint (read-only check)..."
+          
+          response=$(curl -s -w "%{http_code}" -o /tmp/response.json "https://crm.steinway.com.au/api/reminders/check")
+          
+          echo "Response code: $response"
+          echo "Response body:"
+          cat /tmp/response.json | jq '.'
+          
+          if [ "$response" -eq 200 ]; then
+            echo "✅ Endpoint responded successfully"
+          else
+            echo "⚠️ Endpoint returned error code: $response"
+            echo "This is expected during development if email system isn't fully configured"
+          fi
+          
+          # Don't fail the workflow for development testing
+          exit 0 

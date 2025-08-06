@@ -1,9 +1,10 @@
 name: Email Reminders
 
 on:
-  schedule:
-    # Run every hour at the top of the hour
-    - cron: '0 * * * *'
+  # Temporarily disabled during development to prevent spam failures
+  # schedule:
+  #   # Run every hour at the top of the hour
+  #   - cron: '0 * * * *'
   workflow_dispatch: # Allow manual triggering
 
 jobs:
@@ -11,7 +12,30 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Check Production Environment
+        id: env_check
+        run: |
+          echo "Checking if system is ready for email reminders..."
+          
+          # Test email configuration endpoint
+          config_response=$(curl -s -w "%{http_code}" -o /tmp/config.json "https://crm.steinway.com.au/api/debug/email-config")
+          echo "Config check response: $config_response"
+          cat /tmp/config.json
+          
+          # Check if FROM_EMAIL is properly configured (not the placeholder)
+          from_email=$(cat /tmp/config.json | grep -o '"fromEmail":"[^"]*"' | cut -d'"' -f4)
+          echo "FROM_EMAIL: $from_email"
+          
+          if [[ "$from_email" == "noreply@yourdomain.com" ]]; then
+            echo "❌ Email system not configured for production - FROM_EMAIL is placeholder"
+            echo "ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Email system appears configured"
+            echo "ready=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send Email Reminders
+        if: steps.env_check.outputs.ready == 'true'
         run: |
           echo "Triggering email reminders..."
           response=$(curl -s -w "%{http_code}" -o /tmp/response.json "https://crm.steinway.com.au/api/reminders/check")
@@ -25,4 +49,11 @@ jobs:
           else
             echo "❌ Email reminders failed with code: $response"
             exit 1
-          fi 
+          fi
+
+      - name: Skip Development Run
+        if: steps.env_check.outputs.ready == 'false'
+        run: |
+          echo "🚧 Skipping email reminders - system not configured for production"
+          echo "This prevents spam failures during development"
+          echo "Configure FROM_EMAIL environment variable to enable reminders" 

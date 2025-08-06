@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import SuburbAutocomplete from '@/components/ui/suburb-autocomplete'
 import DateTimePicker from '@/components/ui/date-time-picker'
+import CompactDateTimePicker from '@/components/ui/compact-date-time-picker'
 import { getActiveStaff } from '@/lib/staff-management'
 import { getCurrentUser, getUserName } from '@/lib/auth-utils'
 
@@ -501,6 +502,87 @@ export default function EnquiryForm() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Follow-up Information Section */}
+              <div className="space-y-6 p-6 bg-blue-50 rounded-xl border border-blue-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Follow-up Information (Optional)</h3>
+                
+                {/* Best Time to Follow Up & Customer Rating */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <CompactDateTimePicker
+                      value={formData.bestTimeToFollowUp}
+                      onChange={(value) => setFormData(prev => ({ ...prev, bestTimeToFollowUp: value }))}
+                      label="Best Time to Follow Up"
+                      placeholder="Select date and time for follow-up"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      STEP Program
+                    </label>
+                    <select
+                      name="stepProgram"
+                      value={formData.stepProgram}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    >
+                      {STEP_PROGRAM_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Sales Manager Involvement */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Did you involve a Sales Manager or the CEO for this enquiry?
+                  </label>
+                  <div className="flex items-center space-x-6">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="salesManagerInvolved"
+                        value="Yes"
+                        checked={formData.salesManagerInvolved === 'Yes'}
+                        onChange={handleInputChange}
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Yes</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="salesManagerInvolved"
+                        value="No"
+                        checked={formData.salesManagerInvolved === 'No'}
+                        onChange={handleInputChange}
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">No</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Follow-up Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Follow-up Notes
+                  </label>
+                  <textarea
+                    name="followUpInfo"
+                    value={formData.followUpInfo}
+                    onChange={handleInputChange}
+                    placeholder="Add any additional notes about this customer interaction..."
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+                  />
                 </div>
               </div>
 

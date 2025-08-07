@@ -328,9 +328,17 @@ export default function CustomerEmailsPage() {
 
   // Auto-refresh analytics every 30 seconds for real-time updates
   useEffect(() => {
+    console.log('🔄 useEffect triggered - campaigns length:', campaigns.length)
     if (campaigns.length > 0) {
-      // Initial load
-      loadCampaignAnalyticsSync(campaigns)
+      // Force immediate analytics load
+      const loadAnalyticsImmediate = async () => {
+        console.log('🚀 Loading analytics immediately due to campaigns change')
+        setAnalyticsLoading(true)
+        await loadCampaignAnalyticsSync(campaigns)
+        setAnalyticsLoading(false)
+      }
+      
+      loadAnalyticsImmediate()
       
       // Set up interval for auto-refresh
       const interval = setInterval(() => {
@@ -990,17 +998,18 @@ export default function CustomerEmailsPage() {
           </div>
         </div>
         <button
-          onClick={() => {
-            loadCampaignAnalyticsSync(campaigns)
-            loadOverallAnalytics()
-            // 🎯 DON'T reload detailed analytics here - it overwrites campaign-specific data
+          onClick={async () => {
+            setAnalyticsLoading(true)
+            await loadCampaignAnalyticsSync(campaigns)
+            await loadOverallAnalytics()
+            setAnalyticsLoading(false)
           }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          Refresh Now
+          {analyticsLoading ? 'Loading...' : 'Refresh Now'}
         </button>
       </div>
 

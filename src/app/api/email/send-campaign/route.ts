@@ -255,8 +255,8 @@ function generateGmailSpecificHtml(
           
           html += `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0;">
             <tr>
-              <td align="center" style="padding: 0; margin: 0; line-height: 0; position: relative;">
-                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0; position: relative;">
+              <td align="center" style="padding: 0; margin: 0; line-height: 0;">
+                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0;">
                   <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
                     width: 100%;
                     max-width: ${style.width}px;
@@ -268,32 +268,20 @@ function generateGmailSpecificHtml(
                     line-height: 0;
                     vertical-align: top;
                   " />
-                  <!--[if !mso]><!-->
-                  <div style="
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    width: 48px;
-                    height: 48px;
-                    background-color: rgba(0, 0, 0, 0.7);
-                    border-radius: 50%;
-                    z-index: 10;
-                  ">
-                    <div style="
-                      position: absolute;
-                      top: 50%;
-                      left: 55%;
-                      transform: translate(-50%, -50%);
-                      width: 0;
-                      height: 0;
-                      border-left: 16px solid white;
-                      border-top: 10px solid transparent;
-                      border-bottom: 10px solid transparent;
-                    "></div>
-                  </div>
-                  <!--<![endif]-->
                 </a>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding: 10px 0 0 0;">
+                <table border="0" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background-color: #000000; border-radius: 20px; padding: 8px 16px;">
+                      <a href="${videoUrl}" target="_blank" style="color: #ffffff; text-decoration: none; font-family: Arial, sans-serif; font-size: 14px;">
+                        ▶ Play Video
+                      </a>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>`
@@ -569,6 +557,19 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
                   </div>
                   <!--<![endif]-->
                 </a>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding: 10px 0 0 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="background-color: #000000; border-radius: 20px; padding: 8px 16px;">
+                      <a href="${videoUrl}" target="_blank" style="color: #ffffff; text-decoration: none; font-family: Arial, sans-serif; font-size: 14px;">
+                        ▶ Play Video
+                      </a>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>`

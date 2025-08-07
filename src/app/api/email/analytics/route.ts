@@ -145,24 +145,32 @@ async function getOverallAnalytics() {
       FROM email_campaigns
     `
     
-    // Get tracking stats
+    // Get tracking stats - ONLY for existing campaigns
     const trackingStats = await sql`
       SELECT 
         event_type,
         COUNT(*) as total_events,
         COUNT(DISTINCT recipient_email) as unique_recipients,
         COUNT(DISTINCT campaign_id) as campaigns_with_events
-      FROM email_tracking
+      FROM email_tracking et
+      WHERE EXISTS (
+        SELECT 1 FROM email_campaigns ec 
+        WHERE ec.id = et.campaign_id
+      )
       GROUP BY event_type
     `
     
-    // Get recent activity (last 7 days)
+    // Get recent activity (last 7 days) - ONLY for existing campaigns
     const recentActivity = await sql`
       SELECT 
         event_type,
         COUNT(*) as count
-      FROM email_tracking
+      FROM email_tracking et
       WHERE created_at >= NOW() - INTERVAL '7 days'
+        AND EXISTS (
+          SELECT 1 FROM email_campaigns ec 
+          WHERE ec.id = et.campaign_id
+        )
       GROUP BY event_type
     `
     

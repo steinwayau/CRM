@@ -163,7 +163,7 @@ function generateGmailSpecificHtml(
     
     html += `
               <!-- Gmail Row ${rowIndex + 1} -->
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 15px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 0;">
                 <tr>`
 
     sortedRowElements.forEach((element) => {
@@ -197,14 +197,15 @@ function generateGmailSpecificHtml(
           
         case 'heading':
           const headingTag = `h${element.headingLevel || 1}`
-          const gmailHeadingSize = element.headingLevel === 1 ? '26px' : element.headingLevel === 2 ? '22px' : '18px'
+          const gmailHeadingSize = element.headingLevel === 1 ? '22px' : element.headingLevel === 2 ? '18px' : '16px'
           html += `<${headingTag} style="
             font-family: Arial, sans-serif;
-            font-size: ${style.fontSize ? Math.max(16, style.fontSize) + 'px' : gmailHeadingSize};
+            font-size: ${style.fontSize ? Math.max(16, Math.min(style.fontSize, 22)) + 'px' : gmailHeadingSize};
             font-weight: bold;
             line-height: 1.2;
             color: ${style.color || '#333333'};
             margin: 0 0 10px 0;
+            white-space: nowrap;
             ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor}; padding: 10px;` : ''}
             ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
           ">${content}</${headingTag}>`
@@ -218,14 +219,21 @@ function generateGmailSpecificHtml(
             imageSrc = content // Keep as is, but warn
           }
           
-          html += `<img src="${imageSrc}" alt="Email Image" style="
-            width: 100%;
-            max-width: ${style.width}px;
-            height: auto;
-            display: block;
-            border: 0;
-            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-          " />`
+          html += `<table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td align="center" style="padding: 0;">
+                <img src="${imageSrc}" alt="Email Image" style="
+                  width: 100%;
+                  max-width: ${style.width}px;
+                  height: auto;
+                  display: block;
+                  border: 0;
+                  ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                  margin: 0 auto;
+                " />
+              </td>
+            </tr>
+          </table>`
           break
           
         case 'video':
@@ -393,9 +401,9 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
     const sortedRowElements = rowElements.sort((a, b) => a.style.position.x - b.style.position.x)
     
     html += `
-                <!-- Row ${rowIndex + 1} -->
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 10px;">
-                  <tr>`
+                    <!-- Row ${rowIndex + 1} -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 0;">
+                      <tr>`
 
     sortedRowElements.forEach((element) => {
       const { style, content, type } = element
@@ -442,6 +450,7 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
             ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
             ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
             line-height: 1.2;
+            white-space: nowrap;
           ">${content}</${headingTag}>`
           break
           
@@ -451,16 +460,22 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
             imageSrc = content // Keep data URLs for Apple Mail
           }
           
-          html += `<img src="${imageSrc}" alt="Email Image" style="
-            width: 100%;
-            max-width: ${style.width}px;
-            height: auto;
-            display: block;
-            border: 0;
-            outline: none;
-            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-            margin: 0 auto;
-          " />`
+          html += `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td align="center" style="padding: 0;">
+                <img src="${imageSrc}" alt="Email Image" style="
+                  width: 100%;
+                  max-width: ${style.width}px;
+                  height: auto;
+                  display: block;
+                  border: 0;
+                  outline: none;
+                  ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                  margin: 0 auto;
+                " />
+              </td>
+            </tr>
+          </table>`
           break
           
         case 'video':

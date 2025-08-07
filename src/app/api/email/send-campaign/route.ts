@@ -308,9 +308,9 @@ function generateGmailSpecificHtml(
             thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
           }
           
-          // Create composite image URL with play button overlay
+          // Generate composite image URL using our reliable API endpoint
           const encodedThumbnail = encodeURIComponent(thumbnailUrl)
-          const compositeImageUrl = `https://images.weserv.nl/?url=${encodedThumbnail}&w=${style.width}&h=${Math.round(style.width * 0.6)}&fit=cover&overlay=https://cdn.jsdelivr.net/gh/twbs/icons@v1.11.3/icons/play-circle-fill.svg&overlay-width=80&overlay-height=80&overlay-opacity=90&overlay-gravity=center`
+          const compositeImageUrl = `https://crm.steinway.com.au/api/video/generate-thumbnail?url=${encodedThumbnail}&w=${style.width}&h=${Math.round(style.width * 0.6)}`
           
           html += `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0;">
             <tr>
@@ -562,9 +562,9 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
             thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
           }
           
-          // Create composite image URL with play button overlay
+          // Generate composite image URL using our reliable API endpoint
           const encodedThumbnail = encodeURIComponent(thumbnailUrl)
-          const compositeImageUrl = `https://images.weserv.nl/?url=${encodedThumbnail}&w=${style.width}&h=${Math.round(style.width * 0.6)}&fit=cover&overlay=https://cdn.jsdelivr.net/gh/twbs/icons@v1.11.3/icons/play-circle-fill.svg&overlay-width=80&overlay-height=80&overlay-opacity=90&overlay-gravity=center`
+          const compositeImageUrl = `https://crm.steinway.com.au/api/video/generate-thumbnail?url=${encodedThumbnail}&w=${style.width}&h=${Math.round(style.width * 0.6)}`
           
           html += `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0;">
             <tr>

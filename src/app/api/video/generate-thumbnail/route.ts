@@ -5,6 +5,39 @@ import { createCanvas, loadImage } from 'canvas'
 // This endpoint creates composite images with play button overlays
 // Built with comprehensive error handling and graceful fallbacks
 
+export async function GET(request: NextRequest) {
+  try {
+    console.log('🎬 Video thumbnail generation started via GET')
+    
+    const { searchParams } = new URL(request.url)
+    const thumbnailUrl = searchParams.get('url')
+    const width = searchParams.get('w') || '600'
+    const height = searchParams.get('h') || '400'
+    
+    // Input validation
+    if (!thumbnailUrl) {
+      console.log('❌ No thumbnail URL provided in GET request')
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Thumbnail URL required in url parameter' 
+      }, { status: 400 })
+    }
+
+    // Decode the URL
+    const decodedThumbnailUrl = decodeURIComponent(thumbnailUrl)
+    console.log('📸 Processing thumbnail:', decodedThumbnailUrl)
+    
+    return await generateCompositeImage(decodedThumbnailUrl, parseInt(width), parseInt(height))
+    
+  } catch (error) {
+    console.error('❌ GET request failed:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to generate thumbnail'
+    }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🎬 Video thumbnail generation started')
@@ -20,112 +53,90 @@ export async function POST(request: NextRequest) {
         fallback: true 
       }, { status: 400 })
     }
-
-    // Generate composite image with play button
-    const compositeImageBuffer = await generateThumbnailWithPlayButton(thumbnailUrl)
     
-    if (!compositeImageBuffer) {
-      console.log('⚠️ Image generation failed, suggesting fallback')
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Image generation failed',
-        fallback: true,
-        originalUrl: thumbnailUrl 
-      }, { status: 500 })
-    }
-
-    console.log('✅ Video thumbnail generated successfully')
+    return await generateCompositeImage(thumbnailUrl, 600, 400)
     
-    // Return the generated image
-    return new NextResponse(compositeImageBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
-        'X-Generated': 'true'
-      }
-    })
-
   } catch (error) {
-    console.error('🚨 Video thumbnail generation error:', error)
-    
-    // GRACEFUL FALLBACK: Always suggest using original thumbnail
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Thumbnail generation failed',
-      fallback: true,
-      originalUrl: request.url 
+    console.error('❌ POST request failed:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to generate thumbnail',
+      fallback: true
     }, { status: 500 })
   }
 }
 
-// SAFE IMAGE PROCESSING WITH COMPREHENSIVE ERROR HANDLING
-async function generateThumbnailWithPlayButton(thumbnailUrl: string): Promise<Buffer | null> {
+async function generateCompositeImage(thumbnailUrl: string, width: number, height: number) {
   try {
-    console.log('🖼️ Loading thumbnail image:', thumbnailUrl)
+    console.log(`🎨 Creating composite image: ${width}x${height}`)
     
-    // Load the original thumbnail with timeout
-    const image = await Promise.race([
-      loadImage(thumbnailUrl),
-      new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Image load timeout')), 10000)
-      )
-    ])
+    // Load the original thumbnail
+    const img = await loadImage(thumbnailUrl)
     
-    console.log('📐 Image loaded, dimensions:', image.width, 'x', image.height)
-    
-    // Create canvas with original image dimensions
-    const canvas = createCanvas(image.width, image.height)
+    // Create canvas with specified dimensions
+    const canvas = createCanvas(width, height)
     const ctx = canvas.getContext('2d')
     
-    // Draw the original thumbnail
-    ctx.drawImage(image, 0, 0)
+    // Fill background (in case image doesn't cover fully)
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, width, height)
     
-    // Calculate play button size (responsive to image size)
-    const buttonSize = Math.min(image.width, image.height) * 0.15 // 15% of smaller dimension
-    const buttonX = (image.width - buttonSize) / 2
-    const buttonY = (image.height - buttonSize) / 2
+    // Draw the thumbnail to fit the canvas
+    ctx.drawImage(img, 0, 0, width, height)
     
-    // Draw play button background (semi-transparent circle)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+    // Calculate play button size (responsive)
+    const playButtonSize = Math.min(width, height) * 0.15 // 15% of smallest dimension
+    const centerX = width / 2
+    const centerY = height / 2
+    
+    // Draw semi-transparent dark circle background for play button
+    ctx.globalAlpha = 0.8
+    ctx.fillStyle = '#000000'
     ctx.beginPath()
-    ctx.arc(buttonX + buttonSize/2, buttonY + buttonSize/2, buttonSize/2, 0, Math.PI * 2)
+    ctx.arc(centerX, centerY, playButtonSize, 0, 2 * Math.PI)
     ctx.fill()
     
-    // Draw white border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
-    ctx.lineWidth = buttonSize * 0.05
-    ctx.stroke()
-    
-    // Draw play triangle (white)
-    ctx.fillStyle = '#ffffff'
+    // Draw white play triangle
+    ctx.globalAlpha = 1.0
+    ctx.fillStyle = '#FFFFFF'
     ctx.beginPath()
-    const triangleSize = buttonSize * 0.35
-    const triangleX = buttonX + buttonSize/2 - triangleSize/3
-    const triangleY = buttonY + buttonSize/2 - triangleSize/2
     
-    ctx.moveTo(triangleX, triangleY)
-    ctx.lineTo(triangleX, triangleY + triangleSize)
-    ctx.lineTo(triangleX + triangleSize, triangleY + triangleSize/2)
+    // Triangle points (pointing right)
+    const triangleSize = playButtonSize * 0.6
+    const triangleLeft = centerX - triangleSize * 0.3
+    const triangleRight = centerX + triangleSize * 0.7
+    const triangleTop = centerY - triangleSize * 0.5
+    const triangleBottom = centerY + triangleSize * 0.5
+    
+    ctx.moveTo(triangleLeft, triangleTop)
+    ctx.lineTo(triangleRight, centerY)
+    ctx.lineTo(triangleLeft, triangleBottom)
     ctx.closePath()
     ctx.fill()
     
-    console.log('🎨 Play button overlay completed')
+    // Convert to buffer
+    const buffer = canvas.toBuffer('image/png')
     
-    // Convert to PNG buffer
-    return canvas.toBuffer('image/png')
+    console.log('✅ Composite image created successfully')
+    
+    // Return the image directly
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+        'Content-Length': buffer.length.toString(),
+      },
+    })
     
   } catch (error) {
-    console.error('🚨 Image processing error:', error)
-    return null // Graceful failure
+    console.error('❌ Image generation failed:', error)
+    
+    // Return error response
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to create composite image',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
-}
-
-// GET endpoint for health check
-export async function GET() {
-  return NextResponse.json({ 
-    status: 'ok', 
-    service: 'Video Thumbnail Generator',
-    timestamp: new Date().toISOString()
-  })
 } 

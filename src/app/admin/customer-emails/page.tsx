@@ -673,7 +673,7 @@ export default function CustomerEmailsPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Update campaign with actual results and reload from database
+        // Update campaign with actual results and persist to database
         await updateCampaigns(campaigns.map(c => 
           c.id === campaignId 
             ? { 
@@ -688,13 +688,10 @@ export default function CustomerEmailsPage() {
             : c
         ))
 
-        // Reload campaigns from database to get the updated status
-        loadData()
-        
-        // Load analytics data for the sent campaign
-        setTimeout(() => {
-          loadCampaignAnalyticsSync(campaigns)
-        }, 1000)
+        // Wait a moment for database update to complete, then reload
+        setTimeout(async () => {
+          await loadData()  // This will reload campaigns AND analytics
+        }, 2000)
         
         // Start polling for tracking updates every 30 seconds
         const trackingInterval = setInterval(async () => {
@@ -1003,9 +1000,10 @@ export default function CustomerEmailsPage() {
         </div>
         <button
           onClick={async () => {
+            console.log('🔄 Manual refresh clicked')
             setAnalyticsLoading(true)
-            await loadCampaignAnalyticsSync(campaigns)
-            await loadOverallAnalytics()
+            // Reload campaigns first to get latest data
+            await loadData()
             setAnalyticsLoading(false)
           }}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

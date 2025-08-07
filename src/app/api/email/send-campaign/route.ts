@@ -177,7 +177,7 @@ function generateGmailSpecificHtml(
                     width: ${elementWidth}%;
                     vertical-align: top;
                     padding: 8px;
-                    text-align: ${style.textAlign || 'left'};
+                    text-align: center;
                   ">`
 
       // Render Gmail-optimized content
@@ -246,52 +246,44 @@ function generateGmailSpecificHtml(
           }
           
           html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
-            <table border="0" cellpadding="0" cellspacing="0" width="100%">
-              <tr>
-                <td style="position: relative; text-align: center;">
-                  <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
-                    width: 100%;
-                    max-width: ${style.width}px;
-                    height: auto;
-                    display: block;
-                    border: 0;
-                    ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-                  " />
-                  <div style="
-                    margin-top: 10px;
-                    background-color: #000000;
-                    color: #ffffff;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    display: inline-block;
-                  ">▶ Play Video</div>
-                </td>
-              </tr>
-            </table>
+            <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
+              width: 100%;
+              max-width: ${style.width}px;
+              height: auto;
+              display: block;
+              border: 0;
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              margin: 0 auto;
+            " />
           </a>`
           break
           
         case 'button':
           const buttonUrl = element.buttonData?.url || '#'
           const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
-          html += `<table border="0" cellpadding="0" cellspacing="0">
+          html += `<table border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
-              <td style="
-                background-color: ${style.backgroundColor || '#007BFF'};
-                border-radius: ${style.borderRadius || 4}px;
-                text-align: center;
-              ">
-                <a href="${buttonUrl}" target="${buttonTarget}" style="
-                  display: inline-block;
-                  padding: 12px 24px;
-                  color: ${style.color || '#FFFFFF'};
-                  text-decoration: none;
-                  font-family: Arial, sans-serif;
-                  font-size: ${style.fontSize || 16}px;
-                  font-weight: bold;
-                  line-height: 1;
-                ">${content}</a>
+              <td align="center" style="padding: 10px 0;">
+                <table border="0" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="
+                      background-color: ${style.backgroundColor || '#007BFF'};
+                      border-radius: ${style.borderRadius || 4}px;
+                      text-align: center;
+                    ">
+                      <a href="${buttonUrl}" target="${buttonTarget}" style="
+                        display: inline-block;
+                        padding: 12px 24px;
+                        color: ${style.color || '#FFFFFF'};
+                        text-decoration: none;
+                        font-family: Arial, sans-serif;
+                        font-size: ${style.fontSize || 16}px;
+                        font-weight: bold;
+                        line-height: 1;
+                      ">${content}</a>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>`
@@ -416,7 +408,7 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
                       width: ${elementWidth}%;
                       vertical-align: top;
                       padding: 5px;
-                      ${style.textAlign ? `text-align: ${style.textAlign};` : 'text-align: left;'}
+                      text-align: center;
                     ">`
 
       // Render element content based on type
@@ -488,33 +480,16 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
             thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
           }
           
-          html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="position: relative; width: 100%;">
-              <tr>
-                <td style="position: relative;">
-                  <img src="${thumbnailUrl}" alt="Video" style="
-                    width: 100%;
-                    max-width: ${style.width}px;
-                    height: auto;
-                    display: block;
-                    border: 0;
-                    ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-                  " />
-                  <!-- Play button overlay (simplified for email) -->
-                  <div style="
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    background-color: rgba(0,0,0,0.7);
-                    color: white;
-                    padding: 10px 15px;
-                    border-radius: 5px;
-                    font-size: 14px;
-                  ">▶ Play Video</div>
-                </td>
-              </tr>
-            </table>
+          html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0;">
+            <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
+              width: 100%;
+              max-width: ${style.width}px;
+              height: auto;
+              display: block;
+              border: 0;
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              margin: 0 auto;
+            " />
           </a>`
           break
           

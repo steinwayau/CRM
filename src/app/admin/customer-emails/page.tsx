@@ -933,15 +933,29 @@ export default function CustomerEmailsPage() {
     setShowTemplatePreview(true)
   }
 
-  const handleDeleteTemplate = (templateId: string) => {
+  const handleDeleteTemplate = async (templateId: string) => {
     if (confirm('Are you sure you want to delete this template?')) {
-      // Update localStorage
-      const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-      const updatedTemplates = savedTemplates.filter((t: EmailTemplate) => t.id !== templateId)
-      localStorage.setItem('emailTemplates', JSON.stringify(updatedTemplates))
-      
-      // Update state
-      setTemplates(templates.filter(t => t.id !== templateId))
+      try {
+        // Call the DELETE API endpoint
+        const response = await fetch(`/api/admin/templates?id=${templateId}`, {
+          method: 'DELETE',
+        })
+
+        if (response.ok) {
+          // Update localStorage (for backward compatibility)
+          const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+          const updatedTemplates = savedTemplates.filter((t: EmailTemplate) => t.id !== templateId)
+          localStorage.setItem('emailTemplates', JSON.stringify(updatedTemplates))
+          
+          // Update state
+          setTemplates(templates.filter(t => t.id !== templateId))
+        } else {
+          alert('Failed to delete template. Please try again.')
+        }
+      } catch (error) {
+        console.error('Error deleting template:', error)
+        alert('Network error deleting template. Please try again.')
+      }
     }
   }
 

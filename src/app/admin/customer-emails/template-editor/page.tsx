@@ -1023,13 +1023,37 @@ export default function TemplateEditorPage() {
     </xml>
   </noscript>
   <![endif]-->
+  <style>
+    /* Mobile responsiveness for email clients that support CSS */
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 320px !important;
+        height: auto !important;
+      }
+      .email-element {
+        position: relative !important;
+        left: auto !important;
+        top: auto !important;
+        width: 90% !important;
+        max-width: 280px !important;
+        margin: 10px auto !important;
+        display: block !important;
+      }
+      .email-element img {
+        width: 100% !important;
+        height: auto !important;
+        max-width: 280px !important;
+      }
+    }
+  </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <center>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
       <tr>
         <td align="center" style="padding: 20px 0;">
-          <div style="
+          <div class="email-container" style="
             position: relative; 
             width: ${canvasSize.width}px; 
             height: ${canvasSize.height}px;
@@ -1045,7 +1069,7 @@ export default function TemplateEditorPage() {
       
       // Use exact positioning from the visual editor
       const elementHtml = `
-            <div style="
+            <div class="email-element" style="
               position: absolute;
               left: ${style.position.x}px;
               top: ${style.position.y}px;

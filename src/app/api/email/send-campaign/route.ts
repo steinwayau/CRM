@@ -253,17 +253,25 @@ function generateGmailSpecificHtml(
             thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
           }
           
-          html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
-            <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
-              width: 100%;
-              max-width: ${style.width}px;
-              height: auto;
-              display: block;
-              border: 0;
-              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-              margin: 0 auto;
-            " />
-          </a>`
+          html += `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0;">
+            <tr>
+              <td align="center" style="padding: 0; margin: 0; line-height: 0;">
+                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0;">
+                  <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
+                    width: 100%;
+                    max-width: ${style.width}px;
+                    height: auto;
+                    display: block;
+                    border: 0;
+                    ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                    margin: 0;
+                    line-height: 0;
+                    vertical-align: top;
+                  " />
+                </a>
+              </td>
+            </tr>
+          </table>`
           break
           
         case 'button':
@@ -495,17 +503,25 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
             thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
           }
           
-          html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0;">
-            <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
-              width: 100%;
-              max-width: ${style.width}px;
-              height: auto;
-              display: block;
-              border: 0;
-              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-              margin: 0 auto;
-            " />
-          </a>`
+          html += `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0;">
+            <tr>
+              <td align="center" style="padding: 0; margin: 0; line-height: 0;">
+                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0;">
+                  <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
+                    width: 100%;
+                    max-width: ${style.width}px;
+                    height: auto;
+                    display: block;
+                    border: 0;
+                    ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                    margin: 0;
+                    line-height: 0;
+                    vertical-align: top;
+                  " />
+                </a>
+              </td>
+            </tr>
+          </table>`
           break
           
         case 'button':

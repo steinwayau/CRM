@@ -201,15 +201,14 @@ export default function CustomerEmailsPage() {
   // Initialize real-time connection
   const { isConnected } = useRealTimeAnalytics(handleAnalyticsUpdate)
 
-  // Load real analytics data for campaigns
-  const loadCampaignAnalytics = async () => {
+  // Load real analytics data for campaigns (sync version)
+  const loadCampaignAnalyticsSync = async (campaignsList: Campaign[]) => {
     try {
-      console.log('🔄 Loading campaign analytics for campaigns:', campaigns.map(c => ({ id: c.id, name: c.name, status: c.status, sentCount: c.sentCount })))
+      console.log('🔄 Loading campaign analytics for campaigns:', campaignsList.map(c => ({ id: c.id, name: c.name, status: c.status, sentCount: c.sentCount })))
       const analyticsData: {[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}} = {}
       
-      for (const campaign of campaigns) {
+      for (const campaign of campaignsList) {
         // ANALYTICS FIX: Fetch analytics for any campaign with 'sent' status
-        // Previous logic required sentCount > 0, but database campaigns may have sentCount = 0
         if (campaign.status === 'sent') {
           console.log(`📊 Fetching analytics for sent campaign: ${campaign.id} (${campaign.name})`)
           const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
@@ -233,10 +232,93 @@ export default function CustomerEmailsPage() {
       console.log('📊 Final analytics data:', analyticsData)
       setCampaignAnalytics(analyticsData)
       
-      // Also load overall analytics (but NOT detailed analytics - that's campaign-specific)
+      // Also load overall analytics
       loadOverallAnalytics()
     } catch (error) {
       console.error('❌ Failed to load campaign analytics:', error)
+    }
+  }
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      // Load customers from API
+      const response = await fetch('/api/enquiries')
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Transform enquiry data to customer format (keeping transformation logic)
+        const transformedCustomers: Customer[] = data.map((enquiry: any) => ({
+          id: enquiry.id,
+          firstName: enquiry.firstName || '',
+          lastName: enquiry.lastName || '',
+          email: enquiry.email || '',
+          phone: enquiry.phone || '',
+          state: enquiry.state || '',
+          suburb: enquiry.suburb || '',
+          nationality: enquiry.nationality || '',
+          productInterest: enquiry.pianoModel ? [enquiry.pianoModel] : [],
+          source: enquiry.enquirySource || '',
+          eventSource: enquiry.eventSource || '',
+          customerRating: enquiry.customerRating || '',
+          status: enquiry.status || 'New',
+          doNotEmail: enquiry.doNotEmail || false,
+          createdAt: enquiry.createdAt || new Date().toISOString()
+        }))
+        
+        console.log('Loaded', transformedCustomers.length, 'customers')
+        setCustomers(transformedCustomers)
+        
+        // Load templates from database first, fallback to localStorage
+        try {
+          const templateResponse = await fetch('/api/admin/templates')
+          if (templateResponse.ok) {
+            const dbTemplates = await templateResponse.json()
+            setTemplates(dbTemplates)
+            
+            // Check if we need to migrate localStorage templates
+            if (dbTemplates.length === 0) {
+              const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+              if (savedTemplates.length > 0) {
+                console.log('Migrating templates from localStorage to database...')
+                await migrateTemplatesFromLocalStorage()
+              }
+            }
+          } else {
+            throw new Error('Failed to load templates from database')
+          }
+        } catch (error) {
+          console.error('Error loading templates, falling back to localStorage:', error)
+          const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
+          setTemplates(savedTemplates)
+        }
+          
+        // Load campaigns from database
+        const campaignResponse = await fetch('/api/admin/campaigns')
+        if (campaignResponse.ok) {
+          const campaignData = await campaignResponse.json()
+          // Map textContent back to customEmails for campaigns with custom recipient type
+          const campaignsWithCustomEmails = campaignData.map((campaign: any) => ({
+            ...campaign,
+            customEmails: campaign.textContent || ''
+          }))
+          setCampaigns(campaignsWithCustomEmails)
+          
+          // 🚀 IMMEDIATELY LOAD ANALYTICS after campaigns are loaded
+          console.log('🔄 Loading analytics immediately after campaigns loaded')
+          if (campaignsWithCustomEmails.length > 0) {
+            await loadCampaignAnalyticsSync(campaignsWithCustomEmails)
+          }
+        } else {
+          console.error('Failed to load campaigns')
+          setCampaigns([])
+        }
+      }
+        
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -244,12 +326,12 @@ export default function CustomerEmailsPage() {
   useEffect(() => {
     if (campaigns.length > 0) {
       // Initial load
-      loadCampaignAnalytics()
+      loadCampaignAnalyticsSync(campaigns)
       
       // Set up interval for auto-refresh
       const interval = setInterval(() => {
         console.log('Auto-refreshing campaign analytics...')
-        loadCampaignAnalytics()
+        loadCampaignAnalyticsSync(campaigns)
       }, 30000) // 30 seconds
       
       return () => clearInterval(interval)
@@ -418,104 +500,6 @@ export default function CustomerEmailsPage() {
       }
     } catch (error) {
       console.error('Template migration error:', error)
-    }
-  }
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      // Load customer data from your existing enquiries API
-      console.log('Fetching customers from /api/enquiries...')
-      const customersResponse = await fetch('/api/enquiries')
-      
-      if (!customersResponse.ok) {
-        throw new Error(`HTTP ${customersResponse.status}: ${customersResponse.statusText}`)
-      }
-      
-      const customersData = await customersResponse.json()
-      console.log('Customers API response:', customersData)
-      
-      // Check if API returned an error
-      if (customersData.error) {
-        throw new Error(customersData.error)
-      }
-      
-      // Ensure we have an array
-      if (!Array.isArray(customersData)) {
-        throw new Error('API did not return an array of customers')
-      }
-      
-      // Transform enquiry data to customer format
-      const transformedCustomers = customersData.map((enquiry: any) => ({
-        id: enquiry.id,
-        firstName: enquiry.firstName,
-        lastName: enquiry.lastName || enquiry.surname,
-        email: enquiry.email,
-        phone: enquiry.phone,
-        state: enquiry.state,
-        suburb: enquiry.suburb,
-        nationality: enquiry.nationality,
-        productInterest: enquiry.productInterest,
-        source: enquiry.source,
-        eventSource: enquiry.eventSource,
-        customerRating: enquiry.customerRating,
-        status: enquiry.status,
-        doNotEmail: enquiry.doNotEmail || false,
-        createdAt: enquiry.createdAt
-      }))
-      
-      console.log('Transformed customers:', transformedCustomers.length, 'customers')
-      setCustomers(transformedCustomers)
-      
-            // Load templates from database first, fallback to localStorage
-      try {
-        const templateResponse = await fetch('/api/admin/templates')
-        if (templateResponse.ok) {
-          const dbTemplates = await templateResponse.json()
-          setTemplates(dbTemplates)
-          
-          // Check if we need to migrate localStorage templates
-          if (dbTemplates.length === 0) {
-            const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-            if (savedTemplates.length > 0) {
-              console.log('Migrating templates from localStorage to database...')
-              await migrateTemplatesFromLocalStorage()
-            }
-          }
-        } else {
-          throw new Error('Failed to load templates from database')
-        }
-      } catch (error) {
-        console.error('Error loading templates, falling back to localStorage:', error)
-        const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-        setTemplates(savedTemplates)
-      }
-        
-        // Load campaigns from database
-      const campaignResponse = await fetch('/api/admin/campaigns')
-      if (campaignResponse.ok) {
-        const campaignData = await campaignResponse.json()
-        // Map textContent back to customEmails for campaigns with custom recipient type
-        const campaignsWithCustomEmails = campaignData.map((campaign: any) => ({
-          ...campaign,
-          customEmails: campaign.textContent || ''
-        }))
-        setCampaigns(campaignsWithCustomEmails)
-      } else {
-        console.error('Failed to load campaigns')
-        setCampaigns([])
-      }
-      
-    } catch (error) {
-      console.error('Error loading data:', error)
-      // Show user-friendly error message
-      alert(`Failed to load customer data: ${error instanceof Error ? error.message : 'Unknown error'}. Please check the browser console for details.`)
-      // Set empty arrays as fallback
-      setCustomers([])
-      setTemplates([])
-      setCampaigns([])
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -693,7 +677,7 @@ export default function CustomerEmailsPage() {
         
         // Load analytics data for the sent campaign
         setTimeout(() => {
-          loadCampaignAnalytics()
+          loadCampaignAnalyticsSync(campaigns)
         }, 1000)
         
         // Start polling for tracking updates every 30 seconds
@@ -1003,7 +987,7 @@ export default function CustomerEmailsPage() {
         </div>
         <button
           onClick={() => {
-            loadCampaignAnalytics()
+            loadCampaignAnalyticsSync(campaigns)
             loadOverallAnalytics()
             // 🎯 DON'T reload detailed analytics here - it overwrites campaign-specific data
           }}

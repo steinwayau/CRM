@@ -78,6 +78,61 @@ interface CampaignRequest {
   }
 }
 
+// SAFE VIDEO THUMBNAIL GENERATOR WITH COMPREHENSIVE FALLBACK
+// This function attempts to generate a composite thumbnail with play button
+// If anything fails, it gracefully falls back to the original thumbnail
+async function safeGenerateVideoThumbnail(originalThumbnailUrl: string): Promise<string> {
+  try {
+    console.log('🎬 Attempting to generate video thumbnail with play button')
+    
+    // Skip generation if no URL provided
+    if (!originalThumbnailUrl) {
+      console.log('⚠️ No thumbnail URL provided, using fallback')
+      return originalThumbnailUrl
+    }
+    
+    // Call our thumbnail generation API with timeout
+    const apiUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}/api/video/generate-thumbnail`
+      : 'http://localhost:3000/api/video/generate-thumbnail'
+      
+    const response = await Promise.race([
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnailUrl: originalThumbnailUrl })
+      }),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('API timeout')), 5000)
+      )
+    ])
+    
+    if (!response.ok) {
+      console.log('⚠️ Thumbnail API returned error, using original thumbnail')
+      return originalThumbnailUrl
+    }
+    
+    // Check if response is an image
+    const contentType = response.headers.get('content-type')
+    if (contentType?.includes('image')) {
+      // Convert response to data URL for inline usage
+      const buffer = await response.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+      const dataUrl = `data:${contentType};base64,${base64}`
+      
+      console.log('✅ Successfully generated video thumbnail with play button')
+      return dataUrl
+    } else {
+      console.log('⚠️ API response was not an image, using original thumbnail')
+      return originalThumbnailUrl
+    }
+    
+  } catch (error) {
+    console.log('⚠️ Video thumbnail generation failed, using original:', error)
+    return originalThumbnailUrl // Always fall back to original
+  }
+}
+
 // Email HTML Generation - CLIENT-SPECIFIC APPROACH
 // GMAIL: Pure content extraction (no layout preservation)
 // OTHER CLIENTS: Preserve visual layout at original dimensions

@@ -154,6 +154,7 @@ export default function CustomerEmailsPage() {
   const [overallAnalytics, setOverallAnalytics] = useState<any>(null)
   const [detailedAnalytics, setDetailedAnalytics] = useState<any>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
+  const [forceRender, setForceRender] = useState(0)
 
   // Load overall analytics data from working API
   const loadOverallAnalytics = async () => {
@@ -233,6 +234,9 @@ export default function CustomerEmailsPage() {
       
       console.log('📊 Final analytics data:', analyticsData)
       setCampaignAnalytics(analyticsData)
+      
+      // Force a re-render by updating a timestamp
+      setForceRender(Date.now())
       
       // Also load overall analytics
       await loadOverallAnalytics()

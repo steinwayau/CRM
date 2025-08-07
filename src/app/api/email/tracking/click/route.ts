@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
 import { broadcastAnalyticsUpdate } from '@/lib/pusher'
+import { sql } from '@vercel/postgres'
+
+// Force dynamic route to prevent static generation errors
+export const dynamic = 'force-dynamic'
 
 // NEW BULLETPROOF EMAIL CLICK TRACKING
 export async function GET(request: NextRequest) {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
+// Force dynamic route to prevent static generation errors
+export const dynamic = 'force-dynamic'
+
 // DETAILED EMAIL ANALYTICS API - Click breakdowns by type
 export async function GET(request: NextRequest) {
   try {

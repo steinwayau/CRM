@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
+// Force dynamic route to prevent static generation errors
+export const dynamic = 'force-dynamic'
+
 // EVIDENCE-BASED TEST: Use exact same setTimeout approach as working click tracking
 export async function GET(request: NextRequest) {
   try {

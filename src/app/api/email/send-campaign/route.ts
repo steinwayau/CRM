@@ -255,8 +255,8 @@ function generateGmailSpecificHtml(
           
           html += `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0;">
             <tr>
-              <td align="center" style="padding: 0; margin: 0; line-height: 0;">
-                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0;">
+              <td align="center" style="padding: 0; margin: 0; line-height: 0; position: relative;">
+                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0; position: relative;">
                   <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
                     width: 100%;
                     max-width: ${style.width}px;
@@ -268,6 +268,31 @@ function generateGmailSpecificHtml(
                     line-height: 0;
                     vertical-align: top;
                   " />
+                  <!--[if !mso]><!-->
+                  <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 48px;
+                    height: 48px;
+                    background-color: rgba(0, 0, 0, 0.7);
+                    border-radius: 50%;
+                    z-index: 10;
+                  ">
+                    <div style="
+                      position: absolute;
+                      top: 50%;
+                      left: 55%;
+                      transform: translate(-50%, -50%);
+                      width: 0;
+                      height: 0;
+                      border-left: 16px solid white;
+                      border-top: 10px solid transparent;
+                      border-bottom: 10px solid transparent;
+                    "></div>
+                  </div>
+                  <!--<![endif]-->
                 </a>
               </td>
             </tr>
@@ -505,8 +530,8 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
           
           html += `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0;">
             <tr>
-              <td align="center" style="padding: 0; margin: 0; line-height: 0;">
-                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0;">
+              <td align="center" style="padding: 0; margin: 0; line-height: 0; position: relative;">
+                <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0; line-height: 0; position: relative;">
                   <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
                     width: 100%;
                     max-width: ${style.width}px;
@@ -518,6 +543,31 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
                     line-height: 0;
                     vertical-align: top;
                   " />
+                  <!--[if !mso]><!-->
+                  <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 48px;
+                    height: 48px;
+                    background-color: rgba(0, 0, 0, 0.7);
+                    border-radius: 50%;
+                    z-index: 10;
+                  ">
+                    <div style="
+                      position: absolute;
+                      top: 50%;
+                      left: 55%;
+                      transform: translate(-50%, -50%);
+                      width: 0;
+                      height: 0;
+                      border-left: 16px solid white;
+                      border-top: 10px solid transparent;
+                      border-bottom: 10px solid transparent;
+                    "></div>
+                  </div>
+                  <!--<![endif]-->
                 </a>
               </td>
             </tr>

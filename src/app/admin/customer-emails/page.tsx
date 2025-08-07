@@ -153,6 +153,7 @@ export default function CustomerEmailsPage() {
   const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}}>({})
   const [overallAnalytics, setOverallAnalytics] = useState<any>(null)
   const [detailedAnalytics, setDetailedAnalytics] = useState<any>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
 
   // Load overall analytics data from working API
   const loadOverallAnalytics = async () => {
@@ -204,6 +205,7 @@ export default function CustomerEmailsPage() {
   // Load real analytics data for campaigns (sync version)
   const loadCampaignAnalyticsSync = async (campaignsList: Campaign[]) => {
     try {
+      setAnalyticsLoading(true)
       console.log('🔄 Loading campaign analytics for campaigns:', campaignsList.map(c => ({ id: c.id, name: c.name, status: c.status, sentCount: c.sentCount })))
       const analyticsData: {[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}} = {}
       
@@ -233,9 +235,11 @@ export default function CustomerEmailsPage() {
       setCampaignAnalytics(analyticsData)
       
       // Also load overall analytics
-      loadOverallAnalytics()
+      await loadOverallAnalytics()
+      setAnalyticsLoading(false)
     } catch (error) {
       console.error('❌ Failed to load campaign analytics:', error)
+      setAnalyticsLoading(false)
     }
   }
 
@@ -1043,7 +1047,9 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Open Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {(() => {
+                {analyticsLoading ? (
+                  <span className="text-gray-400">Loading...</span>
+                ) : (() => {
                   const sentCampaigns = campaigns.filter(c => c.status === 'sent')
                   if (sentCampaigns.length === 0) return '0'
                   const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
@@ -1051,8 +1057,8 @@ export default function CustomerEmailsPage() {
                   if (analytics) {
                     return analytics.openRate.toFixed(1)
                   }
-                  // Fallback to overall analytics if campaign analytics not loaded
-                  return overallAnalytics?.summary?.overallOpenRate || '0'
+                  // Fallback to overall analytics if campaign analytics not loaded  
+                  return overallAnalytics?.summary?.overallOpenRate?.toFixed(1) || '0'
                 })()}%
               </p>
             </div>
@@ -1069,7 +1075,9 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Avg. Click Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {(() => {
+                {analyticsLoading ? (
+                  <span className="text-gray-400">Loading...</span>
+                ) : (() => {
                   const sentCampaigns = campaigns.filter(c => c.status === 'sent')
                   if (sentCampaigns.length === 0) return '0'
                   const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
@@ -1078,7 +1086,7 @@ export default function CustomerEmailsPage() {
                     return analytics.clickRate.toFixed(1)
                   }
                   // Fallback to overall analytics if campaign analytics not loaded  
-                  return overallAnalytics?.summary?.overallClickRate || '0'
+                  return overallAnalytics?.summary?.overallClickRate?.toFixed(1) || '0'
                 })()}%
               </p>
             </div>

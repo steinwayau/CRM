@@ -96,19 +96,18 @@ function generateEmailHtml(
     return generateGmailSpecificHtml(sortedElements, canvasSettings, templateName)
   } else {
     // ALL OTHER CLIENTS: Preserve original design dimensions
-    return generateStandardEmailHtml(sortedElements, canvasSettings, templateName)
+    return generateStandardEmailHtml(templateName, sortedElements, canvasSettings)
   }
 }
 
-// GMAIL-SPECIFIC: ICONSCOUT TABLE METHOD - Simple table rows, no positioning
+// GMAIL-SPECIFIC: Enhanced table-based layout optimized for Gmail
 function generateGmailSpecificHtml(
   sortedElements: EditorElement[],
   canvasSettings: CanvasSettings,
   templateName: string
 ): string {
-  // GMAIL OPTIMIZATION: 750px width for better desktop viewing (like Elementor)
-  const emailWidth = 750  // Optimized email width for larger Gmail display
-  const emailHeight = canvasSettings.height || 800
+  // GMAIL OPTIMIZATION: 600px width for better mobile compatibility
+  const emailWidth = 600  // Standard email width for Gmail mobile/desktop
   
   let html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -118,75 +117,209 @@ function generateGmailSpecificHtml(
   <title>${templateName}</title>
 </head>
 <body style="margin: 0; padding: 0; width: 100%; background-color: #f4f4f4; font-family: Arial, sans-serif;">
-  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; min-height: ${emailHeight}px;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
     <tr>
-      <td align="center" valign="top" style="padding: 20px 0;">
-        <!-- Main email container - ICONSCOUT METHOD with full height -->
-        <table border="0" cellpadding="0" cellspacing="0" width="${emailWidth}" style="margin: 0 auto; background-color: ${canvasSettings.backgroundColor || '#ffffff'}; min-height: ${emailHeight}px;">
-`
-
-  // IMPROVED APPROACH: Group elements by Y position for side-by-side layout
-  html += `
+      <td align="center" valign="top" style="padding: 20px 10px;">
+        <!-- Main email container for Gmail -->
+        <table border="0" cellpadding="0" cellspacing="0" style="
+          width: 100%;
+          max-width: ${emailWidth}px;
+          background-color: ${canvasSettings.backgroundColor || '#ffffff'};
+          margin: 0 auto;
+        ">
           <tr>
-            <td style="padding: 0; margin: 0; line-height: 1;" align="center" valign="top">`
-            
-  // Group elements by approximate Y position (increased tolerance for videos)
-  const elementGroups: EditorElement[][] = []
-  const rowTolerance = 30 // Conservative tolerance - only group truly side-by-side elements
-  
+            <td style="padding: 20px;">`
+
+  // Group elements by their Y position for better layout
+  const rows: EditorElement[][] = []
+  let currentRow: EditorElement[] = []
+  let currentY = -1
+  const yTolerance = 15 // Slightly more tolerance for Gmail
+
   sortedElements.forEach((element) => {
-    let foundGroup = false
-    for (let i = 0; i < elementGroups.length; i++) {
-      const groupY = elementGroups[i][0].style.position.y
-      if (Math.abs(element.style.position.y - groupY) <= rowTolerance) {
-        elementGroups[i].push(element)
-        foundGroup = true
-        break
-      }
-    }
-    if (!foundGroup) {
-      elementGroups.push([element])
-    }
-  })
-  
-  // SMART SIDE-BY-SIDE: Use the row groups we calculated above
-  elementGroups.forEach((group, groupIndex) => {
-    console.log(`Gmail Group ${groupIndex + 1}: ${group.length} elements`)
+    const elementY = element.style.position.y
     
-    if (group.length === 1) {
-      // Single element: render normally
-      const element = group[0]
-      let elementMaxWidth = emailWidth
-      if (element.type === 'button' || element.type === 'text' || element.type === 'heading') {
-        const scaleRatio = emailWidth / 1000
-        elementMaxWidth = Math.min(emailWidth, Math.round(element.style.width * scaleRatio))
-      }
-      
-      html += `<div style="margin: 0; padding: 0; margin-bottom: 15px; width: 100%; text-align: center;">`
-      html += generateGmailElementHtml(element, elementMaxWidth)
-      html += `</div>`
+    if (currentY === -1 || Math.abs(elementY - currentY) <= yTolerance) {
+      currentRow.push(element)
+      currentY = elementY
     } else {
-      // Multiple elements: render side-by-side using table cells
-      html += `<table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 15px;">
-        <tr>`
-      
-      const cellWidth = Math.floor(emailWidth / group.length)
-      group.forEach((element) => {
-        html += `<td style="width: ${cellWidth}px; text-align: center; vertical-align: top; padding: 0 10px;">`
-        html += generateGmailElementHtml(element, cellWidth - 20) // -20 for proper spacing like template
-        html += `</td>`
-      })
-      
-      html += `</tr>
-      </table>`
+      if (currentRow.length > 0) {
+        rows.push([...currentRow])
+      }
+      currentRow = [element]
+      currentY = elementY
     }
   })
   
+  // Add the last row
+  if (currentRow.length > 0) {
+    rows.push(currentRow)
+  }
+
+  // Render each row optimized for Gmail
+  rows.forEach((rowElements, rowIndex) => {
+    // Sort elements in row by X position
+    const sortedRowElements = rowElements.sort((a, b) => a.style.position.x - b.style.position.x)
+    
+    html += `
+              <!-- Gmail Row ${rowIndex + 1} -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 15px;">
+                <tr>`
+
+    sortedRowElements.forEach((element) => {
+      const { style, content, type } = element
+      
+      // Calculate width percentage for Gmail
+      const elementWidth = Math.min(100, Math.max(15, (style.width / emailWidth) * 100))
+      
+      html += `
+                  <td style="
+                    width: ${elementWidth}%;
+                    vertical-align: top;
+                    padding: 8px;
+                    text-align: ${style.textAlign || 'left'};
+                  ">`
+
+      // Render Gmail-optimized content
+      switch (type) {
+        case 'text':
+          html += `<div style="
+            font-family: Arial, sans-serif;
+            font-size: ${Math.max(14, style.fontSize || 16)}px;
+            line-height: 1.4;
+            color: ${style.color || '#333333'};
+            ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor}; padding: 10px;` : ''}
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            margin: 0;
+          ">${content}</div>`
+          break
+          
+        case 'heading':
+          const headingTag = `h${element.headingLevel || 1}`
+          const gmailHeadingSize = element.headingLevel === 1 ? '26px' : element.headingLevel === 2 ? '22px' : '18px'
+          html += `<${headingTag} style="
+            font-family: Arial, sans-serif;
+            font-size: ${style.fontSize ? Math.max(16, style.fontSize) + 'px' : gmailHeadingSize};
+            font-weight: bold;
+            line-height: 1.2;
+            color: ${style.color || '#333333'};
+            margin: 0 0 10px 0;
+            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor}; padding: 10px;` : ''}
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+          ">${content}</${headingTag}>`
+          break
+          
+        case 'image':
+          // Gmail handles images better with external URLs
+          let imageSrc = content
+          if (content.startsWith('data:')) {
+            console.log('WARNING: Data URL in Gmail - may not display properly')
+            imageSrc = content // Keep as is, but warn
+          }
+          
+          html += `<img src="${imageSrc}" alt="Email Image" style="
+            width: 100%;
+            max-width: ${style.width}px;
+            height: auto;
+            display: block;
+            border: 0;
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+          " />`
+          break
+          
+        case 'video':
+          const videoData = element.videoData
+          const videoUrl = videoData?.url || content || ''
+          let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
+          
+          if (videoUrl && !thumbnailUrl) {
+            const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+            if (youtubeMatch) {
+              const videoId = youtubeMatch[1]
+              thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+            }
+          }
+          
+          if (!thumbnailUrl) {
+            thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+          }
+          
+          html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td style="position: relative; text-align: center;">
+                  <img src="${thumbnailUrl}" alt="Video Thumbnail" style="
+                    width: 100%;
+                    max-width: ${style.width}px;
+                    height: auto;
+                    display: block;
+                    border: 0;
+                    ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                  " />
+                  <div style="
+                    margin-top: 10px;
+                    background-color: #000000;
+                    color: #ffffff;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    display: inline-block;
+                  ">▶ Play Video</div>
+                </td>
+              </tr>
+            </table>
+          </a>`
+          break
+          
+        case 'button':
+          const buttonUrl = element.buttonData?.url || '#'
+          const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
+          html += `<table border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="
+                background-color: ${style.backgroundColor || '#007BFF'};
+                border-radius: ${style.borderRadius || 4}px;
+                text-align: center;
+              ">
+                <a href="${buttonUrl}" target="${buttonTarget}" style="
+                  display: inline-block;
+                  padding: 12px 24px;
+                  color: ${style.color || '#FFFFFF'};
+                  text-decoration: none;
+                  font-family: Arial, sans-serif;
+                  font-size: ${style.fontSize || 16}px;
+                  font-weight: bold;
+                  line-height: 1;
+                ">${content}</a>
+              </td>
+            </tr>
+          </table>`
+          break
+          
+        case 'divider':
+          html += `<hr style="
+            border: none;
+            height: ${style.height || 2}px;
+            background-color: ${style.backgroundColor || '#CCCCCC'};
+            margin: 20px 0;
+            width: 100%;
+          " />`
+          break
+      }
+
+      html += `
+                  </td>`
+    })
+
+    html += `
+                </tr>
+              </table>`
+  })
+
   html += `
             </td>
-          </tr>`
-
-  html += `
+          </tr>
         </table>
       </td>
     </tr>
@@ -197,102 +330,13 @@ function generateGmailSpecificHtml(
   return html
 }
 
-// Generate individual element HTML for Gmail table cells with CONSISTENT SCALING
-function generateGmailElementHtml(element: EditorElement, maxWidth: number): string {
-  const { content, type } = element
-  
-  // PROPORTIONAL SCALING: Scale from 1000px template to 750px Gmail
-  const scaleRatio = 750 / 1000 // 75% scaling for optimal Gmail display
-  const scaledWidth = Math.round(element.style.width * scaleRatio)
-  const scaledHeight = Math.round(element.style.height * scaleRatio)
-  const scaledFontSize = element.style.fontSize ? Math.round(element.style.fontSize * scaleRatio) : undefined
-  
-  switch (type) {
-    case 'text':
-      const textColor = element.style.color || '#000000'
-      const fontSize = scaledFontSize || 14
-      
-      return `<div style="font-family: Arial, sans-serif; font-size: ${fontSize}px; color: ${textColor}; line-height: 1.4; text-align: ${element.style.textAlign || 'left'}; margin: 0; padding: 0; width: ${scaledWidth}px; ${element.style.fontWeight ? `font-weight: ${element.style.fontWeight};` : ''}">${content}</div>`
-
-    case 'heading':
-      const headingColor = element.style.color || '#000000'
-      const headingSize = scaledFontSize || (24 - ((element.headingLevel || 1) - 1) * 2)
-      
-      return `<div style="font-family: Arial, sans-serif; font-size: ${headingSize}px; color: ${headingColor}; font-weight: bold; line-height: 1.2; text-align: ${element.style.textAlign || 'left'}; margin: 0; padding: 0; width: ${scaledWidth}px;">${content}</div>`
-
-    case 'image':
-      // CONSISTENT IMAGE SCALING - Apply to ALL images including logos
-      let imageSrc = content
-      if (content.startsWith('data:')) {
-        console.log('WARNING: Legacy data URL detected, using fallback')
-        imageSrc = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=LEGACY+IMAGE'
-      }
-      
-      return `<img src="${imageSrc}" alt="Email Image" style="width: ${scaledWidth}px; height: ${scaledHeight}px; display: block; border: 0; margin: 0 auto; padding: 0;" width="${scaledWidth}" height="${scaledHeight}" />`
-
-    case 'video':
-      // CONSISTENT VIDEO SCALING - Videos now scale properly
-      const videoData = element.videoData
-      const videoUrl = videoData?.url || content || ''
-      let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
-      
-      if (thumbnailUrl && thumbnailUrl.startsWith('data:')) {
-        console.log('WARNING: Legacy data URL detected in video thumbnail')
-        thumbnailUrl = undefined
-      }
-      
-      if (!thumbnailUrl) {
-        thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
-      }
-      
-      return `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; margin: 0 auto; padding: 0; width: ${scaledWidth}px; height: ${scaledHeight}px; overflow: hidden; border-radius: ${element.style.borderRadius || 0}px; position: relative;">
-        <img src="${thumbnailUrl}" alt="Video" style="width: ${scaledWidth}px; height: ${scaledHeight}px; display: block; border: 0; margin: 0; padding: 0; object-fit: cover; object-position: center;" width="${scaledWidth}" height="${scaledHeight}" />
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-          <div style="width: ${Math.round(48 * scaleRatio)}px; height: ${Math.round(48 * scaleRatio)}px; background-color: rgba(255,255,255,0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-            <div style="width: 0; height: 0; border-left: ${Math.round(16 * scaleRatio)}px solid #333; border-top: ${Math.round(12 * scaleRatio)}px solid transparent; border-bottom: ${Math.round(12 * scaleRatio)}px solid transparent; margin-left: ${Math.round(4 * scaleRatio)}px;"></div>
-          </div>
-        </div>
-      </a>`
-
-    case 'button':
-      // BUTTON OPTIMIZATION - Less aggressive scaling for better readability
-      const buttonBg = element.style.backgroundColor || '#0073e6'
-      const buttonColor = element.style.color || '#ffffff'
-      const buttonText = content || 'Click Here'
-      const buttonUrl = element.buttonData?.url || '#'
-      const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
-      // Use larger font size for buttons - minimal scaling for readability
-      const buttonFontSize = element.style.fontSize ? Math.max(Math.round(element.style.fontSize * 0.9), 16) : 16
-      
-      return `<table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
-        <tr>
-          <td style="background-color: ${buttonBg}; border-radius: ${element.style.borderRadius || 4}px; padding: 14px 28px; margin: 0; text-align: center;">
-            <a href="${buttonUrl}" target="${buttonTarget}" style="color: ${buttonColor}; text-decoration: none; font-family: Arial, sans-serif; font-size: ${buttonFontSize}px; font-weight: ${element.style.fontWeight || 'normal'}; display: block; text-align: center; width: 100%;">${buttonText}</a>
-          </td>
-        </tr>
-      </table>`
-
-    case 'divider':
-      // CONSISTENT DIVIDER SCALING
-      const dividerColor = element.style.backgroundColor || '#cccccc'
-      const dividerHeight = Math.max(Math.round(element.style.height * scaleRatio), 1)
-      
-      return `<div style="width: ${scaledWidth}px; height: ${dividerHeight}px; background-color: ${dividerColor}; border-radius: ${element.style.borderRadius || 0}px; margin: 0 auto; padding: 0;"></div>`
-
-    default:
-      return ''
-  }
-}
-
 // STANDARD EMAIL CLIENTS: Preserve original design dimensions
-function generateStandardEmailHtml(
-  sortedElements: EditorElement[],
-  canvasSettings: CanvasSettings,
-  templateName: string
-): string {
-  // Use ORIGINAL canvas dimensions - NOT constrained to 600px
+function generateStandardEmailHtml(templateName: string, elements: any[], canvasSettings: any = {}) {
   const canvasWidth = canvasSettings.width || 1000
   const canvasHeight = canvasSettings.height || 800
+  
+  // Sort elements by their Y position (top to bottom) for table layout
+  const sortedElements = [...elements].sort((a, b) => a.style.position.y - b.style.position.y)
   
   let html = `<!DOCTYPE html>
 <html lang="en">
@@ -309,199 +353,223 @@ function generateStandardEmailHtml(
     </xml>
   </noscript>
   <![endif]-->
-  <style>
-    /* Mobile responsiveness for email clients that support CSS */
-    @media only screen and (max-width: 600px) {
-      .email-container {
-        width: 100% !important;
-        max-width: 320px !important;
-        height: auto !important;
-      }
-      .email-element {
-        position: relative !important;
-        left: auto !important;
-        top: auto !important;
-        width: 90% !important;
-        max-width: 280px !important;
-        margin: 10px auto !important;
-        display: block !important;
-      }
-      .email-element img {
-        width: 100% !important;
-        height: auto !important;
-        max-width: 280px !important;
-      }
-    }
-  </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <center>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
       <tr>
-        <td align="center" style="padding: 20px 0;">
-          <div class="email-container" style="
-            position: relative; 
-            width: ${canvasWidth}px; 
-            height: ${canvasHeight}px;
-            max-width: ${canvasWidth}px; 
-            background-color: ${canvasSettings.backgroundColor}; 
-            margin: 0 auto;
-            display: block;
-          ">`
-
-  // Render each element with its EXACT positioning and dimensions
-  sortedElements.forEach((element) => {
-    const { style, content, type } = element
-    
-    // Use exact positioning from the visual editor
-    const elementHtml = `
-            <div class="email-element" style="
-              position: absolute;
-              left: ${style.position.x}px;
-              top: ${style.position.y}px;
-              width: ${style.width}px;
-              height: ${style.height}px;
-              ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
-              ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
-              ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
-              ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
-              ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
-              ${style.color ? `color: ${style.color};` : ''}
-              ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
-              ${style.padding ? `padding: ${style.padding}px;` : ''}
-              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-              ${style.textAlign ? `text-align: ${style.textAlign};` : ''}
-              line-height: 1.4;
-              box-sizing: border-box;
-            ">`
-
-    switch (type) {
-      case 'text':
-        html += elementHtml + content + '</div>'
-        break
-      case 'heading':
-        const headingTag = `h${element.headingLevel || 1}`
-        html += elementHtml + `<${headingTag} style="margin: 0; font-size: inherit; font-weight: inherit; color: inherit;">${content}</${headingTag}></div>`
-        break
-      case 'image':
-        // APPLE MAIL: Allow data URLs (they work perfectly!)
-        // GMAIL: Force external URLs only
-        let imageSrc = content
-        
-        // Only force fallback for Gmail users - Apple Mail handles data URLs fine!
-        if (content.startsWith('data:')) {
-          console.log('INFO: Data URL detected in Apple Mail - this is fine!')
-          imageSrc = content // Keep original data URL for Apple Mail
-        }
-        
-        html += elementHtml + `<img src="${imageSrc}" alt="Email Image" style="
-          width: ${style.width}px;
-          height: ${style.height}px;
-          display: block;
-          border: 0;
-          outline: none;
-          object-fit: cover;
-          ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-        " width="${style.width}" height="${style.height}" /></div>`
-        break
-      case 'video':
-        const videoData = element.videoData
-        const videoUrl = videoData?.url || content || ''
-        let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
-        
-        // Extract YouTube thumbnail if URL is provided and no custom thumbnail
-        if (videoUrl && !thumbnailUrl) {
-          const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
-          if (youtubeMatch) {
-            const videoId = youtubeMatch[1]
-            thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-          }
-        }
-        
-        // Fallback thumbnail
-        if (!thumbnailUrl) {
-          thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
-        }
-        
-        html += elementHtml + `
-          <a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
-            <img src="${thumbnailUrl}" alt="Video" style="
-              width: ${style.width}px;
-              height: ${style.height}px;
-              display: block;
-              border: 0;
-              object-fit: cover;
-              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-            " width="${style.width}" height="${style.height}">
-            <div style="
-              position: absolute;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              width: 48px;
-              height: 48px;
-              background-color: rgba(0, 0, 0, 0.7);
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            ">
-              <div style="
-                width: 0;
-                height: 0;
-                border-left: 16px solid white;
-                border-top: 10px solid transparent;
-                border-bottom: 10px solid transparent;
-                margin-left: 4px;
-              "></div>
-            </div>
-          </a>
-        </div>`
-        break
-      case 'button':
-        const buttonUrl = element.buttonData?.url || '#'
-        const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
-        html += elementHtml + `
-          <!--[if mso]>
-          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${buttonUrl}" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
-            <w:anchorlock/>
-            <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
-          </v:roundrect>
-          <![endif]-->
-          <!--[if !mso]><!-->
-          <a href="${buttonUrl}" target="${buttonTarget}" style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        <td align="center" style="padding: 20px 10px;">
+          <!-- Main email container table -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="
             width: 100%;
-            height: 100%;
+            max-width: 600px;
+            background-color: ${canvasSettings.backgroundColor || '#ffffff'};
+            margin: 0 auto;
+          ">
+            <tr>
+              <td style="padding: 20px;">`
+
+  // Group elements by their Y position to create rows
+  const rows: any[][] = []
+  let currentRow: any[] = []
+  let currentY = -1
+  const yTolerance = 10 // Group elements within 10px of each other
+
+  sortedElements.forEach((element) => {
+    const elementY = element.style.position.y
+    
+    if (currentY === -1 || Math.abs(elementY - currentY) <= yTolerance) {
+      currentRow.push(element)
+      currentY = elementY
+    } else {
+      if (currentRow.length > 0) {
+        rows.push([...currentRow])
+      }
+      currentRow = [element]
+      currentY = elementY
+    }
+  })
+  
+  // Add the last row
+  if (currentRow.length > 0) {
+    rows.push(currentRow)
+  }
+
+  // Render each row as a table
+  rows.forEach((rowElements, rowIndex) => {
+    // Sort elements in row by X position (left to right)
+    const sortedRowElements = rowElements.sort((a, b) => a.style.position.x - b.style.position.x)
+    
+    html += `
+                <!-- Row ${rowIndex + 1} -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 10px;">
+                  <tr>`
+
+    sortedRowElements.forEach((element) => {
+      const { style, content, type } = element
+      
+      // Calculate relative width as percentage
+      const elementWidth = Math.min(100, Math.max(10, (style.width / 600) * 100))
+      
+      html += `
+                    <td style="
+                      width: ${elementWidth}%;
+                      vertical-align: top;
+                      padding: 5px;
+                      ${style.textAlign ? `text-align: ${style.textAlign};` : 'text-align: left;'}
+                    ">`
+
+      // Render element content based on type
+      switch (type) {
+        case 'text':
+          html += `<div style="
+            ${style.fontSize ? `font-size: ${Math.max(14, style.fontSize)}px;` : 'font-size: 16px;'}
+            ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+            ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+            ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
+            ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
+            ${style.color ? `color: ${style.color};` : 'color: #333333;'}
+            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+            ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            line-height: 1.4;
+            margin: 0;
+          ">${content}</div>`
+          break
+          
+        case 'heading':
+          const headingTag = `h${element.headingLevel || 1}`
+          const headingSize = element.headingLevel === 1 ? '28px' : element.headingLevel === 2 ? '24px' : '20px'
+          html += `<${headingTag} style="
+            margin: 0;
+            ${style.fontSize ? `font-size: ${Math.max(18, style.fontSize)}px;` : `font-size: ${headingSize};`}
+            ${style.fontWeight ? `font-weight: ${style.fontWeight};` : 'font-weight: bold;'}
+            ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+            ${style.color ? `color: ${style.color};` : 'color: #333333;'}
+            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+            ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            line-height: 1.2;
+          ">${content}</${headingTag}>`
+          break
+          
+        case 'image':
+          let imageSrc = content
+          if (content.startsWith('data:')) {
+            imageSrc = content // Keep data URLs for Apple Mail
+          }
+          
+          html += `<img src="${imageSrc}" alt="Email Image" style="
+            width: 100%;
+            max-width: ${style.width}px;
+            height: auto;
+            display: block;
+            border: 0;
+            outline: none;
+            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+            margin: 0 auto;
+          " />`
+          break
+          
+        case 'video':
+          const videoData = element.videoData
+          const videoUrl = videoData?.url || content || ''
+          let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
+          
+          if (videoUrl && !thumbnailUrl) {
+            const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+            if (youtubeMatch) {
+              const videoId = youtubeMatch[1]
+              thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+            }
+          }
+          
+          if (!thumbnailUrl) {
+            thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+          }
+          
+          html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="position: relative; width: 100%;">
+              <tr>
+                <td style="position: relative;">
+                  <img src="${thumbnailUrl}" alt="Video" style="
+                    width: 100%;
+                    max-width: ${style.width}px;
+                    height: auto;
+                    display: block;
+                    border: 0;
+                    ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                  " />
+                  <!-- Play button overlay (simplified for email) -->
+                  <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background-color: rgba(0,0,0,0.7);
+                    color: white;
+                    padding: 10px 15px;
+                    border-radius: 5px;
+                    font-size: 14px;
+                  ">▶ Play Video</div>
+                </td>
+              </tr>
+            </table>
+          </a>`
+          break
+          
+        case 'button':
+          const buttonUrl = element.buttonData?.url || '#'
+          const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
+          html += `<!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${buttonUrl}" style="height:40px;v-text-anchor:middle;width:150px;" arcsize="10%" stroke="f" fillcolor="${style.backgroundColor || '#007BFF'}">
+              <w:anchorlock/>
+              <center>
+          <![endif]-->
+          <a href="${buttonUrl}" target="${buttonTarget}" style="
+            display: inline-block;
+            padding: 12px 24px;
             background-color: ${style.backgroundColor || '#007BFF'};
             color: ${style.color || '#FFFFFF'};
             text-decoration: none;
             border-radius: ${style.borderRadius || 4}px;
-            font-family: inherit;
-            font-size: inherit;
-            font-weight: inherit;
+            font-family: Arial, sans-serif;
+            font-size: ${style.fontSize || 16}px;
+            font-weight: ${style.fontWeight || 'bold'};
             text-align: center;
-            box-sizing: border-box;
+            line-height: 1;
+            margin: 10px 0;
           ">${content}</a>
-          <!--<![endif]-->
-        </div>`
-        break
-      case 'divider':
-        html += elementHtml + `<hr style="
-          border: none; 
-          height: ${style.height || 1}px; 
-          background-color: ${style.backgroundColor || '#CCCCCC'}; 
-          margin: 0;
-          width: 100%;
-        " /></div>`
-        break
-    }
+          <!--[if mso]>
+              </center>
+            </v:roundrect>
+          <![endif]-->`
+          break
+          
+        case 'divider':
+          html += `<hr style="
+            border: none; 
+            height: ${style.height || 2}px; 
+            background-color: ${style.backgroundColor || '#CCCCCC'}; 
+            margin: 15px 0;
+            width: 100%;
+          " />`
+          break
+      }
+
+      html += `
+                    </td>`
+    })
+
+    html += `
+                  </tr>
+                </table>`
   })
 
   html += `
-          </div>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>

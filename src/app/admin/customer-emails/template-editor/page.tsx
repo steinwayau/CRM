@@ -1003,8 +1003,7 @@ export default function TemplateEditorPage() {
   }
 
   const generateHtmlFromElements = () => {
-    // FIXED: Preserve precise layout using absolute positioning for capable email clients
-    // Sort elements by Y position to maintain proper stacking order
+    // Use table-based layout to match actual email output
     const sortedElements = [...editorElements].sort((a, b) => a.style.position.y - b.style.position.y)
     
     let html = `
@@ -1023,174 +1022,206 @@ export default function TemplateEditorPage() {
     </xml>
   </noscript>
   <![endif]-->
-  <style>
-    /* Mobile responsiveness for email clients that support CSS */
-    @media only screen and (max-width: 600px) {
-      .email-container {
-        width: 100% !important;
-        max-width: 320px !important;
-        height: auto !important;
-      }
-      .email-element {
-        position: relative !important;
-        left: auto !important;
-        top: auto !important;
-        width: 90% !important;
-        max-width: 280px !important;
-        margin: 10px auto !important;
-        display: block !important;
-      }
-      .email-element img {
-        width: 100% !important;
-        height: auto !important;
-        max-width: 280px !important;
-      }
-    }
-  </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <center>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
       <tr>
-        <td align="center" style="padding: 20px 0;">
-          <div class="email-container" style="
-            position: relative; 
-            width: ${canvasSize.width}px; 
-            height: ${canvasSize.height}px;
-            max-width: ${canvasSize.width}px; 
-            background-color: ${canvasBackgroundColor}; 
+        <td align="center" style="padding: 20px 10px;">
+          <!-- Main email container table -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="
+            width: 100%;
+            max-width: 600px;
+            background-color: ${canvasBackgroundColor};
             margin: 0 auto;
-            display: block;
-          ">`
+          ">
+            <tr>
+              <td style="padding: 20px;">`
 
-    // FIXED: Render each element with its EXACT positioning and dimensions
-    sortedElements.forEach((element, index) => {
-      const { style, content, type } = element
+    // Group elements by their Y position to create rows (same as email generation)
+    const rows: any[][] = []
+    let currentRow: any[] = []
+    let currentY = -1
+    const yTolerance = 10
+
+    sortedElements.forEach((element) => {
+      const elementY = element.style.position.y
       
-      // Use exact positioning from the visual editor
-      const elementHtml = `
-            <div class="email-element" style="
-              position: absolute;
-              left: ${style.position.x}px;
-              top: ${style.position.y}px;
-              width: ${style.width}px;
-              height: ${style.height}px;
-              ${style.fontSize ? `font-size: ${style.fontSize}px;` : ''}
+      if (currentY === -1 || Math.abs(elementY - currentY) <= yTolerance) {
+        currentRow.push(element)
+        currentY = elementY
+      } else {
+        if (currentRow.length > 0) {
+          rows.push([...currentRow])
+        }
+        currentRow = [element]
+        currentY = elementY
+      }
+    })
+    
+    // Add the last row
+    if (currentRow.length > 0) {
+      rows.push(currentRow)
+    }
+
+    // Render each row as a table (same logic as email generation)
+    rows.forEach((rowElements, rowIndex) => {
+      const sortedRowElements = rowElements.sort((a, b) => a.style.position.x - b.style.position.x)
+      
+      html += `
+                <!-- Row ${rowIndex + 1} -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 10px;">
+                  <tr>`
+
+      sortedRowElements.forEach((element) => {
+        const { style, content, type } = element
+        
+        // Calculate relative width as percentage
+        const elementWidth = Math.min(100, Math.max(10, (style.width / 600) * 100))
+        
+        html += `
+                    <td style="
+                      width: ${elementWidth}%;
+                      vertical-align: top;
+                      padding: 5px;
+                      ${style.textAlign ? `text-align: ${style.textAlign};` : 'text-align: left;'}
+                    ">`
+
+        // Render element content (same logic as email generation)
+        switch (type) {
+          case 'text':
+            html += `<div style="
+              ${style.fontSize ? `font-size: ${Math.max(14, style.fontSize)}px;` : 'font-size: 16px;'}
               ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
               ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
               ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
               ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
-              ${style.color ? `color: ${style.color};` : ''}
+              ${style.color ? `color: ${style.color};` : 'color: #333333;'}
               ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
-              ${style.padding ? `padding: ${style.padding}px;` : ''}
+              ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
               ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-              ${style.textAlign ? `text-align: ${style.textAlign};` : ''}
               line-height: 1.4;
-              box-sizing: border-box;
-            ">`
-
-      switch (type) {
-        case 'text':
-          html += elementHtml + content + '</div>'
-          break
-        case 'heading':
-          const headingTag = `h${element.headingLevel || 1}`
-          html += elementHtml + `<${headingTag} style="margin: 0; font-size: inherit; font-weight: inherit; color: inherit;">${content}</${headingTag}></div>`
-          break
-        case 'image':
-          // FIXED: Use exact dimensions from the element style to prevent stretching
-          html += elementHtml + `<img src="${content}" alt="Email Image" style="
-            width: ${style.width}px;
-            height: ${style.height}px;
-            display: block;
-            border: 0;
-            outline: none;
-            object-fit: cover;
-            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-          " width="${style.width}" height="${style.height}" /></div>`
-          break
-        case 'video':
-          const videoData = element.videoData
-          const thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl || 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=VIDEO'
-          html += elementHtml + `
-            <a href="${content}" style="display: block; text-decoration: none; position: relative; width: 100%; height: 100%;">
-              <img src="${thumbnailUrl}" alt="${videoData?.title || 'Video'}" style="
-                width: ${style.width}px;
-                height: ${style.height}px;
-                display: block;
-                border: 0;
-                object-fit: cover;
-                ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-              " width="${style.width}" height="${style.height}">
-              <div style="
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 48px;
-                height: 48px;
-                background-color: rgba(0, 0, 0, 0.7);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              ">
-                <div style="
-                  width: 0;
-                  height: 0;
-                  border-left: 16px solid white;
-                  border-top: 10px solid transparent;
-                  border-bottom: 10px solid transparent;
-                  margin-left: 4px;
-                "></div>
-              </div>
-            </a>
-          </div>`
-          break
-        case 'button':
-          const buttonUrl = element.buttonData?.url || '#'
-          const buttonTarget = element.buttonData?.openInNewTab ? '_blank' : '_self'
-          html += elementHtml + `
-            <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${buttonUrl}" style="height:${style.height}px;v-text-anchor:middle;width:${style.width}px;" arcsize="${style.borderRadius ? Math.round((style.borderRadius / Math.min(style.width, style.height)) * 100) : 0}%" strokecolor="${style.backgroundColor}" fillcolor="${style.backgroundColor}">
-              <w:anchorlock/>
-              <center style="color:${style.color};font-family:Arial,sans-serif;font-size:${style.fontSize || 16}px;font-weight:${style.fontWeight || 'normal'};">${content}</center>
-            </v:roundrect>
-            <![endif]-->
-            <!--[if !mso]><!-->
-            <a href="${buttonUrl}" target="${buttonTarget}" style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
+              margin: 0;
+            ">${content}</div>`
+            break
+            
+          case 'heading':
+            const headingTag = `h${element.headingLevel || 1}`
+            const headingSize = element.headingLevel === 1 ? '28px' : element.headingLevel === 2 ? '24px' : '20px'
+            html += `<${headingTag} style="
+              margin: 0;
+              ${style.fontSize ? `font-size: ${Math.max(18, style.fontSize)}px;` : `font-size: ${headingSize};`}
+              ${style.fontWeight ? `font-weight: ${style.fontWeight};` : 'font-weight: bold;'}
+              ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+              ${style.color ? `color: ${style.color};` : 'color: #333333;'}
+              ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+              ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              line-height: 1.2;
+            ">${content}</${headingTag}>`
+            break
+            
+          case 'image':
+            let imageSrc = content
+            html += `<img src="${imageSrc}" alt="Email Image" style="
               width: 100%;
-              height: 100%;
+              max-width: ${style.width}px;
+              height: auto;
+              display: block;
+              border: 0;
+              outline: none;
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              margin: 0 auto;
+            " />`
+            break
+            
+          case 'video':
+            const videoData = element.videoData
+            const videoUrl = videoData?.url || content || ''
+            let thumbnailUrl = videoData?.customThumbnail || videoData?.thumbnailUrl
+            
+            if (videoUrl && !thumbnailUrl) {
+              const youtubeMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+              if (youtubeMatch) {
+                const videoId = youtubeMatch[1]
+                thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+              }
+            }
+            
+            if (!thumbnailUrl) {
+              thumbnailUrl = 'https://via.placeholder.com/400x300/000000/FFFFFF/?text=▶+VIDEO'
+            }
+            
+            html += `<a href="${videoUrl}" target="_blank" style="display: block; text-decoration: none;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="position: relative; width: 100%;">
+                <tr>
+                  <td style="position: relative;">
+                    <img src="${thumbnailUrl}" alt="Video" style="
+                      width: 100%;
+                      max-width: ${style.width}px;
+                      height: auto;
+                      display: block;
+                      border: 0;
+                      ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+                    " />
+                    <div style="
+                      margin-top: 10px;
+                      background-color: rgba(0,0,0,0.7);
+                      color: white;
+                      padding: 10px 15px;
+                      border-radius: 5px;
+                      font-size: 14px;
+                      text-align: center;
+                    ">▶ Play Video</div>
+                  </td>
+                </tr>
+              </table>
+            </a>`
+            break
+            
+          case 'button':
+            const buttonUrl = element.url || '#'
+            const buttonTarget = element.target || '_blank'
+            html += `<a href="${buttonUrl}" target="${buttonTarget}" style="
+              display: inline-block;
+              padding: 12px 24px;
               background-color: ${style.backgroundColor || '#007BFF'};
               color: ${style.color || '#FFFFFF'};
               text-decoration: none;
               border-radius: ${style.borderRadius || 4}px;
-              font-family: inherit;
-              font-size: inherit;
-              font-weight: inherit;
+              font-family: Arial, sans-serif;
+              font-size: ${style.fontSize || 16}px;
+              font-weight: ${style.fontWeight || 'bold'};
               text-align: center;
-              box-sizing: border-box;
-            ">${content}</a>
-            <!--<![endif]-->
-          </div>`
-          break
-        case 'divider':
-          html += elementHtml + `<hr style="
-            border: none; 
-            height: ${style.height || 1}px; 
-            background-color: ${style.backgroundColor || '#CCCCCC'}; 
-            margin: 0;
-            width: 100%;
-          " /></div>`
-          break
-      }
+              line-height: 1;
+              margin: 10px 0;
+            ">${content}</a>`
+            break
+            
+          case 'divider':
+            html += `<hr style="
+              border: none; 
+              height: ${style.height || 2}px; 
+              background-color: ${style.backgroundColor || '#CCCCCC'}; 
+              margin: 15px 0;
+              width: 100%;
+            " />`
+            break
+        }
+
+        html += `
+                    </td>`
+      })
+
+      html += `
+                  </tr>
+                </table>`
     })
 
     html += `
-          </div>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>

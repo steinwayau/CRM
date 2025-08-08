@@ -344,6 +344,10 @@ export default function CustomerEmailsPage() {
           console.log('🔄 Loading analytics immediately after campaigns loaded')
           if (campaignsWithCustomEmails.length > 0) {
             await loadCampaignAnalyticsSync(campaignsWithCustomEmails)
+          } else {
+            // No campaigns: clear per-campaign analytics and refresh overall analytics to reset stats to 0
+            setCampaignAnalytics({})
+            await loadOverallAnalytics()
           }
         } else {
           console.error('Failed to load campaigns')
@@ -1032,6 +1036,11 @@ export default function CustomerEmailsPage() {
             setAnalyticsLoading(true)
             // Reload campaigns first to get latest data
             await loadData()
+            // If no campaigns, ensure totals reset
+            if (campaigns.length === 0) {
+              setCampaignAnalytics({})
+              await loadOverallAnalytics()
+            }
             setAnalyticsLoading(false)
           }}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

@@ -700,6 +700,30 @@ async function sendWithConcurrency<T>(
   return results
 }
 
+// Helper: rate-limited + concurrency window (msgs/sec)
+async function sendWithRateLimitedConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number,
+  msgsPerSecond: number,
+  maxAttempts: number
+) {
+  const results: Array<{ status: 'fulfilled' | 'rejected'; value?: any; reason?: any }> = []
+  let index = 0
+  const windowSize = Math.max(1, Math.min(concurrency, msgsPerSecond))
+  while (index < tasks.length) {
+    const slice = tasks.slice(index, index + windowSize)
+    const settled = await Promise.all(
+      slice.map(fn => sendEmailWithRetry(fn, maxAttempts))
+    )
+    results.push(...settled)
+    index += windowSize
+    if (index < tasks.length) {
+      await delay(1000) // next second
+    }
+  }
+  return results
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Environment validation
@@ -832,12 +856,15 @@ export async function POST(request: NextRequest) {
         })
 
         // Send batch using Resend with concurrency cap and backoff
-        const batchResults = await sendWithConcurrency(
+        const RATE = Math.max(1, parseInt(process.env.EMAIL_RATE_PER_SEC || '5'))
+        const CONCURRENCY = Math.min(RATE, 5)
+        const batchResults = await sendWithRateLimitedConcurrency(
           batchEmails.map(email => () => resend.emails.send(email)),
-          5, // concurrency
-          3  // attempts
+          CONCURRENCY,
+          RATE,
+          3
         )
-
+ 
             // Process results
         batchResults.forEach((result, index) => {
           if (result.status === 'fulfilled') {
@@ -863,10 +890,7 @@ export async function POST(request: NextRequest) {
           }
         })
 
-        // Add delay between batches to respect rate limits
-        if (batches.length > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second delay
-        }
+        // Per-second pacing handled by sendWithRateLimitedConcurrency
 
       } catch (error) {
         console.error('Batch sending error:', error)

@@ -174,11 +174,11 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         COUNT(DISTINCT recipient_email) as unique_users,
         COUNT(DISTINCT campaign_id) as campaigns_with_type,
         array_agg(DISTINCT target_url) as sample_urls
-      FROM email_tracking 
-      WHERE event_type = 'click'
-        AND (${start} IS NULL OR created_at >= ${start})
-        AND (${end} IS NULL OR created_at <= ${end})
-        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
+      FROM email_tracking et
+      WHERE et.event_type = 'click'
+        AND (${start} IS NULL OR et.created_at >= ${start})
+        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY link_type
       ORDER BY total_clicks DESC
     `
@@ -190,11 +190,11 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         link_type,
         COUNT(*) as clicks,
         COUNT(DISTINCT recipient_email) as unique_users
-      FROM email_tracking 
-      WHERE event_type = 'click' AND target_url IS NOT NULL
-        AND (${start} IS NULL OR created_at >= ${start})
-        AND (${end} IS NULL OR created_at <= ${end})
-        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
+      FROM email_tracking et
+      WHERE et.event_type = 'click' AND et.target_url IS NOT NULL
+        AND (${start} IS NULL OR et.created_at >= ${start})
+        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY target_url, link_type
       ORDER BY clicks DESC
       LIMIT 10
@@ -206,11 +206,11 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         split_part(recipient_email, '@', 2) AS domain,
         COUNT(DISTINCT recipient_email) AS unique_users,
         COUNT(*) AS events
-      FROM email_tracking
-      WHERE recipient_email <> ''
-        AND (${start} IS NULL OR created_at >= ${start})
-        AND (${end} IS NULL OR created_at <= ${end})
-        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
+      FROM email_tracking et
+      WHERE et.recipient_email <> ''
+        AND (${start} IS NULL OR et.created_at >= ${start})
+        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY domain
       ORDER BY unique_users DESC
       LIMIT 20
@@ -219,11 +219,11 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
     // Client/device sample overall (last 1000 events)
     const uaRows = await sql`
       SELECT user_agent
-      FROM email_tracking
-      WHERE (${start} IS NULL OR created_at >= ${start})
-        AND (${end} IS NULL OR created_at <= ${end})
-        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
-      ORDER BY created_at DESC
+      FROM email_tracking et
+      WHERE (${start} IS NULL OR et.created_at >= ${start})
+        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
+      ORDER BY et.created_at DESC
       LIMIT 1000
     `
     const clientCounts: Record<string, number> = {}
@@ -239,10 +239,10 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
       SELECT date_trunc('minute', created_at) AS ts,
              event_type,
              COUNT(*) AS count
-      FROM email_tracking
-      WHERE (${start} IS NULL OR created_at >= ${start})
-        AND (${end} IS NULL OR created_at <= ${end})
-        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
+      FROM email_tracking et
+      WHERE (${start} IS NULL OR et.created_at >= ${start})
+        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY ts, event_type
       ORDER BY ts ASC
     `

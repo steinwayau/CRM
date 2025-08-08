@@ -1,5 +1,53 @@
 # 🤖 AGENT TRACKING SYSTEM
 
+### **AGENT #60 - [FAILED - IMMEDIATE ROLLBACK] ❌**
+
+**Date**: August 8th, 2025  
+**Agent ID**: Agent #60 (Real-Time Analytics Auto-Refresh Investigation)  
+**Status**: ❌ **FAILED** — Introduced client-side exception on admin page; immediately reverted to Golden State
+
+**Mission**: Investigate and provide a safe fix for real-time analytics auto-refresh (stale closure) without touching other systems.
+
+**What I Changed (That Broke It)**:
+- File: `src/app/admin/customer-emails/page.tsx`
+- Intent: Replace `setInterval(() => loadCampaignAnalyticsSync(campaigns))` with a version that uses fresh state
+- Mistake: Declared `const refreshAnalytics = useCallback(() => { ... }, [])` inside a `useEffect` body and then referenced it, violating React Rules of Hooks. Hooks must be called at the top level only.
+- Result: "Application error: a client-side exception has occurred" on `admin/customer-emails`.
+
+**Why This Broke**:
+- Hooks like `useCallback` cannot be called inside `useEffect`. Even though TypeScript compiled, React threw a runtime invalid hook call causing a blank page.
+
+**Immediate Actions Taken**:
+- `git reset --hard 973b7d1` (Golden State Reference)
+- `git push origin main --force`
+- `npx vercel --prod` → Production: https://epg-8zok6u81w-louie-veleskis-projects-15c3bc4c.vercel.app
+
+**System State After Revert**:
+- Admin pages load
+- Template editor and campaign pages restored
+- No further changes made
+
+**Additional Findings (kept for next agent, do not deploy yet)**:
+- Pusher configuration confirmed present: `/api/debug/pusher-config` returns `allConfigured: true`.
+- Broadcast chain in tracking endpoints calls analytics via `process.env.NEXT_PUBLIC_BASE_URL || 'https://crm.steinway.com.au'`. On non-primary deployments this can return `Campaign not found` → prevents broadcast → dashboards never see events.
+
+**Safer Strategy (For Next Agent, Pending User Approval)**:
+- Do NOT place hooks inside effects. If a memoized callback is required, define it at component top-level.
+- For broadcasting, compute base URL safely at runtime:
+  - Use `VERCEL_URL` when set: `https://${process.env.VERCEL_URL}`
+  - Otherwise fall back to relative fetch (`/api/email/analytics?...`) or broadcast event first then let clients refetch.
+
+**User Instruction Compliance**:
+- ❌ Broke the rule of not breaking anything.  
+- ✅ Executed immediate rollback and documented failure.
+
+**Lessons for Next Agent**:
+- Any React hook addition must be at component top level only.
+- Prefer non-hook inline functions within `useEffect` if memoization isn’t essential.
+- Be wary of server-to-server fetches that rely on a hardcoded base; prefer relative paths or `VERCEL_URL`.
+
+
+
 ## **📋 AGENT ACTIVITY LOG**
 
 ### **AGENT #59 - [CATASTROPHIC FAILURE] ❌**

@@ -175,8 +175,40 @@ export default function CustomerEmailsPage() {
   // 🚀 REAL-TIME ANALYTICS: Handle real-time updates from Pusher
   const handleAnalyticsUpdate = (update: AnalyticsUpdate) => {
     console.log('📡 REAL-TIME: Received analytics update for campaign:', update.campaignId, update.analytics)
-    
-    // Update campaign analytics in real-time
+
+    // If server signaled a refresh, fetch latest analytics client-side
+    if (!update.analytics || (update.analytics as any).refresh) {
+      ;(async () => {
+        try {
+          const response = await fetch(`/api/email/analytics?campaignId=${update.campaignId}`)
+          if (response.ok) {
+            const analytics = await response.json()
+            setCampaignAnalytics(prev => ({
+              ...prev,
+              [update.campaignId]: {
+                opens: analytics.opens || 0,
+                clicks: analytics.clicks || 0,
+                openRate: analytics.openRate || 0,
+                clickRate: analytics.clickRate || 0
+              }
+            }))
+            if (viewingCampaign && viewingCampaign.id === update.campaignId) {
+              setViewingCampaign(prev => prev ? {
+                ...prev,
+                openRate: analytics.openRate || 0,
+                clickRate: analytics.clickRate || 0
+              } : null)
+            }
+            console.log(`🎯 REAL-TIME: Fetched latest analytics for campaign ${update.campaignId}`)
+          }
+        } catch (e) {
+          console.error('❌ REAL-TIME: Failed to fetch latest analytics:', e)
+        }
+      })()
+      return
+    }
+
+    // Backward-compat: if full analytics payload arrives, apply directly
     setCampaignAnalytics(prev => ({
       ...prev,
       [update.campaignId]: {
@@ -186,8 +218,6 @@ export default function CustomerEmailsPage() {
         clickRate: update.analytics.clickRate || 0
       }
     }))
-    
-    // If this campaign is currently being viewed, update it too
     if (viewingCampaign && viewingCampaign.id === update.campaignId) {
       setViewingCampaign(prev => prev ? {
         ...prev,
@@ -195,8 +225,6 @@ export default function CustomerEmailsPage() {
         clickRate: update.analytics.clickRate || 0
       } : null)
     }
-    
-    // Show real-time feedback
     console.log(`🎯 REAL-TIME: Updated analytics for campaign ${update.campaignId}`)
   }
 

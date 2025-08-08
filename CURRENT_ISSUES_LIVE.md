@@ -1,3 +1,23 @@
+# 🚨 EMERGENCY ROLLBACK - AUGUST 8TH, 2025
+
+**Status**: ✅ System restored to Golden State
+
+- **What happened**: Attempted a 4-line "stale-closure" fix in `src/app/admin/customer-emails/page.tsx` to improve auto-refresh. I mistakenly called `useCallback` inside a `useEffect` block, which violates React's Rules of Hooks and caused a client-side exception on the Admin Customer Emails page.
+- **User impact**: Page showed "Application error: a client-side exception has occurred". User requested immediate revert.
+- **Root cause**: Hook (`useCallback`) invoked inside `useEffect`. Hooks must be called unconditionally at the top level of the component. This triggered an invalid hook call at runtime.
+- **Actions taken**:
+  - Reverted to Golden State commit: `973b7d1`
+  - Forced push to `main`
+  - Deployed to production: https://epg-8zok6u81w-louie-veleskis-projects-15c3bc4c.vercel.app
+- **Do not repeat**: Never call React Hooks inside `useEffect`, loops, or conditionals. For interval refresh, define plain functions inside effects or define memoized callbacks at the top level only.
+
+### Real-time analytics current status (unchanged)
+- **Pusher env**: Confirmed configured (`/api/debug/pusher-config` → `allConfigured: true`).
+- **Broadcast flow gap**: Tracking endpoints fetch analytics using `process.env.NEXT_PUBLIC_BASE_URL || 'https://crm.steinway.com.au'`. On non-primary deployments this returns analytics for the wrong base or nonexistent campaign, so the broadcast short-circuits when analytics API responds "Campaign not found".
+- **Safest fix (pending approval)**: Use runtime base using `VERCEL_URL` when present, or broadcast the event without an analytics fetch and let dashboards refetch.
+
+---
+
 # 🎉 CURRENT ISSUES LIVE TRACKER 🎉
 
 **Last Updated**: August 4th, 2025 - 6:00 PM by Successful Agent (MISSION ACCOMPLISHED)

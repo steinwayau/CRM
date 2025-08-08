@@ -1,23 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
-// Force dynamic route to prevent static generation errors
+// Force dynamic and prevent caching
 export const dynamic = 'force-dynamic'
+const noStore = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+}
 
-// DETAILED EMAIL ANALYTICS API - Click breakdowns by type
+// Simple UA classifier
+function classifyUA(ua: string) {
+  const u = (ua || '').toLowerCase()
+  const client = u.includes('applewebkit') && u.includes('mobile') ? 'Apple Mail (iOS)' :
+    u.includes('iphone') ? 'Apple Mail (iPhone)' :
+    u.includes('ipad') ? 'Apple Mail (iPad)' :
+    u.includes('mac') && u.includes('mail') ? 'Apple Mail (Mac)' :
+    u.includes('gmail') || u.includes('googleimageproxy') ? 'Gmail' :
+    u.includes('outlook') ? 'Outlook' :
+    u.includes('thunderbird') ? 'Thunderbird' :
+    u.includes('android') ? 'Android Mail' : 'Other'
+  const device = u.includes('iphone') || u.includes('android') || (u.includes('mobile') && !u.includes('ipad')) ? 'Mobile' :
+    u.includes('ipad') ? 'Tablet' : 'Desktop'
+  return { client, device }
+}
+
+// DETAILED EMAIL ANALYTICS API - Click breakdowns by type + clients/devices/domains/timeline
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const campaignId = searchParams.get('campaignId')
     
     if (campaignId) {
-      // Get detailed analytics for specific campaign
       const detailedAnalytics = await getCampaignDetailedAnalytics(campaignId)
-      return NextResponse.json(detailedAnalytics)
+      return NextResponse.json(detailedAnalytics, { headers: noStore })
     } else {
-      // Get overall detailed analytics for all campaigns
       const overallDetailed = await getOverallDetailedAnalytics()
-      return NextResponse.json(overallDetailed)
+      return NextResponse.json(overallDetailed, { headers: noStore })
     }
     
   } catch (error) {
@@ -25,14 +44,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       error: 'Failed to fetch detailed analytics',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    }, { status: 500, headers: noStore })
   }
 }
 
 // Get detailed analytics for a specific campaign
 async function getCampaignDetailedAnalytics(campaignId: string) {
   try {
-    // Get click breakdown by type
+    // Click breakdown by type
     const clickBreakdown = await sql`
       SELECT 
         link_type,
@@ -45,20 +64,62 @@ async function getCampaignDetailedAnalytics(campaignId: string) {
       ORDER BY clicks DESC
     `
     
-    // Get recent activity
+    // Recent activity
     const recentActivity = await sql`
       SELECT 
         event_type,
         link_type,
         target_url,
         recipient_email,
-        created_at
+        created_at,
+        user_agent
       FROM email_tracking 
       WHERE campaign_id = ${campaignId}
       ORDER BY created_at DESC
+      LIMIT 50
+    `
+
+    // Domains (unique recipients by domain)
+    const domainRows = await sql`
+      SELECT 
+        split_part(recipient_email, '@', 2) AS domain,
+        COUNT(DISTINCT recipient_email) AS unique_users,
+        COUNT(*) AS events
+      FROM email_tracking
+      WHERE campaign_id = ${campaignId} AND recipient_email <> ''
+      GROUP BY domain
+      ORDER BY unique_users DESC
       LIMIT 20
     `
-    
+
+    // Timeline by minute for last 24h
+    const timelineRows = await sql`
+      SELECT date_trunc('minute', created_at) AS ts,
+             event_type,
+             COUNT(*) AS count
+      FROM email_tracking
+      WHERE campaign_id = ${campaignId}
+        AND created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY ts, event_type
+      ORDER BY ts ASC
+    `
+
+    // Client/device breakdown from recent UA sample (last 500 events)
+    const uaRows = await sql`
+      SELECT user_agent
+      FROM email_tracking
+      WHERE campaign_id = ${campaignId}
+      ORDER BY created_at DESC
+      LIMIT 500
+    `
+    const clientCounts: Record<string, number> = {}
+    const deviceCounts: Record<string, number> = {}
+    uaRows.rows.forEach(r => {
+      const { client, device } = classifyUA(r.user_agent || '')
+      clientCounts[client] = (clientCounts[client] || 0) + 1
+      deviceCounts[device] = (deviceCounts[device] || 0) + 1
+    })
+
     return {
       campaignId,
       clickBreakdown: clickBreakdown.rows.map(row => ({
@@ -66,6 +127,18 @@ async function getCampaignDetailedAnalytics(campaignId: string) {
         clicks: parseInt(row.clicks),
         uniqueUsers: parseInt(row.unique_users),
         sampleUrls: row.sample_urls || []
+      })),
+      domains: domainRows.rows.map(row => ({
+        domain: row.domain || 'unknown',
+        uniqueUsers: parseInt(row.unique_users),
+        events: parseInt(row.events)
+      })),
+      clients: Object.entries(clientCounts).map(([k, v]) => ({ client: k, events: v as number })).sort((a, b) => b.events - a.events),
+      devices: Object.entries(deviceCounts).map(([k, v]) => ({ device: k, events: v as number })).sort((a, b) => b.events - a.events),
+      timeline: timelineRows.rows.map(row => ({
+        ts: row.ts,
+        type: row.event_type,
+        count: parseInt(row.count)
       })),
       recentActivity: recentActivity.rows.map(row => ({
         type: row.event_type,
@@ -90,7 +163,7 @@ async function getCampaignDetailedAnalytics(campaignId: string) {
 // Get overall detailed analytics across all campaigns
 async function getOverallDetailedAnalytics() {
   try {
-    // Get overall click breakdown by type
+    // Overall click breakdown by type
     const overallClickBreakdown = await sql`
       SELECT 
         link_type,
@@ -104,7 +177,7 @@ async function getOverallDetailedAnalytics() {
       ORDER BY total_clicks DESC
     `
     
-    // Get top clicked URLs
+    // Top clicked URLs
     const topUrls = await sql`
       SELECT 
         target_url,
@@ -117,7 +190,46 @@ async function getOverallDetailedAnalytics() {
       ORDER BY clicks DESC
       LIMIT 10
     `
-    
+
+    // Top domains overall
+    const overallDomains = await sql`
+      SELECT 
+        split_part(recipient_email, '@', 2) AS domain,
+        COUNT(DISTINCT recipient_email) AS unique_users,
+        COUNT(*) AS events
+      FROM email_tracking
+      WHERE recipient_email <> ''
+      GROUP BY domain
+      ORDER BY unique_users DESC
+      LIMIT 20
+    `
+
+    // Client/device sample overall (last 1000 events)
+    const uaRows = await sql`
+      SELECT user_agent
+      FROM email_tracking
+      ORDER BY created_at DESC
+      LIMIT 1000
+    `
+    const clientCounts: Record<string, number> = {}
+    const deviceCounts: Record<string, number> = {}
+    uaRows.rows.forEach(r => {
+      const { client, device } = classifyUA(r.user_agent || '')
+      clientCounts[client] = (clientCounts[client] || 0) + 1
+      deviceCounts[device] = (deviceCounts[device] || 0) + 1
+    })
+
+    // Overall timeline by minute (opens & clicks)
+    const timelineRows = await sql`
+      SELECT date_trunc('minute', created_at) AS ts,
+             event_type,
+             COUNT(*) AS count
+      FROM email_tracking
+      WHERE created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY ts, event_type
+      ORDER BY ts ASC
+    `
+
     return {
       summary: {
         clickBreakdown: overallClickBreakdown.rows.map(row => ({
@@ -132,7 +244,15 @@ async function getOverallDetailedAnalytics() {
           linkType: row.link_type,
           clicks: parseInt(row.clicks),
           uniqueUsers: parseInt(row.unique_users)
-        }))
+        })),
+        domains: overallDomains.rows.map(row => ({
+          domain: row.domain || 'unknown',
+          uniqueUsers: parseInt(row.unique_users),
+          events: parseInt(row.events)
+        })),
+        clients: Object.entries(clientCounts).map(([k, v]) => ({ client: k, events: v as number })).sort((a, b) => b.events - a.events),
+        devices: Object.entries(deviceCounts).map(([k, v]) => ({ device: k, events: v as number })).sort((a, b) => b.events - a.events),
+        timeline: timelineRows.rows.map(row => ({ ts: row.ts, type: row.event_type, count: parseInt(row.count) }))
       },
       timestamp: new Date().toISOString()
     }

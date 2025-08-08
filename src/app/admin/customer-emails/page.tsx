@@ -159,13 +159,29 @@ export default function CustomerEmailsPage() {
   // Load overall analytics data from working API
   const loadOverallAnalytics = async () => {
     try {
-      const response = await fetch('/api/email/analytics')
+      const response = await fetch('/api/email/analytics', { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setOverallAnalytics(data)
       }
     } catch (error) {
       console.error('Failed to load overall analytics:', error)
+    }
+  }
+
+  // NEW: Load overall detailed analytics for Analytics tab
+  const loadOverallDetailedAnalytics = async () => {
+    try {
+      setAnalyticsLoading(true)
+      const res = await fetch('/api/email/analytics/detailed', { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setDetailedAnalytics(data)
+      }
+    } catch (e) {
+      console.error('Failed to load detailed analytics:', e)
+    } finally {
+      setAnalyticsLoading(false)
     }
   }
 
@@ -412,6 +428,15 @@ export default function CustomerEmailsPage() {
       router.push(url.pathname + url.search, { scroll: false })
     }
   }, [searchParams, router])
+
+  // When Analytics tab is active, load detailed analytics and auto-refresh
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      loadOverallDetailedAnalytics()
+      const i = setInterval(loadOverallDetailedAnalytics, 30000)
+      return () => clearInterval(i)
+    }
+  }, [activeTab])
 
   // 🎯 Handle tab changes with URL synchronization
   const handleTabChange = (newTab: string) => {
@@ -1701,159 +1726,169 @@ export default function CustomerEmailsPage() {
 
   const renderAnalytics = () => (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Email Analytics</h2>
-        <p className="text-gray-600">Track performance and engagement metrics</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Email Analytics</h2>
+          <p className="text-gray-600">Track performance and engagement metrics</p>
+        </div>
+        <button
+          onClick={loadOverallDetailedAnalytics}
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          {analyticsLoading ? 'Loading…' : 'Refresh'}
+        </button>
       </div>
 
-      {/* Analytics placeholder */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Overview cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-semibold mb-4">Campaign Performance</h3>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-            <p className="text-gray-500">Analytics charts coming soon</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-semibold mb-4">Engagement Trends</h3>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-            <p className="text-gray-500">Engagement metrics coming soon</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Click Analytics */}
-      {detailedAnalytics?.summary?.clickBreakdown?.length > 0 && (
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold">Click Analytics Breakdown</h3>
-            <p className="text-sm text-gray-600">Detailed analysis of link clicks by type</p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {detailedAnalytics.summary.clickBreakdown.map((breakdown: any, index: number) => (
-                <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600 capitalize">
-                      {breakdown.linkType.replace('-', ' ')} Links
-                    </span>
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                      {breakdown.campaignsWithType} campaign{breakdown.campaignsWithType !== 1 ? 's' : ''}
-                    </span>
+          <h3 className="text-lg font-semibold mb-3">Click Breakdown</h3>
+          {detailedAnalytics?.summary?.clickBreakdown?.length ? (
+            <div className="space-y-2">
+              {detailedAnalytics.summary.clickBreakdown.slice(0,6).map((b: any, idx: number) => (
+                <div key={idx} className="w-full">
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span className="capitalize">{b.linkType.replace('-', ' ')}</span>
+                    <span>{b.totalClicks || b.clicks} clicks</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
-                    {breakdown.totalClicks}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {breakdown.uniqueUsers} unique user{breakdown.uniqueUsers !== 1 ? 's' : ''}
+                  <div className="w-full bg-gray-100 h-2 rounded">
+                    <div className="bg-blue-500 h-2 rounded" style={{ width: `${Math.min(100, ((b.totalClicks||b.clicks) / (detailedAnalytics.summary.topUrls?.[0]?.clicks || (b.totalClicks||b.clicks) || 1)) * 100)}%` }} />
                   </div>
                 </div>
               ))}
             </div>
-            
-            {/* Top Clicked URLs */}
-            {detailedAnalytics.summary.topUrls?.length > 0 && (
-              <div className="mt-6">
-                <h4 className="text-md font-semibold mb-3">Most Clicked Links</h4>
-                <div className="space-y-2">
-                  {detailedAnalytics.summary.topUrls.slice(0, 5).map((urlData: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">
-                          {urlData.url}
-                        </div>
-                        <div className="text-xs text-gray-500 capitalize">
-                          {urlData.linkType} • {urlData.uniqueUsers} unique user{urlData.uniqueUsers !== 1 ? 's' : ''}
-                        </div>
-                      </div>
-                      <div className="text-lg font-semibold text-blue-600">
-                        {urlData.clicks}
-                      </div>
-                    </div>
-                  ))}
+          ) : (
+            <p className="text-gray-500">No click data yet</p>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-semibold mb-3">Email Clients</h3>
+          {detailedAnalytics?.summary?.clients?.length ? (
+            <div className="space-y-2">
+              {detailedAnalytics.summary.clients.slice(0,6).map((c: any, idx: number) => (
+                <div key={idx}>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>{c.client}</span>
+                    <span>{c.events}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-2 rounded">
+                    <div className="bg-purple-500 h-2 rounded" style={{ width: `${Math.min(100, (c.events / (detailedAnalytics.summary.clients[0].events || 1)) * 100)}%` }} />
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">No client data</p>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-semibold mb-3">Devices</h3>
+          {detailedAnalytics?.summary?.devices?.length ? (
+            <div className="space-y-2">
+              {detailedAnalytics.summary.devices.map((d: any, idx: number) => (
+                <div key={idx}>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>{d.device}</span>
+                    <span>{d.events}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-2 rounded">
+                    <div className="bg-orange-500 h-2 rounded" style={{ width: `${Math.min(100, (d.events / (detailedAnalytics.summary.devices[0].events || 1)) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">No device data</p>
+          )}
+        </div>
+      </div>
+
+      {/* Domains & Top URLs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-semibold mb-3">Top Recipient Domains</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-gray-600">Domain</th>
+                  <th className="px-3 py-2 text-right text-gray-600">Unique Users</th>
+                  <th className="px-3 py-2 text-right text-gray-600">Events</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {(detailedAnalytics?.summary?.domains || []).slice(0,10).map((r: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="px-3 py-2">{r.domain}</td>
+                    <td className="px-3 py-2 text-right">{r.uniqueUsers}</td>
+                    <td className="px-3 py-2 text-right">{r.events}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-semibold mb-3">Top Clicked URLs</h3>
+          <div className="space-y-2">
+            {(detailedAnalytics?.summary?.topUrls || []).map((u: any, idx: number) => (
+              <div key={idx} className="text-sm">
+                <div className="flex justify-between text-gray-700">
+                  <a className="truncate max-w-[70%] text-blue-600 hover:underline" href={u.url} target="_blank" rel="noreferrer">{u.url}</a>
+                  <span>{u.clicks} clicks • {u.uniqueUsers} users</span>
+                </div>
+                <div className="w-full bg-gray-100 h-2 rounded">
+                  <div className="bg-green-500 h-2 rounded" style={{ width: `${Math.min(100, (u.clicks / ((detailedAnalytics?.summary?.topUrls?.[0]?.clicks) || 1)) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-      {/* Campaigns List */}
-      <div className="bg-white rounded-lg shadow border">
-        <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold">Recent Campaigns</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Template</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Performance</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {campaigns.map((campaign) => (
-                <tr key={campaign.id}>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">{campaign.name}</p>
-                      <p className="text-sm text-gray-500">{campaign.subject}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{campaign.templateName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{campaign.recipientCount.toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      campaign.status === 'sent' ? 'bg-green-100 text-green-800' :
-                      campaign.status === 'sending' ? 'bg-yellow-100 text-yellow-800' :
-                      campaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {campaign.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {(() => {
-                      const a = campaignAnalytics[campaign.id]
-                      if (a) {
-                        return (
-                          <div>
-                            <p>Open: {a.openRate?.toFixed?.(1) ?? a.openRate}%</p>
-                            <p>Click: {a.clickRate?.toFixed?.(1) ?? a.clickRate}%</p>
-                          </div>
-                        )
-                      }
-                      return <span className="text-gray-400">Pending</span>
-                    })()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex space-x-2">
-                      {campaign.status === 'draft' && (
-                        <button
-                          onClick={() => handleSendCampaign(campaign.id)}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          Send Now
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => handleViewCampaign(campaign)}
-                        className="text-gray-600 hover:text-gray-800 text-sm"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Timeline */}
+      <div className="bg-white p-6 rounded-lg shadow border">
+        <h3 className="text-lg font-semibold mb-3">Engagement Timeline (24h)</h3>
+        {detailedAnalytics?.summary?.timeline?.length ? (
+          <div className="w-full overflow-x-auto">
+            {(() => {
+              const points = detailedAnalytics.summary.timeline as Array<{ ts: string; type: string; count: number }>
+              const opens = points.filter((p: any) => p.type === 'open')
+              const clicks = points.filter((p: any) => p.type === 'click')
+              const allCounts = points.map((p: any) => p.count)
+              const maxY = Math.max(1, ...allCounts)
+              const width = Math.max(600, points.length * 4)
+              const height = 120
+              const pad = 20
+              const toX = (i: number) => pad + (i / Math.max(1, points.length - 1)) * (width - pad * 2)
+              const toY = (c: number) => height - pad - (c / maxY) * (height - pad * 2)
+              const path = (arr: any[]) => arr.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(p.count)}`).join(' ')
+              return (
+                <svg width={width} height={height} className="min-w-full">
+                  <rect x={0} y={0} width={width} height={height} fill="#fafafa" />
+                  {/* Axes */}
+                  <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#e5e7eb" />
+                  <line x1={pad} y1={pad} x2={pad} y2={height - pad} stroke="#e5e7eb" />
+                  {/* Opens */}
+                  <path d={path(opens)} stroke="#7c3aed" fill="none" strokeWidth={2} />
+                  {/* Clicks */}
+                  <path d={path(clicks)} stroke="#10b981" fill="none" strokeWidth={2} />
+                  {/* Legend */}
+                  <g>
+                    <rect x={pad} y={5} width={10} height={10} fill="#7c3aed" />
+                    <text x={pad + 16} y={14} fontSize={12} fill="#374151">Opens</text>
+                    <rect x={pad + 70} y={5} width={10} height={10} fill="#10b981" />
+                    <text x={pad + 86} y={14} fontSize={12} fill="#374151">Clicks</text>
+                  </g>
+                </svg>
+              )
+            })()}
+          </div>
+        ) : (
+          <p className="text-gray-500">No activity in the last 24 hours</p>
+        )}
       </div>
     </div>
   )

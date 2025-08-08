@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
+// Prevent any caching and static optimization
+export const dynamic = 'force-dynamic'
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+}
+
 // NEW BULLETPROOF EMAIL ANALYTICS API - WITH CLICK-BASED OPEN FALLBACK
 export async function GET(request: NextRequest) {
   try {
@@ -10,11 +18,11 @@ export async function GET(request: NextRequest) {
     if (campaignId) {
       // Get analytics for specific campaign
       const campaignAnalytics = await getCampaignAnalytics(campaignId)
-      return NextResponse.json(campaignAnalytics)
+      return NextResponse.json(campaignAnalytics, { headers: noStoreHeaders })
     } else {
       // Get overall analytics for all campaigns
       const overallAnalytics = await getOverallAnalytics()
-      return NextResponse.json(overallAnalytics)
+      return NextResponse.json(overallAnalytics, { headers: noStoreHeaders })
     }
     
   } catch (error) {
@@ -22,7 +30,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       error: 'Failed to fetch analytics',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    }, { status: 500, headers: noStoreHeaders })
   }
 }
 
@@ -282,13 +290,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true,
       message: 'Analytics data update queued (will be processed once database schema is deployed)'
-    })
+    }, { headers: noStoreHeaders })
 
   } catch (error) {
     console.error('Analytics update error:', error)
     return NextResponse.json(
       { error: 'Failed to update analytics data' },
-      { status: 500 }
+      { status: 500, headers: noStoreHeaders }
     )
   }
 } 

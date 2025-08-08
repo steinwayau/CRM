@@ -240,7 +240,7 @@ export default function CustomerEmailsPage() {
       
       for (const campaign of campaignsList) {
         console.log(`📊 Fetching analytics for campaign: ${campaign.id} (${campaign.name}) status=${campaign.status}`)
-        const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
+        const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`, { cache: 'no-store' })
         if (response.ok) {
           const data = await response.json()
           console.log(`📈 Analytics data for ${campaign.id}:`, data)
@@ -256,6 +256,8 @@ export default function CustomerEmailsPage() {
       }
       
       console.log('📊 Final analytics data:', analyticsData)
+      // Debounce state application slightly to avoid UI flicker
+      await new Promise(r => setTimeout(r, 150))
       setCampaignAnalytics(analyticsData)
       
       // Force a re-render by updating a timestamp
@@ -1114,14 +1116,10 @@ export default function CustomerEmailsPage() {
                 {analyticsLoading ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
-                  const sentCampaigns = campaigns.filter(c => c.status === 'sent')
-                  if (sentCampaigns.length === 0) return '0'
-                  const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
-                  const analytics = campaignAnalytics[latestCampaign.id]
-                  if (analytics) {
-                    return analytics.openRate.toFixed(1)
-                  }
-                  // Fallback to overall analytics if campaign analytics not loaded  
+                  const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                  const latest = ordered[ordered.length - 1]
+                  const analytics = latest ? campaignAnalytics[latest.id] : undefined
+                  if (analytics) return analytics.openRate.toFixed(1)
                   return overallAnalytics?.summary?.overallOpenRate?.toFixed(1) || '0'
                 })()}%
               </p>
@@ -1133,7 +1131,7 @@ export default function CustomerEmailsPage() {
           <div className="flex items-center">
             <div className="p-3 bg-orange-100 rounded-lg mr-4">
               <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 005.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             </div>
             <div>
@@ -1142,14 +1140,10 @@ export default function CustomerEmailsPage() {
                 {analyticsLoading ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
-                  const sentCampaigns = campaigns.filter(c => c.status === 'sent')
-                  if (sentCampaigns.length === 0) return '0'
-                  const latestCampaign = sentCampaigns[sentCampaigns.length - 1]
-                  const analytics = campaignAnalytics[latestCampaign.id]
-                  if (analytics) {
-                    return analytics.clickRate.toFixed(1)
-                  }
-                  // Fallback to overall analytics if campaign analytics not loaded  
+                  const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                  const latest = ordered[ordered.length - 1]
+                  const analytics = latest ? campaignAnalytics[latest.id] : undefined
+                  if (analytics) return analytics.clickRate.toFixed(1)
                   return overallAnalytics?.summary?.overallClickRate?.toFixed(1) || '0'
                 })()}%
               </p>
@@ -1197,14 +1191,18 @@ export default function CustomerEmailsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    {campaign.openRate && campaign.clickRate ? (
-                      <div>
-                        <p>Open: {campaign.openRate}%</p>
-                        <p>Click: {campaign.clickRate}%</p>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">Pending</span>
-                    )}
+                    {(() => {
+                      const a = campaignAnalytics[campaign.id]
+                      if (a) {
+                        return (
+                          <div>
+                            <p>Open: {a.openRate?.toFixed?.(1) ?? a.openRate}%</p>
+                            <p>Click: {a.clickRate?.toFixed?.(1) ?? a.clickRate}%</p>
+                          </div>
+                        )
+                      }
+                      return <span className="text-gray-400">Pending</span>
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex space-x-2">
@@ -1820,14 +1818,18 @@ export default function CustomerEmailsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    {campaign.openRate && campaign.clickRate ? (
-                      <div>
-                        <p>Open: {campaign.openRate}%</p>
-                        <p>Click: {campaign.clickRate}%</p>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">Pending</span>
-                    )}
+                    {(() => {
+                      const a = campaignAnalytics[campaign.id]
+                      if (a) {
+                        return (
+                          <div>
+                            <p>Open: {a.openRate?.toFixed?.(1) ?? a.openRate}%</p>
+                            <p>Click: {a.clickRate?.toFixed?.(1) ?? a.clickRate}%</p>
+                          </div>
+                        )
+                      }
+                      return <span className="text-gray-400">Pending</span>
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex space-x-2">
@@ -2230,7 +2232,7 @@ export default function CustomerEmailsPage() {
                   <div className="flex items-center">
                     <div className="p-2 bg-orange-100 rounded-lg mr-3">
                       <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 005.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                       </svg>
                     </div>
                     <div>

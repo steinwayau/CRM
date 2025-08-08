@@ -59,7 +59,11 @@ export async function GET(request: NextRequest) {
     }
     
     // Immediate redirect - user experience first
-    return NextResponse.redirect(redirectUrl, 302)
+    const res = NextResponse.redirect(redirectUrl, 302)
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+    res.headers.set('Pragma', 'no-cache')
+    res.headers.set('Expires', '0')
+    return res
     
   } catch (error) {
     console.error('❌ NEW TRACKING: Click endpoint error:', error)
@@ -68,7 +72,10 @@ export async function GET(request: NextRequest) {
     const fallbackUrl = request.nextUrl.searchParams.get('url') 
       ? decodeURIComponent(request.nextUrl.searchParams.get('url')!)
       : 'https://crm.steinway.com.au'
-    
-    return NextResponse.redirect(fallbackUrl, 302)
+    const res = NextResponse.redirect(fallbackUrl, 302)
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+    res.headers.set('Pragma', 'no-cache')
+    res.headers.set('Expires', '0')
+    return res
   }
 } 

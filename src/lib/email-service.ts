@@ -201,7 +201,7 @@ function createFollowUpEmailTemplate(enquiry: Enquiry, staff: StaffMember, produ
     </div>
     
     <p>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://your-crm-domain.com'}/submitted-forms/enquiry-data/follow-up/${enquiry.id}" class="cta-button">
+      <a href="${(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'))}/submitted-forms/enquiry-data/follow-up/${enquiry.id}" class="cta-button">
         📋 Open Customer Record
       </a>
     </p>
@@ -210,7 +210,7 @@ function createFollowUpEmailTemplate(enquiry: Enquiry, staff: StaffMember, produ
     <ul>
       <li>📞 <a href="tel:${enquiry.phone}">${enquiry.phone ? 'Call customer' : 'No phone number provided'}</a></li>
       <li>📧 <a href="mailto:${enquiry.email}">Email customer</a></li>
-      <li>📝 <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://your-crm-domain.com'}/submitted-forms/enquiry-data/follow-up/${enquiry.id}">Update follow-up notes</a></li>
+      <li>📝 <a href="${(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'))}/submitted-forms/enquiry-data/follow-up/${enquiry.id}">Update follow-up notes</a></li>
     </ul>
   </div>
   
@@ -266,7 +266,7 @@ QUICK ACTIONS
 ============
 📞 Call: ${enquiry.phone || 'No phone number provided'}
 📧 Email: ${enquiry.email}
-📝 Update record: ${process.env.NEXT_PUBLIC_APP_URL || 'https://your-crm-domain.com'}/submitted-forms/enquiry-data/follow-up/${enquiry.id}
+📝 Update record: ${(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'))}/submitted-forms/enquiry-data/follow-up/${enquiry.id}
 
 ---
 Exclusive Piano Group CRM System

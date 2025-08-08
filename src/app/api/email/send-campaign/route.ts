@@ -724,6 +724,16 @@ async function sendWithRateLimitedConcurrency<T>(
   return results
 }
 
+// Helper to resolve base URL reliably in all environments
+function getBaseUrl(): string {
+  // Prefer Vercel-provided URL in serverless environment
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  // Fall back to explicit public app URL
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL
+  // Final fallback: production custom domain
+  return 'https://crm.steinway.com.au'
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Environment validation
@@ -964,7 +974,7 @@ async function getCustomersForCampaign(
 
   // For database customers, query the existing customer database
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/enquiries`)
+    const response = await fetch(`${getBaseUrl()}/api/enquiries`)
     const enquiries = await response.json()
     
     // Transform enquiry data to customer format
@@ -996,7 +1006,7 @@ async function getCustomersForCampaign(
 
 // Helper function to add email tracking (NEW SYSTEM - Uses email addresses directly)
 function addEmailTracking(htmlContent: string, campaignId: string, recipientEmail: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.steinway.com.au'
+  const baseUrl = getBaseUrl()
   
   // 1. Add tracking pixel for email opens - NEW: Direct email parameter
   const encodedEmail = encodeURIComponent(recipientEmail)

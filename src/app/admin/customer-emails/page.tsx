@@ -161,6 +161,10 @@ export default function CustomerEmailsPage() {
   const [campaignSearch, setCampaignSearch] = useState('')
   const [previousCampaigns, setPreviousCampaigns] = useState<any[]>([])
   const [prevTotal, setPrevTotal] = useState(0)
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [resetScope, setResetScope] = useState<'current'|'all'|'custom'>('current')
+  const [resetFrom, setResetFrom] = useState('')
+  const [resetTo, setResetTo] = useState('')
 
   const computeDateRange = () => {
     const now = new Date()
@@ -1781,6 +1785,9 @@ export default function CustomerEmailsPage() {
           {analyticsLoading ? 'Loading…' : 'Refresh'}
         </button>
       </div>
+      <div className="mt-3">
+        <button onClick={() => setShowResetModal(true)} className="px-3 py-2 border border-red-300 text-red-700 rounded hover:bg-red-50">Reset analytics…</button>
+      </div>
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow border grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2027,6 +2034,22 @@ export default function CustomerEmailsPage() {
       setPreviousCampaigns(data.items || [])
       setPrevTotal(data.total || 0)
     }
+  }
+
+  const handleReset = async () => {
+    const payload:any = {}
+    if (resetScope === 'current') {
+      const { start, end } = computeDateRange()
+      if (start) payload.start = start
+      if (end) payload.end = end
+    } else if (resetScope === 'custom') {
+      if (resetFrom) payload.start = new Date(resetFrom).toISOString()
+      if (resetTo) payload.end = new Date(resetTo).toISOString()
+    }
+    await fetch('/api/admin/analytics/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    setShowResetModal(false)
+    // Reload data
+    await Promise.all([loadOverallDetailedAnalytics(), loadPreviousCampaigns()])
   }
 
   if (loading) {

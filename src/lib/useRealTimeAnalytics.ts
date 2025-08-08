@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Pusher from 'pusher-js'
 
 // Client-side Pusher configuration
@@ -37,66 +37,79 @@ export function useRealTimeAnalytics(
   const analyticsChannelRef = useRef<any>(null)
   const campaignChannelRef = useRef<any>(null)
 
+  // Keep latest callbacks in refs to avoid resubscribe churn
+  const analyticsCbRef = useRef<typeof onAnalyticsUpdate>()
+  const campaignCbRef = useRef<typeof onCampaignUpdate>()
+  analyticsCbRef.current = onAnalyticsUpdate
+  campaignCbRef.current = onCampaignUpdate
+
+  const [isConnected, setIsConnected] = useState(false)
+
   useEffect(() => {
-    // Initialize Pusher client
-    pusherRef.current = new Pusher(PUSHER_CONFIG.key, {
+    // Initialize Pusher client once
+    if (pusherRef.current) return
+
+    const pusher = new Pusher(PUSHER_CONFIG.key, {
       cluster: PUSHER_CONFIG.cluster,
       forceTLS: PUSHER_CONFIG.forceTLS
     })
+    pusherRef.current = pusher
+
+    // Track connection state reactively
+    const handleStateChange = () => {
+      setIsConnected(pusher.connection.state === 'connected')
+    }
+    pusher.connection.bind('state_change', handleStateChange)
 
     // Subscribe to analytics updates
-    if (onAnalyticsUpdate) {
-      analyticsChannelRef.current = pusherRef.current.subscribe(CHANNELS.ANALYTICS)
-      analyticsChannelRef.current.bind(EVENTS.ANALYTICS_UPDATED, (data: AnalyticsUpdate) => {
-        console.log('📡 REAL-TIME: Received analytics update:', data)
-        onAnalyticsUpdate(data)
-      })
-    }
+    analyticsChannelRef.current = pusher.subscribe(CHANNELS.ANALYTICS)
+    analyticsChannelRef.current.bind(EVENTS.ANALYTICS_UPDATED, (data: AnalyticsUpdate) => {
+      if (analyticsCbRef.current) {
+        analyticsCbRef.current(data)
+      }
+    })
 
     // Subscribe to campaign updates
-    if (onCampaignUpdate) {
-      campaignChannelRef.current = pusherRef.current.subscribe(CHANNELS.CAMPAIGNS)
-      campaignChannelRef.current.bind(EVENTS.CAMPAIGN_UPDATED, (data: CampaignUpdate) => {
-        console.log('📡 REAL-TIME: Received campaign update:', data)
-        onCampaignUpdate(data)
-      })
-    }
+    campaignChannelRef.current = pusher.subscribe(CHANNELS.CAMPAIGNS)
+    campaignChannelRef.current.bind(EVENTS.CAMPAIGN_UPDATED, (data: CampaignUpdate) => {
+      if (campaignCbRef.current) {
+        campaignCbRef.current(data)
+      }
+    })
 
-    console.log('🔌 REAL-TIME: Initializing Pusher connection...')
-    
-    // Add connection state logging
-    pusherRef.current.connection.bind('connected', () => {
+    // Initial connection log
+    pusher.connection.bind('connected', () => {
+      setIsConnected(true)
       console.log('✅ REAL-TIME: Successfully connected to Pusher!')
     })
-    
-    pusherRef.current.connection.bind('disconnected', () => {
+    pusher.connection.bind('disconnected', () => {
+      setIsConnected(false)
       console.log('❌ REAL-TIME: Disconnected from Pusher')
     })
-    
-    pusherRef.current.connection.bind('failed', () => {
+    pusher.connection.bind('failed', () => {
+      setIsConnected(false)
       console.log('❌ REAL-TIME: Failed to connect to Pusher')
     })
-    
+
     console.log('🔌 REAL-TIME: Pusher initialized, waiting for connection...')
 
     // Cleanup function
     return () => {
       if (analyticsChannelRef.current) {
         analyticsChannelRef.current.unbind_all()
-        pusherRef.current?.unsubscribe(CHANNELS.ANALYTICS)
+        pusher.unsubscribe(CHANNELS.ANALYTICS)
       }
       if (campaignChannelRef.current) {
         campaignChannelRef.current.unbind_all()
-        pusherRef.current?.unsubscribe(CHANNELS.CAMPAIGNS)
+        pusher.unsubscribe(CHANNELS.CAMPAIGNS)
       }
-      if (pusherRef.current) {
-        pusherRef.current.disconnect()
-      }
+      pusher.connection.unbind('state_change', handleStateChange)
+      pusher.disconnect()
       console.log('🔌 REAL-TIME: Disconnected from Pusher')
     }
-  }, [onAnalyticsUpdate, onCampaignUpdate])
+  }, [])
 
   return {
-    isConnected: pusherRef.current?.connection.state === 'connected'
+    isConnected
   }
 } 

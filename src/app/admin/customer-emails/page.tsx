@@ -1033,18 +1033,21 @@ export default function CustomerEmailsPage() {
         </div>
         <button
           onClick={async () => {
-            console.log('🔄 Manual refresh clicked')
+            console.log('🔄 Manual refresh clicked (analytics-only)')
             setAnalyticsLoading(true)
-            // Reload campaigns first to get latest data
-            await loadData()
-            // If no campaigns, ensure totals reset
-            if (campaigns.length === 0) {
-              setCampaignAnalytics({})
-              await loadOverallAnalytics()
+            try {
+              const sent = campaigns.filter(c => c.status === 'sent')
+              if (sent.length > 0) {
+                await loadCampaignAnalyticsSync(sent)
+              } else {
+                setCampaignAnalytics({})
+                await loadOverallAnalytics()
+              }
+            } catch (e) {
+              console.error('Manual analytics refresh failed:', e)
+            } finally {
               setAnalyticsLoading(false)
-              return
             }
-            setAnalyticsLoading(false)
           }}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >

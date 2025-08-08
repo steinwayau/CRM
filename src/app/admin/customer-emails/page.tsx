@@ -348,6 +348,7 @@ export default function CustomerEmailsPage() {
             // No campaigns: clear per-campaign analytics and refresh overall analytics to reset stats to 0
             setCampaignAnalytics({})
             await loadOverallAnalytics()
+            setAnalyticsLoading(false)
           }
         } else {
           console.error('Failed to load campaigns')
@@ -1040,6 +1041,8 @@ export default function CustomerEmailsPage() {
             if (campaigns.length === 0) {
               setCampaignAnalytics({})
               await loadOverallAnalytics()
+              setAnalyticsLoading(false)
+              return
             }
             setAnalyticsLoading(false)
           }}

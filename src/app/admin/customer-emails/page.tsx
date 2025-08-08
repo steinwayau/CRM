@@ -155,7 +155,7 @@ export default function CustomerEmailsPage() {
   const [detailedAnalytics, setDetailedAnalytics] = useState<any>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [forceRender, setForceRender] = useState(0)
-  const [datePreset, setDatePreset] = useState<'today'|'yesterday'|'1w'|'1m'|'3m'|'6m'|'9m'|'12m'|'fy'|'ly'|'custom'>('1m')
+  const [datePreset, setDatePreset] = useState<'all'|'today'|'yesterday'|'1w'|'1m'|'3m'|'6m'|'9m'|'12m'|'fy'|'ly'|'custom'>('all')
   const [customFrom, setCustomFrom] = useState<string>('')
   const [customTo, setCustomTo] = useState<string>('')
   const [campaignSearch, setCampaignSearch] = useState('')
@@ -166,6 +166,7 @@ export default function CustomerEmailsPage() {
     let to: Date | null = new Date()
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     switch (datePreset) {
+      case 'all': from = null; to = null; break
       case 'today': from = startOfToday; break
       case 'yesterday': from = new Date(startOfToday.getTime() - 86400000); to = startOfToday; break
       case '1w': from = new Date(now.getTime() - 7*86400000); break
@@ -1791,6 +1792,7 @@ export default function CustomerEmailsPage() {
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
           >
+            <option value="all">All time</option>
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
             <option value="1w">1 week</option>

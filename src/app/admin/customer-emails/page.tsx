@@ -480,6 +480,7 @@ export default function CustomerEmailsPage() {
   useEffect(() => {
     if (activeTab === 'analytics') {
       loadOverallDetailedAnalytics()
+      loadPreviousCampaigns()
       const i = setInterval(loadOverallDetailedAnalytics, 30000)
       return () => clearInterval(i)
     }
@@ -2046,11 +2047,30 @@ export default function CustomerEmailsPage() {
       if (resetFrom) payload.start = new Date(resetFrom).toISOString()
       if (resetTo) payload.end = new Date(resetTo).toISOString()
     }
-    await fetch('/api/admin/analytics/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    setShowResetModal(false)
-    // Reload data
-    await Promise.all([loadOverallDetailedAnalytics(), loadPreviousCampaigns()])
+    try {
+      const res = await fetch('/api/admin/analytics/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Reset failed: ${err.error || res.statusText}`)
+        return
+      }
+      const data = await res.json().catch(() => ({}))
+      alert(`Analytics reset successful${typeof data.deleted === 'number' ? ` — deleted ${data.deleted} record(s)` : ''}.`)
+    } catch (e:any) {
+      alert(`Reset failed: ${e?.message || 'Unknown error'}`)
+    } finally {
+      setShowResetModal(false)
+      await Promise.all([loadOverallDetailedAnalytics(), loadPreviousCampaigns()])
+    }
   }
+
+  useEffect(() => {
+    if (activeTab !== 'analytics') return
+    const t = setTimeout(() => {
+      loadPreviousCampaigns()
+    }, 400)
+    return () => clearTimeout(t)
+  }, [campaignSearch, datePreset, customFrom, customTo, activeTab])
 
   if (loading) {
     return (

@@ -454,3 +454,24 @@ By this exit verification, I acknowledge that:
 **FINAL WARNING FOR NEXT AGENT**: This is an extremely challenging task that has defeated multiple agents. Approach with humility, proper planning, and real understanding of responsive design principles. Do not make claims you cannot deliver.
 
 --- 
+
+# Current Issues Live (Aug 9, 2025)
+
+- Production: https://crm.steinway.com.au  
+- Last deploy: commit `6f6cef3` (Aug 9, 2025)
+
+## Open Items for Next Agent
+
+1) Analytics Reset button
+- UI shows confirmation modal but delete action appears to do nothing.  
+- Backend is live: POST `/api/admin/analytics/reset` supports { start, end } (ISO strings) and returns { ok, deleted }.  
+- Likely UI wiring issue: confirm handler not sending payload or not awaiting response; verify in `src/app/admin/customer-emails/page.tsx` (handleReset) and test with devtools.
+
+2) Previous Campaigns search UX
+- API is live: GET `/api/admin/campaigns/search?q=&start=&end=&page=&pageSize=`  
+- Table appears under Analytics but should mirror analytics filters and auto-load on Apply.  
+- Wire up initial load and debounce search; add pagination if needed.
+
+## Notes
+- Analytics filters now apply server-side; API returns `meta` echo (filtersActive/start/end/events) for verification.  
+- Date presets are local; identical results can occur if data lies entirely in a recent window. 

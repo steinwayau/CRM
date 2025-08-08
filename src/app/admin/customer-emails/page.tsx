@@ -159,6 +159,8 @@ export default function CustomerEmailsPage() {
   const [customFrom, setCustomFrom] = useState<string>('')
   const [customTo, setCustomTo] = useState<string>('')
   const [campaignSearch, setCampaignSearch] = useState('')
+  const [previousCampaigns, setPreviousCampaigns] = useState<any[]>([])
+  const [prevTotal, setPrevTotal] = useState(0)
 
   const computeDateRange = () => {
     const now = new Date()
@@ -1822,7 +1824,7 @@ export default function CustomerEmailsPage() {
           <label className="block text-sm text-gray-600 mb-1">Search campaigns</label>
           <div className="flex gap-2">
             <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
-            <button onClick={loadOverallDetailedAnalytics} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
+            <button onClick={() => { loadOverallDetailedAnalytics(); loadPreviousCampaigns(); }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
           </div>
         </div>
       </div>
@@ -1978,8 +1980,54 @@ export default function CustomerEmailsPage() {
           <p className="text-gray-500">No activity in the last 24 hours</p>
         )}
       </div>
+
+      {/* Previous Campaigns */}
+      <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Previous Campaigns ({prevTotal})</h3>
+          <button onClick={loadPreviousCampaigns} className="px-3 py-2 bg-gray-100 border rounded">Refresh</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-gray-600">Name</th>
+                <th className="px-3 py-2 text-left text-gray-600">Subject</th>
+                <th className="px-3 py-2 text-left text-gray-600">Status</th>
+                <th className="px-3 py-2 text-right text-gray-600">Sent</th>
+                <th className="px-3 py-2 text-right text-gray-600">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {previousCampaigns.map((c:any) => (
+                <tr key={c.id}>
+                  <td className="px-3 py-2">{c.name}</td>
+                  <td className="px-3 py-2">{c.subject}</td>
+                  <td className="px-3 py-2">{c.status}</td>
+                  <td className="px-3 py-2 text-right">{c.sentCount}</td>
+                  <td className="px-3 py-2 text-right">{new Date(c.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
+
+  const loadPreviousCampaigns = async () => {
+    const params = new URLSearchParams()
+    if (campaignSearch.trim()) params.set('q', campaignSearch.trim())
+    const { start, end } = computeDateRange()
+    if (start) params.set('start', start)
+    if (end) params.set('end', end)
+    const res = await fetch(`/api/admin/campaigns/search?${params.toString()}`, { cache: 'no-store' })
+    if (res.ok) {
+      const data = await res.json()
+      setPreviousCampaigns(data.items || [])
+      setPrevTotal(data.total || 0)
+    }
+  }
 
   if (loading) {
     return (

@@ -250,6 +250,7 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
           devices: Object.entries(deviceCounts).map(([k, v]) => ({ device: k, events: v as number })).sort((a, b) => b.events - a.events),
           timeline: timelineRows.rows.map(row => ({ ts: row.ts, type: row.event_type, count: parseInt(row.count) }))
         },
+        meta: { filtersActive: false, start: null, end: null, q: '' },
         timestamp: new Date().toISOString()
       }
     }
@@ -334,6 +335,14 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
       ORDER BY ts ASC
     `
 
+    const filteredCount = await sql`
+      SELECT COUNT(*) AS events
+      FROM email_tracking et
+      WHERE (${start} IS NULL OR et.created_at >= ${start}::timestamptz)
+        AND (${end} IS NULL OR et.created_at <= ${end}::timestamptz)
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
+    `
+
     return {
       summary: {
         clickBreakdown: overallClickBreakdown.rows.map(row => ({
@@ -358,6 +367,7 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         devices: Object.entries(deviceCounts).map(([k, v]) => ({ device: k, events: v as number })).sort((a, b) => b.events - a.events),
         timeline: timelineRows.rows.map(row => ({ ts: row.ts, type: row.event_type, count: parseInt(row.count) }))
       },
+      meta: { filtersActive: true, start, end, q, events: parseInt((filteredCount.rows[0] as any).events || 0) },
       timestamp: new Date().toISOString()
     }
     

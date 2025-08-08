@@ -166,6 +166,93 @@ async function getCampaignDetailedAnalytics(campaignId: string) {
 // Get overall detailed analytics across all campaigns
 async function getOverallDetailedAnalytics({ start, end, q }: { start: string | null, end: string | null, q: string }) {
   try {
+    const filtersActive = !!(start || end || (q && q.trim() !== ''))
+    if (!filtersActive) {
+      // Legacy (unfiltered) behavior to guarantee historical visibility
+      const overallClickBreakdown = await sql`
+        SELECT 
+          link_type,
+          COUNT(*) as total_clicks,
+          COUNT(DISTINCT recipient_email) as unique_users,
+          COUNT(DISTINCT campaign_id) as campaigns_with_type,
+          array_agg(DISTINCT target_url) as sample_urls
+        FROM email_tracking 
+        WHERE event_type = 'click'
+        GROUP BY link_type
+        ORDER BY total_clicks DESC
+      `
+      const topUrls = await sql`
+        SELECT 
+          target_url,
+          link_type,
+          COUNT(*) as clicks,
+          COUNT(DISTINCT recipient_email) as unique_users
+        FROM email_tracking 
+        WHERE event_type = 'click' AND target_url IS NOT NULL
+        GROUP BY target_url, link_type
+        ORDER BY clicks DESC
+        LIMIT 10
+      `
+      const overallDomains = await sql`
+        SELECT 
+          split_part(recipient_email, '@', 2) AS domain,
+          COUNT(DISTINCT recipient_email) AS unique_users,
+          COUNT(*) AS events
+        FROM email_tracking
+        WHERE recipient_email <> ''
+        GROUP BY domain
+        ORDER BY unique_users DESC
+        LIMIT 20
+      `
+      const uaRows = await sql`
+        SELECT user_agent
+        FROM email_tracking
+        ORDER BY created_at DESC
+        LIMIT 1000
+      `
+      const clientCounts: Record<string, number> = {}
+      const deviceCounts: Record<string, number> = {}
+      uaRows.rows.forEach(r => {
+        const { client, device } = classifyUA(r.user_agent || '')
+        clientCounts[client] = (clientCounts[client] || 0) + 1
+        deviceCounts[device] = (deviceCounts[device] || 0) + 1
+      })
+      const timelineRows = await sql`
+        SELECT date_trunc('minute', created_at) AS ts,
+               event_type,
+               COUNT(*) AS count
+        FROM email_tracking
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
+        GROUP BY ts, event_type
+        ORDER BY ts ASC
+      `
+      return {
+        summary: {
+          clickBreakdown: overallClickBreakdown.rows.map(row => ({
+            linkType: row.link_type || 'unknown',
+            totalClicks: parseInt(row.total_clicks),
+            uniqueUsers: parseInt(row.unique_users),
+            campaignsWithType: parseInt(row.campaigns_with_type),
+            sampleUrls: row.sample_urls || []
+          })),
+          topUrls: topUrls.rows.map(row => ({
+            url: row.target_url,
+            linkType: row.link_type,
+            clicks: parseInt(row.clicks),
+            uniqueUsers: parseInt(row.unique_users)
+          })),
+          domains: overallDomains.rows.map(row => ({
+            domain: row.domain || 'unknown',
+            uniqueUsers: parseInt(row.unique_users),
+            events: parseInt(row.events)
+          })),
+          clients: Object.entries(clientCounts).map(([k, v]) => ({ client: k, events: v as number })).sort((a, b) => b.events - a.events),
+          devices: Object.entries(deviceCounts).map(([k, v]) => ({ device: k, events: v as number })).sort((a, b) => b.events - a.events),
+          timeline: timelineRows.rows.map(row => ({ ts: row.ts, type: row.event_type, count: parseInt(row.count) }))
+        },
+        timestamp: new Date().toISOString()
+      }
+    }
     // Overall click breakdown by type
     const overallClickBreakdown = await sql`
       SELECT 

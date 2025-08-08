@@ -80,14 +80,20 @@ git push origin main
 ### **🎯 Phase 3: Production Deployment**
 
 #### **3.1 Deploy to Production**
-```bash
-# THE ONLY ACCEPTABLE DEPLOYMENT COMMAND:
-npx vercel --prod
 
-# ❌ NEVER USE:
-# npx vercel (preview only)
-# vercel --prod (missing npx - will fail)
-# direct Vercel dashboard uploads
+Primary path (default): Git auto-deploy via Vercel
+- Push to `main` and Vercel will build and promote to Production automatically.
+- Do not run the CLI if Git auto-deploy is enabled, to avoid duplicate deployments.
+
+Verification steps:
+1) Push succeeds (see GitHub repo updated)
+2) Open Vercel → Project → Deployments → latest Production build is in progress/completed
+3) Production URL shows the new build when finished
+
+Optional path (only if Git auto-deploy is disabled/approved):
+```bash
+npx vercel --prod
+# Use this ONLY when Git auto-deploy is off to avoid duplicates
 ```
 
 #### **3.2 Verify Deployment Success**
@@ -161,8 +167,10 @@ git push origin main
 **Solution**: Follow GitHub Token Recovery Protocol above
 
 ### **❌ Disaster #5: Multiple Conflicting Deployments**
-**Problem**: Creating multiple deployment URLs
-**Solution**: Use only `npx vercel --prod`, never create new projects
+**Problem**: Duplicate Production builds (Git + CLI)
+**Solution**:
+- Prefer Git auto-deploy (push to `main`) and do NOT run `npx vercel --prod`.
+- Or, if CLI is required, disable Git auto-deploy in Vercel first.
 
 ### **❌ Disaster #6: Unauthorized Deployment**
 **Problem**: Deploying without explicit permission
@@ -248,8 +256,8 @@ npx vercel --prod
 ### **Rule #2: Git Push Always**
 **NEVER deploy without pushing to GitHub first**
 
-### **Rule #3: One Command Only**
-**ONLY use: `npx vercel --prod`**
+### **Rule #3: One Deployment Path Only**
+**EITHER** push to `main` (Git auto-deploy) **OR** run `npx vercel --prod` (if Git auto-deploy is disabled) — not both.
 
 ### **Rule #4: Verify Everything**
 **NEVER claim success without verification**

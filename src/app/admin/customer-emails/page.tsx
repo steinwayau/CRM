@@ -1036,9 +1036,11 @@ export default function CustomerEmailsPage() {
             console.log('🔄 Manual refresh clicked (analytics-only)')
             setAnalyticsLoading(true)
             try {
-              const sent = campaigns.filter(c => c.status === 'sent')
-              if (sent.length > 0) {
-                await loadCampaignAnalyticsSync(sent)
+              const anyCampaigns = campaigns.length > 0
+              if (anyCampaigns) {
+                // Fetch analytics for all campaigns; latest first
+                const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                await loadCampaignAnalyticsSync(ordered)
               } else {
                 setCampaignAnalytics({})
                 await loadOverallAnalytics()

@@ -649,6 +649,57 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
   return html
 }
 
+// Helper: delay
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Helper: send one email with retry/backoff (handles Resend rate limits)
+async function sendEmailWithRetry(sendFn: () => Promise<any>, maxAttempts: number = 3) {
+  let attempt = 0
+  let lastError: any = null
+  while (attempt < maxAttempts) {
+    try {
+      const resp = await sendFn()
+      // Resend returns { error } on soft failure
+      if (resp && resp.error) {
+        throw resp.error
+      }
+      return { status: 'fulfilled' as const, value: resp }
+    } catch (err: any) {
+      lastError = err
+      const message = (err?.message || '').toLowerCase()
+      const isRateLimit = message.includes('too many requests') || message.includes('rate') || err?.status === 429
+      attempt += 1
+      if (attempt >= maxAttempts || !isRateLimit) {
+        return { status: 'rejected' as const, reason: err }
+      }
+      // Backoff: 1s, 2s, 4s
+      await delay(1000 * Math.pow(2, attempt - 1))
+    }
+  }
+  return { status: 'rejected' as const, reason: lastError }
+}
+
+// Helper: send a batch with limited concurrency
+async function sendWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>, 
+  concurrency: number = 5,
+  maxAttempts: number = 3
+) {
+  const results: Array<{ status: 'fulfilled' | 'rejected'; value?: any; reason?: any }> = []
+  let index = 0
+  while (index < tasks.length) {
+    const slice = tasks.slice(index, index + concurrency)
+    const settled = await Promise.all(
+      slice.map(fn => sendEmailWithRetry(fn, maxAttempts))
+    )
+    results.push(...settled)
+    index += concurrency
+  }
+  return results
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Environment validation
@@ -780,9 +831,11 @@ export async function POST(request: NextRequest) {
           }
         })
 
-        // Send batch using Resend
-        const batchResults = await Promise.allSettled(
-          batchEmails.map(email => resend.emails.send(email))
+        // Send batch using Resend with concurrency cap and backoff
+        const batchResults = await sendWithConcurrency(
+          batchEmails.map(email => () => resend.emails.send(email)),
+          5, // concurrency
+          3  // attempts
         )
 
             // Process results
@@ -805,7 +858,7 @@ export async function POST(request: NextRequest) {
             results.failureCount++
             results.failures.push({
               email: batch[index].email,
-              error: result.reason
+              error: (result.reason?.message || result.reason || '').toString()
             })
           }
         })

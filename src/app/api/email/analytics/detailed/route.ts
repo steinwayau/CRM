@@ -263,8 +263,8 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         array_agg(DISTINCT target_url) as sample_urls
       FROM email_tracking et
       WHERE et.event_type = 'click'
-        AND (${start} IS NULL OR et.created_at >= ${start})
-        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${start} IS NULL OR et.created_at >= ${start}::timestamptz)
+        AND (${end} IS NULL OR et.created_at <= ${end}::timestamptz)
         AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY link_type
       ORDER BY total_clicks DESC
@@ -279,8 +279,8 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         COUNT(DISTINCT recipient_email) as unique_users
       FROM email_tracking et
       WHERE et.event_type = 'click' AND et.target_url IS NOT NULL
-        AND (${start} IS NULL OR et.created_at >= ${start})
-        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${start} IS NULL OR et.created_at >= ${start}::timestamptz)
+        AND (${end} IS NULL OR et.created_at <= ${end}::timestamptz)
         AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY target_url, link_type
       ORDER BY clicks DESC
@@ -295,8 +295,8 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
         COUNT(*) AS events
       FROM email_tracking et
       WHERE et.recipient_email <> ''
-        AND (${start} IS NULL OR et.created_at >= ${start})
-        AND (${end} IS NULL OR et.created_at <= ${end})
+        AND (${start} IS NULL OR et.created_at >= ${start}::timestamptz)
+        AND (${end} IS NULL OR et.created_at <= ${end}::timestamptz)
         AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY domain
       ORDER BY unique_users DESC
@@ -307,8 +307,8 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
     const uaRows = await sql`
       SELECT user_agent
       FROM email_tracking et
-      WHERE (${start} IS NULL OR et.created_at >= ${start})
-        AND (${end} IS NULL OR et.created_at <= ${end})
+      WHERE (${start} IS NULL OR et.created_at >= ${start}::timestamptz)
+        AND (${end} IS NULL OR et.created_at <= ${end}::timestamptz)
         AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       ORDER BY et.created_at DESC
       LIMIT 1000
@@ -327,8 +327,8 @@ async function getOverallDetailedAnalytics({ start, end, q }: { start: string | 
              event_type,
              COUNT(*) AS count
       FROM email_tracking et
-      WHERE (${start} IS NULL OR et.created_at >= ${start})
-        AND (${end} IS NULL OR et.created_at <= ${end})
+      WHERE (${start} IS NULL OR et.created_at >= ${start}::timestamptz)
+        AND (${end} IS NULL OR et.created_at <= ${end}::timestamptz)
         AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY ts, event_type
       ORDER BY ts ASC

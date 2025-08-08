@@ -734,6 +734,24 @@ function getBaseUrl(): string {
   return 'https://crm.steinway.com.au'
 }
 
+function appendFooter(html: string, recipientEmail: string): string {
+  const base = getBaseUrl()
+  const unsub = `${base}/api/email/unsubscribe?e=${encodeURIComponent(recipientEmail)}`
+  const footer = `
+    <tr>
+      <td style="padding:20px 10px 0 10px; font-family: Arial, sans-serif; font-size:12px; color:#6b7280;">
+        <p style="margin:0 0 6px 0;">You are receiving this email because you subscribed to our newsletter or joined our mailing list.</p>
+        <p style="margin:0;">If you prefer not to receive these emails, you can <a href="${unsub}" style="color:#111827; text-decoration:underline;">unsubscribe here</a>.</p>
+      </td>
+    </tr>`
+  // Insert before closing container table if possible
+  if (html.includes('</table>')) {
+    const last = html.lastIndexOf('</table>')
+    return html.slice(0, last) + footer + html.slice(last)
+  }
+  return html + footer
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Environment validation
@@ -854,11 +872,14 @@ export async function POST(request: NextRequest) {
           
           // Add tracking to HTML email - NEW SYSTEM: Use email address directly
           const trackedHtml = addEmailTracking(personalizedHtml, updateCampaignId, customer.email)
+
+          // Append standard footer with unsubscribe
+          const finalHtml = appendFooter(trackedHtml, customer.email)
           
           return {
             to: customer.email,
             subject: subject,
-            html: trackedHtml,
+            html: finalHtml,
             text: personalizedText,
             from: 'noreply@steinway.com.au',
             replyTo: process.env.REPLY_TO_EMAIL || 'info@steinway.com.au'

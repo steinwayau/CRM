@@ -155,6 +155,10 @@ export default function CustomerEmailsPage() {
   const [detailedAnalytics, setDetailedAnalytics] = useState<any>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [forceRender, setForceRender] = useState(0)
+  const [datePreset, setDatePreset] = useState<'today'|'yesterday'|'1w'|'1m'|'3m'|'6m'|'9m'|'12m'|'fy'|'ly'|'custom'>('1m')
+  const [customFrom, setCustomFrom] = useState<string>('')
+  const [customTo, setCustomTo] = useState<string>('')
+  const [campaignSearch, setCampaignSearch] = useState('')
 
   // Load overall analytics data from working API
   const loadOverallAnalytics = async () => {
@@ -255,7 +259,7 @@ export default function CustomerEmailsPage() {
       const analyticsData: {[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}} = {}
       
       for (const campaign of campaignsList) {
-        console.log(`📊 Fetching analytics for campaign: ${campaign.id} (${campaign.name}) status=${campaign.status}`)
+        console.log(`�� Fetching analytics for campaign: ${campaign.id} (${campaign.name}) status=${campaign.status}`)
         const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`, { cache: 'no-store' })
         if (response.ok) {
           const data = await response.json()
@@ -1737,6 +1741,46 @@ export default function CustomerEmailsPage() {
         >
           {analyticsLoading ? 'Loading…' : 'Refresh'}
         </button>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow border grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Date range</label>
+          <select
+            value={datePreset}
+            onChange={(e) => setDatePreset(e.target.value as any)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="1w">1 week</option>
+            <option value="1m">1 month</option>
+            <option value="3m">3 months</option>
+            <option value="6m">6 months</option>
+            <option value="9m">9 months</option>
+            <option value="12m">12 months</option>
+            <option value="fy">Last financial year</option>
+            <option value="ly">Last year</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        {datePreset === 'custom' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">From</label>
+              <input type="date" value={customFrom} onChange={(e)=>setCustomFrom(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">To</label>
+              <input type="date" value={customTo} onChange={(e)=>setCustomTo(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+            </div>
+          </div>
+        )}
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Search campaigns</label>
+          <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+        </div>
       </div>
 
       {/* Overview cards */}

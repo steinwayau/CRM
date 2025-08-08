@@ -31,7 +31,7 @@ async function getCampaignAnalytics(campaignId: string) {
   try {
     // Get campaign details
     const campaignResult = await sql`
-      SELECT id, name
+      SELECT id, name, "sentCount" AS sent_count
       FROM email_campaigns 
       WHERE id = ${campaignId}
     `
@@ -73,51 +73,62 @@ async function getCampaignAnalytics(campaignId: string) {
       }
     })
     
-    // Calculate total sent based on unique recipients (since sentCount doesn't exist)
-    const totalSentResult = await sql`
-      SELECT COUNT(DISTINCT recipient_email) as total_sent
-      FROM email_tracking 
+    // Determine total sent: prefer campaign.sentCount, fall back to distinct recipients observed
+    let totalSent = parseInt(campaign.sent_count) || 0
+    if (!totalSent) {
+      const totalSentResult = await sql`
+        SELECT COUNT(DISTINCT recipient_email) as total_sent
+        FROM email_tracking 
+        WHERE campaign_id = ${campaignId}
+      `
+      totalSent = parseInt(totalSentResult.rows[0]?.total_sent) || 0
+    }
+    
+    // Adjusted opens: exclude known machine/proxy fetches (e.g., Gmail Image Proxy)
+    const adjustedOpensResult = await sql`
+      SELECT COUNT(DISTINCT recipient_email) AS adjusted_unique_opens
+      FROM email_tracking
       WHERE campaign_id = ${campaignId}
+        AND event_type = 'open'
+        AND COALESCE(user_agent, '') NOT ILIKE '%GoogleImageProxy%'
     `
+    const adjustedUniqueOpens = parseInt(adjustedOpensResult.rows[0]?.adjusted_unique_opens) || 0
     
-    const totalSent = parseInt(totalSentResult.rows[0]?.total_sent) || uniqueClicks || 1
+    // Engagement metrics (click-based)
+    const clickBasedOpens = uniqueClicks // keep for transparency
     
-    // 🎯 CLICK-BASED OPEN LOGIC: Use clicks as engagement indicator
-    // If someone clicked any link, they definitely "opened" the email
-    const clickBasedOpens = uniqueClicks
-    const traditionalOpenRate = totalSent > 0 ? parseFloat(((uniqueTraditionalOpens / totalSent) * 100).toFixed(1)) : 0
-    const clickBasedOpenRate = totalSent > 0 ? parseFloat(((clickBasedOpens / totalSent) * 100).toFixed(1)) : 0
-    const clickRate = totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
-
-    // Use click-based opens as the primary metric (stronger engagement signal)
-    const openRate = clickBasedOpenRate
-    const opens = clickBasedOpens
-    const uniqueOpens = clickBasedOpens
-
-    console.log(`📊 CLICK-BASED ANALYTICS for ${campaignId}:`, {
-      totalSent,
-      traditionalOpens: uniqueTraditionalOpens,
-      clickBasedOpens,
-      traditionalOpenRate,
-      clickBasedOpenRate: openRate,
-      clickRate
-    })
-
+    // Rates
+    const openRateTrue = totalSent > 0 ? parseFloat(((uniqueTraditionalOpens / totalSent) * 100).toFixed(1)) : 0
+    const openRateAdjusted = totalSent > 0 ? parseFloat(((adjustedUniqueOpens / totalSent) * 100).toFixed(1)) : 0
+    const engagedRate = totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
+    const clickRate = engagedRate
+    const ctor = uniqueTraditionalOpens > 0 ? parseFloat(((uniqueClicks / uniqueTraditionalOpens) * 100).toFixed(1)) : 0
+    
+    // Preserve backward-compatible fields (opens/openRate now reflect TRUE opens)
+    const opens = uniqueTraditionalOpens
+    const uniqueOpens = uniqueTraditionalOpens
+    const openRate = openRateTrue
+    
     return {
       campaignId,
       campaignName: campaign.name,
       totalSent,
-      opens, // Now using click-based opens
+      opens, // true unique opens
       clicks,
-      uniqueOpens, // Now using click-based opens
+      uniqueOpens, // true unique opens
       uniqueClicks,
-      openRate, // Now using click-based open rate
-      clickRate,
-      // Additional metrics for debugging/transparency
+      openRate, // true open rate
+      clickRate, // clicks / sent
+      // Additional enterprise metrics
+      openRateAdjusted, // true opens excluding proxies
+      engagedRate, // clicks / sent (what we previously surfaced as open rate)
+      ctor, // click-to-open rate
+      // Transparency fields retained from previous implementation
       traditionalOpens: uniqueTraditionalOpens,
-      traditionalOpenRate,
+      traditionalOpenRate: openRateTrue,
       clickBasedOpens,
-      clickBasedOpenRate,
+      clickBasedOpenRate: engagedRate,
+      adjustedUniqueOpens,
       status: 'sent',
       sentAt: null,
       found: true
@@ -174,6 +185,15 @@ async function getOverallAnalytics() {
       GROUP BY event_type
     `
     
+    // Adjusted unique opens overall (exclude Gmail Image Proxy)
+    const adjustedOverallOpens = await sql`
+      SELECT COUNT(DISTINCT et.recipient_email) AS adjusted_unique_opens
+      FROM email_tracking et
+      WHERE et.event_type = 'open'
+        AND COALESCE(et.user_agent, '') NOT ILIKE '%GoogleImageProxy%'
+        AND EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = et.campaign_id)
+    `
+    
     // Process data
     const campaignData = campaignStats.rows[0]
     let totalTraditionalOpens = 0
@@ -202,36 +222,31 @@ async function getOverallAnalytics() {
     })
     
     const totalSent = parseInt(campaignData.total_sent) || 0
+    const adjustedUniqueOpensOverall = parseInt(adjustedOverallOpens.rows[0]?.adjusted_unique_opens) || 0
     
-    // 🎯 CLICK-BASED OVERALL ANALYTICS
-    const clickBasedOpens = uniqueClicks
-    const traditionalOpenRate = totalSent > 0 ? parseFloat(((uniqueTraditionalOpens / totalSent) * 100).toFixed(1)) : 0
-    const clickBasedOpenRate = totalSent > 0 ? parseFloat(((clickBasedOpens / totalSent) * 100).toFixed(1)) : 0
-    
-    console.log(`📊 OVERALL CLICK-BASED ANALYTICS:`, {
-      totalSent,
-      traditionalOpens: uniqueTraditionalOpens,
-      clickBasedOpens,
-      traditionalOpenRate,
-      clickBasedOpenRate
-    })
+    // Metrics
+    const openRateTrue = totalSent > 0 ? parseFloat(((uniqueTraditionalOpens / totalSent) * 100).toFixed(1)) : 0
+    const openRateAdjusted = totalSent > 0 ? parseFloat(((adjustedUniqueOpensOverall / totalSent) * 100).toFixed(1)) : 0
+    const engagedRate = totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0
     
     return {
       summary: {
         totalCampaigns: parseInt(campaignData.total_campaigns),
         sentCampaigns: parseInt(campaignData.sent_campaigns),
         totalEmailsSent: totalSent,
-        totalOpens: clickBasedOpens, // Now using click-based opens
+        totalOpens: uniqueTraditionalOpens, // true unique opens
         totalClicks,
-        uniqueOpens: clickBasedOpens, // Now using click-based opens
+        uniqueOpens: uniqueTraditionalOpens, // true unique opens
         uniqueClicks,
-        overallOpenRate: clickBasedOpenRate, // Now using click-based open rate
-        overallClickRate: totalSent > 0 ? parseFloat(((uniqueClicks / totalSent) * 100).toFixed(1)) : 0,
+        overallOpenRate: openRateTrue, // true open rate
+        overallClickRate: engagedRate, // clicks / sent
         // Additional metrics for transparency
         traditionalOpens: uniqueTraditionalOpens,
-        traditionalOpenRate,
-        clickBasedOpens,
-        clickBasedOpenRate
+        traditionalOpenRate: openRateTrue,
+        clickBasedOpens: uniqueClicks,
+        clickBasedOpenRate: engagedRate,
+        adjustedUniqueOpens: adjustedUniqueOpensOverall,
+        adjustedOpenRate: openRateAdjusted
       },
       recent: {
         opensLast7Days: recentOpens,

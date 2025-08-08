@@ -239,24 +239,19 @@ export default function CustomerEmailsPage() {
       const analyticsData: {[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}} = {}
       
       for (const campaign of campaignsList) {
-        // ANALYTICS FIX: Fetch analytics for any campaign with 'sent' status
-        if (campaign.status === 'sent') {
-          console.log(`📊 Fetching analytics for sent campaign: ${campaign.id} (${campaign.name})`)
-          const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
-          if (response.ok) {
-            const data = await response.json()
-            console.log(`📈 Analytics data for ${campaign.id}:`, data)
-            analyticsData[campaign.id] = {
-              opens: data.opens || 0,
-              clicks: data.clicks || 0,
-              openRate: data.openRate || 0,
-              clickRate: data.clickRate || 0
-            }
-          } else {
-            console.error(`❌ Failed to fetch analytics for campaign ${campaign.id}:`, response.status, response.statusText)
+        console.log(`📊 Fetching analytics for campaign: ${campaign.id} (${campaign.name}) status=${campaign.status}`)
+        const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`📈 Analytics data for ${campaign.id}:`, data)
+          analyticsData[campaign.id] = {
+            opens: data.opens || 0,
+            clicks: data.clicks || 0,
+            openRate: data.openRate || 0,
+            clickRate: data.clickRate || 0
           }
         } else {
-          console.log(`⏭️ Skipping campaign ${campaign.id} - status: ${campaign.status} (not sent)`)
+          console.error(`❌ Failed to fetch analytics for campaign ${campaign.id}:`, response.status, response.statusText)
         }
       }
       
@@ -1036,14 +1031,27 @@ export default function CustomerEmailsPage() {
             console.log('🔄 Manual refresh clicked (analytics-only)')
             setAnalyticsLoading(true)
             try {
-              const anyCampaigns = campaigns.length > 0
-              if (anyCampaigns) {
-                // Fetch analytics for all campaigns; latest first
-                const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
-                await loadCampaignAnalyticsSync(ordered)
+              // Always fetch latest campaigns from API to ensure status/sentCount are current
+              const latestResp = await fetch('/api/admin/campaigns')
+              if (latestResp.ok) {
+                const latest = await latestResp.json()
+                setCampaigns(latest)
+                if (latest.length > 0) {
+                  const ordered = [...latest].sort((a: Campaign, b: Campaign) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                  await loadCampaignAnalyticsSync(ordered)
+                } else {
+                  setCampaignAnalytics({})
+                  await loadOverallAnalytics()
+                }
               } else {
-                setCampaignAnalytics({})
-                await loadOverallAnalytics()
+                // Fallback to current state
+                if (campaigns.length > 0) {
+                  const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                  await loadCampaignAnalyticsSync(ordered)
+                } else {
+                  setCampaignAnalytics({})
+                  await loadOverallAnalytics()
+                }
               }
             } catch (e) {
               console.error('Manual analytics refresh failed:', e)

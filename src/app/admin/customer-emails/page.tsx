@@ -160,6 +160,37 @@ export default function CustomerEmailsPage() {
   const [customTo, setCustomTo] = useState<string>('')
   const [campaignSearch, setCampaignSearch] = useState('')
 
+  const computeDateRange = () => {
+    const now = new Date()
+    let from: Date | null = null
+    let to: Date | null = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    switch (datePreset) {
+      case 'today': from = startOfToday; break
+      case 'yesterday': from = new Date(startOfToday.getTime() - 86400000); to = startOfToday; break
+      case '1w': from = new Date(now.getTime() - 7*86400000); break
+      case '1m': from = new Date(now); from.setMonth(now.getMonth()-1); break
+      case '3m': from = new Date(now); from.setMonth(now.getMonth()-3); break
+      case '6m': from = new Date(now); from.setMonth(now.getMonth()-6); break
+      case '9m': from = new Date(now); from.setMonth(now.getMonth()-9); break
+      case '12m': from = new Date(now); from.setMonth(now.getMonth()-12); break
+      case 'fy': {
+        const year = now.getMonth() >= 6 ? now.getFullYear()-1 : now.getFullYear()-2
+        from = new Date(year, 6, 1); to = new Date(year+1, 5, 30, 23, 59, 59)
+        break
+      }
+      case 'ly': from = new Date(now.getFullYear()-1, 0, 1); to = new Date(now.getFullYear()-1, 11, 31, 23, 59, 59); break
+      case 'custom':
+        from = customFrom ? new Date(customFrom) : null
+        to = customTo ? new Date(customTo) : null
+        break
+    }
+    return {
+      start: from ? from.toISOString() : '',
+      end: to ? to.toISOString() : ''
+    }
+  }
+
   // Load overall analytics data from working API
   const loadOverallAnalytics = async () => {
     try {
@@ -177,7 +208,12 @@ export default function CustomerEmailsPage() {
   const loadOverallDetailedAnalytics = async () => {
     try {
       setAnalyticsLoading(true)
-      const res = await fetch('/api/email/analytics/detailed', { cache: 'no-store' })
+      const { start, end } = computeDateRange()
+      const params = new URLSearchParams()
+      if (start) params.set('start', start)
+      if (end) params.set('end', end)
+      if (campaignSearch.trim()) params.set('q', campaignSearch.trim())
+      const res = await fetch(`/api/email/analytics/detailed?${params.toString()}`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setDetailedAnalytics(data)
@@ -1749,7 +1785,10 @@ export default function CustomerEmailsPage() {
           <label className="block text-sm text-gray-600 mb-1">Date range</label>
           <select
             value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value as any)}
+            onChange={(e) => {
+              setDatePreset(e.target.value as any)
+              if (e.target.value !== 'custom') { loadOverallDetailedAnalytics() }
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
           >
             <option value="today">Today</option>
@@ -1779,7 +1818,10 @@ export default function CustomerEmailsPage() {
         )}
         <div>
           <label className="block text-sm text-gray-600 mb-1">Search campaigns</label>
-          <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+          <div className="flex gap-2">
+            <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+            <button onClick={loadOverallDetailedAnalytics} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
+          </div>
         </div>
       </div>
 

@@ -30,12 +30,15 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const campaignId = searchParams.get('campaignId')
+    const start = searchParams.get('start') || null
+    const end = searchParams.get('end') || null
+    const q = searchParams.get('q') || ''
     
     if (campaignId) {
       const detailedAnalytics = await getCampaignDetailedAnalytics(campaignId)
       return NextResponse.json(detailedAnalytics, { headers: noStore })
     } else {
-      const overallDetailed = await getOverallDetailedAnalytics()
+      const overallDetailed = await getOverallDetailedAnalytics({ start, end, q })
       return NextResponse.json(overallDetailed, { headers: noStore })
     }
     
@@ -161,7 +164,7 @@ async function getCampaignDetailedAnalytics(campaignId: string) {
 }
 
 // Get overall detailed analytics across all campaigns
-async function getOverallDetailedAnalytics() {
+async function getOverallDetailedAnalytics({ start, end, q }: { start: string | null, end: string | null, q: string }) {
   try {
     // Overall click breakdown by type
     const overallClickBreakdown = await sql`
@@ -173,6 +176,9 @@ async function getOverallDetailedAnalytics() {
         array_agg(DISTINCT target_url) as sample_urls
       FROM email_tracking 
       WHERE event_type = 'click'
+        AND (${start} IS NULL OR created_at >= ${start})
+        AND (${end} IS NULL OR created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY link_type
       ORDER BY total_clicks DESC
     `
@@ -186,6 +192,9 @@ async function getOverallDetailedAnalytics() {
         COUNT(DISTINCT recipient_email) as unique_users
       FROM email_tracking 
       WHERE event_type = 'click' AND target_url IS NOT NULL
+        AND (${start} IS NULL OR created_at >= ${start})
+        AND (${end} IS NULL OR created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY target_url, link_type
       ORDER BY clicks DESC
       LIMIT 10
@@ -199,6 +208,9 @@ async function getOverallDetailedAnalytics() {
         COUNT(*) AS events
       FROM email_tracking
       WHERE recipient_email <> ''
+        AND (${start} IS NULL OR created_at >= ${start})
+        AND (${end} IS NULL OR created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY domain
       ORDER BY unique_users DESC
       LIMIT 20
@@ -208,6 +220,9 @@ async function getOverallDetailedAnalytics() {
     const uaRows = await sql`
       SELECT user_agent
       FROM email_tracking
+      WHERE (${start} IS NULL OR created_at >= ${start})
+        AND (${end} IS NULL OR created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       ORDER BY created_at DESC
       LIMIT 1000
     `
@@ -225,7 +240,9 @@ async function getOverallDetailedAnalytics() {
              event_type,
              COUNT(*) AS count
       FROM email_tracking
-      WHERE created_at >= NOW() - INTERVAL '24 hours'
+      WHERE (${start} IS NULL OR created_at >= ${start})
+        AND (${end} IS NULL OR created_at <= ${end})
+        AND (${q} = '' OR EXISTS (SELECT 1 FROM email_campaigns ec WHERE ec.id = email_tracking.campaign_id AND (ec.name ILIKE '%' || ${q} || '%' OR ec.subject ILIKE '%' || ${q} || '%')))
       GROUP BY ts, event_type
       ORDER BY ts ASC
     `

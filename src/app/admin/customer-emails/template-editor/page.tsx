@@ -398,6 +398,13 @@ export default function TemplateEditorPage() {
   const [angleHint, setAngleHint] = useState<number | null>(null)
   const [measureOverlays, setMeasureOverlays] = useState<Array<{ x1: number, y1: number, x2: number, y2: number, label: string }>>([])
   const MAX_NEIGHBORS_FOR_SNAP = 40
+  const [zoom, setZoom] = useState<50 | 75 | 100 | 125>(100)
+  const [fadeTick, setFadeTick] = useState(0) // changes to trigger label fade timing
+  useEffect(() => {
+    if (measureOverlays.length === 0) return
+    const t = setTimeout(() => setFadeTick(v => v + 1), 800) // fade labels after delay
+    return () => clearTimeout(t)
+  }, [measureOverlays])
 
   // Spatial index for performance (rebuilt whenever elements change)
   const spatialRef = useRef(new SpatialIndex<EditorElement>(GRID_CELL_SIZE))
@@ -723,6 +730,7 @@ export default function TemplateEditorPage() {
 
   // Create smooth resize handler
   const createResizeHandler = (elementId: string, handle: string) => (e: React.MouseEvent) => {
+    if (zoom !== 100) return
     e.stopPropagation()
     e.preventDefault()
     const startX = e.clientX
@@ -885,6 +893,7 @@ export default function TemplateEditorPage() {
 
   // Rotation handler
   const createRotateHandler = (elementId: string) => (e: React.MouseEvent) => {
+    if (zoom !== 100) return
     e.stopPropagation()
     e.preventDefault()
     const element = editorElements.find(el => el.id === elementId)
@@ -2348,7 +2357,7 @@ export default function TemplateEditorPage() {
           </div>
 
           {/* Visual Canvas */}
-          <div className="flex-1 bg-gray-100 overflow-auto p-8">
+          <div id="canvas-scroll" className="flex-1 bg-gray-100 overflow-auto p-8">
             {previewMode ? (
               /* Email Client Preview Mode */
               <div className="w-full h-full">
@@ -2387,13 +2396,13 @@ export default function TemplateEditorPage() {
               <div 
                 className="shadow-lg mx-auto relative"
                 style={{ 
-                  width: `${canvasSize.width}px`, 
-                  minHeight: `${canvasSize.height}px`,
+                  width: `${Math.round(canvasSize.width * (zoom/100))}px`, 
+                  minHeight: `${Math.round(canvasSize.height * (zoom/100))}px`,
                   backgroundColor: canvasBackgroundColor,
                   border: '1px solid #e5e7eb',
                   backgroundImage: showGrid ? 
                     `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
-                  backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
+                  backgroundSize: showGrid ? `${Math.round(gridSize * (zoom/100))}px ${Math.round(gridSize * (zoom/100))}px` : 'auto'
                 }}
                 onClick={(e) => {
                   // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
@@ -2416,10 +2425,10 @@ export default function TemplateEditorPage() {
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     backgroundImage: `
-                      linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)
+                      linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px)
                     `,
-                    backgroundSize: `${gridSize}px ${gridSize}px`
+                    backgroundSize: `${Math.round(gridSize * (zoom/100))}px ${Math.round(gridSize * (zoom/100))}px`
                   }}
                 />
               )}
@@ -2433,7 +2442,7 @@ export default function TemplateEditorPage() {
                     style={{
                       left: `${(canvasSize.width - 600) / 2}px`,
                       width: '600px',
-                      height: `${canvasSize.height}px`
+                      height: `${Math.round(canvasSize.height * (zoom/100))}px`
                     }}
                   >
                                          <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
@@ -2446,7 +2455,7 @@ export default function TemplateEditorPage() {
                     className="absolute top-0 left-0 bg-green-100 bg-opacity-30"
                     style={{
                       width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${canvasSize.height}px`
+                      height: `${Math.round(canvasSize.height * (zoom/100))}px`
                     }}
                   >
                                          <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded rotate-90 origin-bottom-left">
@@ -2457,7 +2466,7 @@ export default function TemplateEditorPage() {
                     className="absolute top-0 right-0 bg-green-100 bg-opacity-30"
                     style={{
                       width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${canvasSize.height}px`
+                      height: `${Math.round(canvasSize.height * (zoom/100))}px`
                     }}
                   >
                                          <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
@@ -2474,7 +2483,7 @@ export default function TemplateEditorPage() {
                   className="absolute pointer-events-none z-50"
                   style={{
                     ...(guide.type === 'vertical' ? {
-                      left: guide.position,
+                      left: Math.round(guide.position * (zoom/100)),
                       top: 0,
                       width: '1px',
                       height: '100%',
@@ -2482,7 +2491,7 @@ export default function TemplateEditorPage() {
                       boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
                     } : {
                       left: 0,
-                      top: guide.position,
+                      top: Math.round(guide.position * (zoom/100)),
                       width: '100%',
                       height: '1px',
                       backgroundColor: '#3b82f6',
@@ -2506,6 +2515,23 @@ export default function TemplateEditorPage() {
                   </div>
                 </div>
               ))}
+              {/* Distance/redline overlays (fade) */}
+              {measureOverlays.map((m, i) => (
+                <div key={`m-${i}`} className={`absolute pointer-events-none z-40 transition-opacity duration-300 ${fadeTick ? 'opacity-60':'opacity-100'}`}
+                  style={{
+                    left: `${Math.round(Math.min(m.x1, m.x2) * (zoom/100))}px`,
+                    top: `${Math.round(Math.min(m.y1, m.y2) * (zoom/100))}px`,
+                    width: `${Math.max(1, Math.round(Math.abs(m.x2 - m.x1) * (zoom/100)))}px`,
+                    height: `${Math.max(1, Math.round(Math.abs(m.y2 - m.y1) * (zoom/100)))}px`,
+                    borderTop: m.y1 === m.y2 ? '1px dashed #10b981' : undefined,
+                    borderLeft: m.x1 === m.x2 ? '1px dashed #10b981' : undefined,
+                  }}
+                >
+                  <div className="absolute -translate-y-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded"
+                    style={{ left: '50%', top: '50%' }}
+                  >{m.label}</div>
+                </div>
+              ))}
               {editorElements.map((element) => (
                 <div
                   key={element.id}
@@ -2515,16 +2541,17 @@ export default function TemplateEditorPage() {
                     draggedElement === element.id ? 'shadow-lg opacity-80' : ''
                   }`}
                   style={{
-                    left: element.style.position.x,
-                    top: element.style.position.y,
-                    width: element.style.width,
-                    height: element.style.height,
+                    left: Math.round(element.style.position.x * (zoom/100)),
+                    top: Math.round(element.style.position.y * (zoom/100)),
+                    width: Math.round(element.style.width * (zoom/100)),
+                    height: Math.round(element.style.height * (zoom/100)),
                     zIndex: selectedElement === element.id ? 10 : 1,
                     userSelect: 'none',
                     transform: element.style.rotation ? `rotate(${element.style.rotation}deg)` : undefined,
                     transformOrigin: 'center center'
                   }}
                   onClick={(e) => {
+                    if (zoom !== 100) return // editing disabled at non-100%
                     e.stopPropagation()
                     // Track element interaction time
                     lastElementInteractionRef.current = Date.now()
@@ -2534,6 +2561,7 @@ export default function TemplateEditorPage() {
                     }
                   }}
                   onMouseDown={(e) => {
+                    if (zoom !== 100) return
                     // Don't start dragging if we're resizing
                     if (isResizingElement) return
                     

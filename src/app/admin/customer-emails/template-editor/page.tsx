@@ -449,7 +449,7 @@ export default function TemplateEditorPage() {
     let snappedY = snapToGridValue(newY)
     
     const guides = getAlignmentGuides(draggedElement, snappedX, snappedY)
-    const threshold = 5
+    const threshold = 8 // slightly more forgiving
     
     // Apply snapping based on guides
     guides.forEach(guide => {
@@ -475,7 +475,7 @@ export default function TemplateEditorPage() {
     })
     
     // Keep within canvas bounds with edge snapping
-    const edgeThreshold = 5 // pixels from edge to trigger snapping
+    const edgeThreshold = 8 // pixels from edge to trigger snapping
     
     // Snap to left edge
     if (snappedX <= edgeThreshold) {
@@ -524,9 +524,26 @@ export default function TemplateEditorPage() {
       }
       
       animationFrameId = requestAnimationFrame(() => {
-        const deltaX = e.clientX - startX
-        const deltaY = e.clientY - startY
-        handleElementResize(elementId, handle, deltaX, deltaY, e.shiftKey)
+        const dx = e.clientX - startX
+        const dy = e.clientY - startY
+        
+        const element = editorElements.find(el => el.id === elementId)
+        if (!element) return
+        const newStyle = { ...element.style }
+        
+        // Handle-based resizing
+        if (handle.includes('e')) newStyle.width = Math.max(10, element.style.width + dx)
+        if (handle.includes('s')) newStyle.height = Math.max(10, element.style.height + dy)
+        if (handle.includes('w')) {
+          newStyle.width = Math.max(10, element.style.width - dx)
+          newStyle.position = { ...newStyle.position, x: element.style.position.x + dx }
+        }
+        if (handle.includes('n')) {
+          newStyle.height = Math.max(10, element.style.height - dy)
+          newStyle.position = { ...newStyle.position, y: element.style.position.y + dy }
+        }
+        
+        updateElement(elementId, { style: newStyle })
       })
     }
     

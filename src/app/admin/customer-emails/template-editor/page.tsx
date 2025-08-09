@@ -551,6 +551,37 @@ export default function TemplateEditorPage() {
     return { above, below }
   }
 
+  // Edge candidate producers for resize-edge snapping
+  const getVerticalEdgeCandidates = (x: number, y: number, w: number, h: number, selfId: string) => {
+    const neighbors = spatialRef.current.queryNeighbors({ x: x - 400, y: y - 400, width: w + 800, height: h + 800 }, MAX_NEIGHBORS_FOR_SNAP)
+    const positions: number[] = []
+    for (const el of neighbors) {
+      if (el.id === selfId) continue
+      positions.push(el.style.position.x) // left
+      positions.push(el.style.position.x + el.style.width) // right
+      positions.push(el.style.position.x + Math.round(el.style.width / 2)) // center
+    }
+    // canvas edges and center
+    positions.push(0)
+    positions.push(canvasSize.width)
+    positions.push(Math.round(canvasSize.width / 2))
+    return positions
+  }
+  const getHorizontalEdgeCandidates = (x: number, y: number, w: number, h: number, selfId: string) => {
+    const neighbors = spatialRef.current.queryNeighbors({ x: x - 400, y: y - 400, width: w + 800, height: h + 800 }, MAX_NEIGHBORS_FOR_SNAP)
+    const positions: number[] = []
+    for (const el of neighbors) {
+      if (el.id === selfId) continue
+      positions.push(el.style.position.y) // top
+      positions.push(el.style.position.y + el.style.height) // bottom
+      positions.push(el.style.position.y + Math.round(el.style.height / 2)) // middle
+    }
+    positions.push(0)
+    positions.push(canvasSize.height)
+    positions.push(Math.round(canvasSize.height / 2))
+    return positions
+  }
+
   const snapPosition = (draggedElement: EditorElement, newX: number, newY: number) => {
     // First compute guide-based snapping using raw coordinates
     let snappedX = newX
@@ -754,6 +785,57 @@ export default function TemplateEditorPage() {
           }
         }
 
+        // Resize-edge snapping (anchor opposite edge). Skip when meta/ctrl pressed
+        if (!(e.metaKey || e.ctrlKey)) {
+          const candidatesV = getVerticalEdgeCandidates(newStyle.position.x, newStyle.position.y, newStyle.width, newStyle.height, elementId)
+          const candidatesH = getHorizontalEdgeCandidates(newStyle.position.x, newStyle.position.y, newStyle.width, newStyle.height, elementId)
+          let guide: { type: 'vertical' | 'horizontal'; position: number; label: string } | null = null
+
+          // Moving right edge
+          if (handle.includes('e')) {
+            const moving = newStyle.position.x + newStyle.width
+            const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.width = Math.max(10, best - newStyle.position.x)
+              guide = { type: 'vertical', position: best, label: 'Snap Right' }
+            }
+          }
+          // Moving left edge (right edge anchored)
+          if (handle.includes('w')) {
+            const rightEdge = newStyle.position.x + newStyle.width
+            const moving = newStyle.position.x
+            const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.position = { ...newStyle.position, x: best }
+              newStyle.width = Math.max(10, rightEdge - best)
+              guide = { type: 'vertical', position: best, label: 'Snap Left' }
+            }
+          }
+          // Moving bottom edge
+          if (handle.includes('s')) {
+            const moving = newStyle.position.y + newStyle.height
+            const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.height = Math.max(10, best - newStyle.position.y)
+              guide = { type: 'horizontal', position: best, label: 'Snap Bottom' }
+            }
+          }
+          // Moving top edge (bottom anchored)
+          if (handle.includes('n')) {
+            const bottomEdge = newStyle.position.y + newStyle.height
+            const moving = newStyle.position.y
+            const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.position = { ...newStyle.position, y: best }
+              newStyle.height = Math.max(10, bottomEdge - best)
+              guide = { type: 'horizontal', position: best, label: 'Snap Top' }
+            }
+          }
+          setShowAlignmentGuides(guide ? [guide] : [])
+        } else {
+          setShowAlignmentGuides([])
+        }
+
         // Size-match snapping: match width/height of nearest elements within 2px
         const others = spatialRef.current
           .queryNeighbors({ x: newStyle.position?.x ?? element.style.position.x, y: newStyle.position?.y ?? element.style.position.y, width: newStyle.width, height: newStyle.height }, MAX_NEIGHBORS_FOR_SNAP)
@@ -794,6 +876,7 @@ export default function TemplateEditorPage() {
       setIsResizingElement(null)
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      setShowAlignmentGuides([])
     }
     
     document.addEventListener('mousemove', handleMouseMove)

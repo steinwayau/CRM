@@ -74,6 +74,7 @@ export default function TemplateEditorPage() {
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 800 })
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#ffffff')
+  const [zoom, setZoom] = useState<number>(100)
 
   const [previewMode, setPreviewMode] = useState(false)
   const [selectedEmailClient, setSelectedEmailClient] = useState<'gmail' | 'outlook' | 'apple' | 'generic'>('gmail')
@@ -1919,6 +1920,21 @@ export default function TemplateEditorPage() {
                   >
                     {propertiesCollapsed ? 'Show Properties' : 'Hide Properties'}
                   </button>
+                  {/* Zoom control */}
+                  <label className="flex items-center gap-1 text-sm ml-2">
+                    <span className="text-sm text-gray-600">Zoom:</span>
+                    <select
+                      value={zoom}
+                      onChange={(e)=>setZoom(parseInt(e.target.value))}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm"
+                      title="Change canvas preview zoom"
+                    >
+                      <option value={50}>50%</option>
+                      <option value={75}>75%</option>
+                      <option value={100}>100%</option>
+                      <option value={125}>125%</option>
+                    </select>
+                  </label>
                 </div>
                 
                 <div className="flex items-center space-x-2">
@@ -1999,1331 +2015,1333 @@ export default function TemplateEditorPage() {
               </div>
             ) : (
               /* Regular Template Editor Mode */
-              <div 
-                className="shadow-lg mx-auto relative"
-                style={{ 
-                  width: `${canvasSize.width}px`, 
-                  minHeight: `${canvasSize.height}px`,
-                  backgroundColor: canvasBackgroundColor,
-                  border: '1px solid #e5e7eb',
-                  backgroundImage: showGrid ? 
-                    `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
-                  backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
-                }}
-                onClick={(e) => {
-                  // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
-                  const timeSinceLastInteraction = Date.now() - lastElementInteractionRef.current
-                  const wasRecentlyInteractingWithElement = timeSinceLastInteraction < 100 // 100ms threshold
-                  const isCurrentlyDragging = dragStateRef.current.dragStarted || dragStateRef.current.isDragging
-                  
-                  // Don't clear selection if we just interacted with an element or are currently dragging
-                  if (!wasRecentlyInteractingWithElement && !isCurrentlyDragging) {
-                    setSelectedElement(null)
-                    if (editingTextElement) {
-                      finishEditingText()
-                    }
-                  }
-                }}
-              >
-              {/* Grid overlay */}
-              {showGrid && (
+              <div className="mx-auto" style={{ transform: `scale(${zoom/100})`, transformOrigin: 'top center' }}>
                 <div 
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    backgroundImage: `
-                      linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)
-                    `,
-                    backgroundSize: `${gridSize}px ${gridSize}px`
+                  className={`shadow-lg relative ${zoom !== 100 ? 'pointer-events-none select-none' : ''}`}
+                  style={{ 
+                    width: `${canvasSize.width}px`, 
+                    minHeight: `${canvasSize.height}px`,
+                    backgroundColor: canvasBackgroundColor,
+                    border: '1px solid #e5e7eb',
+                    backgroundImage: showGrid ? 
+                      `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
+                    backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
                   }}
-                />
-              )}
-
-              {/* Gmail 600px Constraint Overlay */}
-              {showGmailConstraints && canvasSize.width > 600 && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Gmail Safe Zone (600px centered) */}
+                  onClick={(e) => {
+                    // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
+                    const timeSinceLastInteraction = Date.now() - lastElementInteractionRef.current
+                    const wasRecentlyInteractingWithElement = timeSinceLastInteraction < 100 // 100ms threshold
+                    const isCurrentlyDragging = dragStateRef.current.dragStarted || dragStateRef.current.isDragging
+                    
+                    // Don't clear selection if we just interacted with an element or are currently dragging
+                    if (!wasRecentlyInteractingWithElement && !isCurrentlyDragging) {
+                      setSelectedElement(null)
+                      if (editingTextElement) {
+                        finishEditingText()
+                      }
+                    }
+                  }}
+                >
+                {/* Grid overlay */}
+                {showGrid && (
                   <div 
-                    className="absolute top-0 bg-blue-100 bg-opacity-30 border-2 border-blue-400 border-dashed"
+                    className="absolute inset-0 pointer-events-none"
                     style={{
-                      left: `${(canvasSize.width - 600) / 2}px`,
-                      width: '600px',
-                      height: `${canvasSize.height}px`
+                      backgroundImage: `
+                        linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)
+                      `,
+                      backgroundSize: `${gridSize}px ${gridSize}px`
                     }}
-                  >
+                  />
+                )}
+
+                {/* Gmail 600px Constraint Overlay */}
+                {showGmailConstraints && canvasSize.width > 600 && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {/* Gmail Safe Zone (600px centered) */}
+                    <div 
+                      className="absolute top-0 bg-blue-100 bg-opacity-30 border-2 border-blue-400 border-dashed"
+                      style={{
+                        left: `${(canvasSize.width - 600) / 2}px`,
+                        width: '600px',
+                        height: `${canvasSize.height}px`
+                      }}
+                    >
                                          <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
                        Gmail Preview Zone (Auto-scales to 600px)
                      </div>
-                  </div>
-                  
-                  {/* Side margins that will auto-scale in Gmail */}
-                  <div 
-                    className="absolute top-0 left-0 bg-green-100 bg-opacity-30"
-                    style={{
-                      width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${canvasSize.height}px`
-                    }}
-                  >
+                    </div>
+                    
+                    {/* Side margins that will auto-scale in Gmail */}
+                    <div 
+                      className="absolute top-0 left-0 bg-green-100 bg-opacity-30"
+                      style={{
+                        width: `${(canvasSize.width - 600) / 2}px`,
+                        height: `${canvasSize.height}px`
+                      }}
+                    >
                                          <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded rotate-90 origin-bottom-left">
                        Auto-scales to fit
                      </div>
-                  </div>
-                  <div 
-                    className="absolute top-0 right-0 bg-green-100 bg-opacity-30"
-                    style={{
-                      width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${canvasSize.height}px`
-                    }}
-                  >
+                    </div>
+                    <div 
+                      className="absolute top-0 right-0 bg-green-100 bg-opacity-30"
+                      style={{
+                        width: `${(canvasSize.width - 600) / 2}px`,
+                        height: `${canvasSize.height}px`
+                      }}
+                    >
                                          <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
                        Auto-scales to fit
                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {/* Alignment guides */}
-              {showAlignmentGuides.map((guide, index) => (
-                <div
-                  key={index}
-                  className="absolute pointer-events-none z-50"
-                  style={{
-                    ...(guide.type === 'vertical' ? {
-                      left: guide.position,
-                      top: 0,
-                      width: '1px',
-                      height: '100%',
-                      backgroundColor: '#3b82f6',
-                      boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
-                    } : {
-                      left: 0,
-                      top: guide.position,
-                      width: '100%',
-                      height: '1px',
-                      backgroundColor: '#3b82f6',
-                      boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
-                    })
-                  }}
-                >
-                  <div 
-                    className="absolute bg-blue-600 text-white px-2 py-1 text-xs rounded"
+                )}
+                
+                {/* Alignment guides */}
+                {showAlignmentGuides.map((guide, index) => (
+                  <div
+                    key={index}
+                    className="absolute pointer-events-none z-50"
                     style={{
                       ...(guide.type === 'vertical' ? {
-                        left: '4px',
-                        top: '10px'
+                        left: guide.position,
+                        top: 0,
+                        width: '1px',
+                        height: '100%',
+                        backgroundColor: '#3b82f6',
+                        boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
                       } : {
-                        left: '10px',
-                        top: '-24px'
+                        left: 0,
+                        top: guide.position,
+                        width: '100%',
+                        height: '1px',
+                        backgroundColor: '#3b82f6',
+                        boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
                       })
                     }}
                   >
-                    {guide.label}
+                    <div 
+                      className="absolute bg-blue-600 text-white px-2 py-1 text-xs rounded"
+                      style={{
+                        ...(guide.type === 'vertical' ? {
+                          left: '4px',
+                          top: '10px'
+                        } : {
+                          left: '10px',
+                          top: '-24px'
+                        })
+                      }}
+                    >
+                      {guide.label}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {editorElements.map((element) => (
-                <div
-                  key={element.id}
-                  className={`absolute cursor-move transition-shadow ${
-                    selectedElement === element.id ? 'ring-2 ring-blue-500' : ''
-                  } ${
-                    draggedElement === element.id ? 'shadow-lg opacity-80' : ''
-                  }`}
-                  style={{
-                    left: element.style.position.x,
-                    top: element.style.position.y,
-                    width: element.style.width,
-                    height: element.style.height,
-                    zIndex: selectedElement === element.id ? 10 : 1,
-                    userSelect: 'none'
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Track element interaction time
-                    lastElementInteractionRef.current = Date.now()
-                    // Only handle click if we haven't dragged
-                    if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                      setSelectedElement(element.id)
-                    }
-                  }}
-                  onMouseDown={(e) => {
-                    // Don't start dragging if we're resizing
-                    if (isResizingElement) return
-                    
-                    e.preventDefault()
-                    e.stopPropagation()
-                    // Track element interaction time
-                    lastElementInteractionRef.current = Date.now()
-                    setSelectedElement(element.id)
-                    
-                    // Reset drag state
-                    dragStateRef.current = {
-                      isDragging: false,
-                      dragStarted: false,
-                      elementId: element.id
-                    }
-                    
-                    // Clear any existing timeout
-                    if (dragTimeoutRef.current) {
-                      clearTimeout(dragTimeoutRef.current)
-                    }
-                    
-                    const startX = e.clientX - element.style.position.x
-                    const startY = e.clientY - element.style.position.y
-                    const startMouseX = e.clientX
-                    const startMouseY = e.clientY
-                    
-                    let animationFrameId: number
-                    
-                    const handleMouseMove = (e: MouseEvent) => {
+                ))}
+                {editorElements.map((element) => (
+                  <div
+                    key={element.id}
+                    className={`absolute cursor-move transition-shadow ${
+                      selectedElement === element.id ? 'ring-2 ring-blue-500' : ''
+                    } ${
+                      draggedElement === element.id ? 'shadow-lg opacity-80' : ''
+                    }`}
+                    style={{
+                      left: element.style.position.x,
+                      top: element.style.position.y,
+                      width: element.style.width,
+                      height: element.style.height,
+                      zIndex: selectedElement === element.id ? 10 : 1,
+                      userSelect: 'none'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Track element interaction time
+                      lastElementInteractionRef.current = Date.now()
+                      // Only handle click if we haven't dragged
+                      if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                        setSelectedElement(element.id)
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      // Don't start dragging if we're resizing
+                      if (isResizingElement) return
+                      
                       e.preventDefault()
+                      e.stopPropagation()
+                      // Track element interaction time
+                      lastElementInteractionRef.current = Date.now()
+                      setSelectedElement(element.id)
                       
-                      // Calculate how far mouse has moved
-                      const deltaX = Math.abs(e.clientX - startMouseX)
-                      const deltaY = Math.abs(e.clientY - startMouseY)
-                      
-                      // Only start dragging if mouse has moved more than 3 pixels
-                      if (!dragStateRef.current.dragStarted && (deltaX > 3 || deltaY > 3)) {
-                        dragStateRef.current.dragStarted = true
-                        dragStateRef.current.isDragging = true
-                        setIsDragging(true)
-                        setDraggedElement(element.id)
+                      // Reset drag state
+                      dragStateRef.current = {
+                        isDragging: false,
+                        dragStarted: false,
+                        elementId: element.id
                       }
                       
-                      if (dragStateRef.current.dragStarted) {
-                        // Use requestAnimationFrame for smoother performance
+                      // Clear any existing timeout
+                      if (dragTimeoutRef.current) {
+                        clearTimeout(dragTimeoutRef.current)
+                      }
+                      
+                      const startX = e.clientX - element.style.position.x
+                      const startY = e.clientY - element.style.position.y
+                      const startMouseX = e.clientX
+                      const startMouseY = e.clientY
+                      
+                      let animationFrameId: number
+                      
+                      const handleMouseMove = (e: MouseEvent) => {
+                        e.preventDefault()
+                        
+                        // Calculate how far mouse has moved
+                        const deltaX = Math.abs(e.clientX - startMouseX)
+                        const deltaY = Math.abs(e.clientY - startMouseY)
+                        
+                        // Only start dragging if mouse has moved more than 3 pixels
+                        if (!dragStateRef.current.dragStarted && (deltaX > 3 || deltaY > 3)) {
+                          dragStateRef.current.dragStarted = true
+                          dragStateRef.current.isDragging = true
+                          setIsDragging(true)
+                          setDraggedElement(element.id)
+                        }
+                        
+                        if (dragStateRef.current.dragStarted) {
+                          // Use requestAnimationFrame for smoother performance
+                          if (animationFrameId) {
+                            cancelAnimationFrame(animationFrameId)
+                          }
+                          
+                          animationFrameId = requestAnimationFrame(() => {
+                            const rawX = e.clientX - startX
+                            const rawY = e.clientY - startY
+                            
+                            // Constrain to canvas bounds
+                            const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - element.style.width))
+                            const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - element.style.height))
+                            
+                            const { x: newX, y: newY, guides } = snapPosition(element, constrainedX, constrainedY)
+                            
+                            setShowAlignmentGuides(guides)
+                            
+                            updateElement(element.id, {
+                              style: {
+                                ...element.style,
+                                position: { x: newX, y: newY }
+                              }
+                            })
+                          })
+                        }
+                      }
+                      
+                      const handleMouseUp = () => {
                         if (animationFrameId) {
                           cancelAnimationFrame(animationFrameId)
                         }
+                        // Track element interaction time
+                        lastElementInteractionRef.current = Date.now()
+                        setIsDragging(false)
+                        setDraggedElement(null)
+                        setShowAlignmentGuides([])
+                        document.removeEventListener('mousemove', handleMouseMove)
+                        document.removeEventListener('mouseup', handleMouseUp)
                         
-                        animationFrameId = requestAnimationFrame(() => {
-                          const rawX = e.clientX - startX
-                          const rawY = e.clientY - startY
-                          
-                          // Constrain to canvas bounds
-                          const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - element.style.width))
-                          const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - element.style.height))
-                          
-                          const { x: newX, y: newY, guides } = snapPosition(element, constrainedX, constrainedY)
-                          
-                          setShowAlignmentGuides(guides)
-                          
-                          updateElement(element.id, {
-                            style: {
-                              ...element.style,
-                              position: { x: newX, y: newY }
-                            }
-                          })
-                        })
+                        // Reset drag state after a delay to allow click handler to check it
+                        dragTimeoutRef.current = setTimeout(() => {
+                          dragStateRef.current = {
+                            isDragging: false,
+                            dragStarted: false,
+                            elementId: null
+                          }
+                        }, 50)
                       }
-                    }
-                    
-                    const handleMouseUp = () => {
-                      if (animationFrameId) {
-                        cancelAnimationFrame(animationFrameId)
-                      }
-                      // Track element interaction time
-                      lastElementInteractionRef.current = Date.now()
-                      setIsDragging(false)
-                      setDraggedElement(null)
-                      setShowAlignmentGuides([])
-                      document.removeEventListener('mousemove', handleMouseMove)
-                      document.removeEventListener('mouseup', handleMouseUp)
                       
-                      // Reset drag state after a delay to allow click handler to check it
-                      dragTimeoutRef.current = setTimeout(() => {
-                        dragStateRef.current = {
-                          isDragging: false,
-                          dragStarted: false,
-                          elementId: null
-                        }
-                      }, 50)
-                    }
-                    
-                    document.addEventListener('mousemove', handleMouseMove)
-                    document.addEventListener('mouseup', handleMouseUp)
-                  }}
-                >
-                  {element.type === 'text' && (
-                    <>
-                      {editingTextElement === element.id ? (
-                        <textarea
-                          ref={textEditRef}
-                          value={tempTextContent}
-                          onChange={(e) => setTempTextContent(e.target.value)}
-                          onKeyDown={handleTextEditKeyDown}
-                          onBlur={finishEditingText}
-                          style={{
-                            fontSize: element.style.fontSize,
-                            fontWeight: element.style.fontWeight,
-                            fontFamily: element.style.fontFamily,
-                            fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration,
-                            color: element.style.color,
-                            backgroundColor: element.style.backgroundColor,
-                            padding: element.style.padding,
-                            borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
-                            resize: 'none',
-                            overflow: 'hidden'
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            fontSize: element.style.fontSize,
-                            fontWeight: element.style.fontWeight,
-                            fontFamily: element.style.fontFamily,
-                            fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration,
-                            color: element.style.color,
-                            backgroundColor: element.style.backgroundColor,
-                            padding: element.style.padding,
-                            borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
-                            border: '1px solid #e5e7eb',
-                            cursor: 'text'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Start editing immediately on single click, but only if not dragging
-                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              startEditingText(element.id)
-                            }
-                          }}
-                        >
-                          {element.content}
-                        </div>
-                      )}
-                    </>
-                  )}
-                  
-                  {element.type === 'heading' && (
-                    <>
-                      {editingTextElement === element.id ? (
-                        <textarea
-                          ref={textEditRef}
-                          value={tempTextContent}
-                          onChange={(e) => setTempTextContent(e.target.value)}
-                          onKeyDown={handleTextEditKeyDown}
-                          onBlur={finishEditingText}
-                          style={{
-                            fontSize: element.style.fontSize,
-                            fontWeight: element.style.fontWeight,
-                            fontFamily: element.style.fontFamily,
-                            fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration,
-                            color: element.style.color,
-                            backgroundColor: element.style.backgroundColor,
-                            padding: element.style.padding,
-                            borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
-                            resize: 'none',
-                            overflow: 'hidden'
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            fontSize: element.style.fontSize,
-                            fontWeight: element.style.fontWeight,
-                            fontFamily: element.style.fontFamily,
-                            fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration,
-                            color: element.style.color,
-                            backgroundColor: element.style.backgroundColor,
-                            padding: element.style.padding,
-                            borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
-                            border: '1px solid #e5e7eb',
-                            cursor: 'text'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Start editing immediately on single click, but only if not dragging
-                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              startEditingText(element.id)
-                            }
-                          }}
-                        >
-                          {element.content}
-                        </div>
-                      )}
-                    </>
-                  )}
-                  
-                  {element.type === 'image' && (
-                    <img 
-                      src={element.content} 
-                      alt="Template Image"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        borderRadius: element.style.borderRadius
-                      }}
-                    />
-                  )}
-                  
-                  {element.type === 'button' && (
-                    <>
-                      {editingTextElement === element.id ? (
-                        <textarea
-                          ref={textEditRef}
-                          value={tempTextContent}
-                          onChange={(e) => setTempTextContent(e.target.value)}
-                          onKeyDown={handleTextEditKeyDown}
-                          onBlur={finishEditingText}
-                          style={{
-                            backgroundColor: element.style.backgroundColor,
-                            color: element.style.color,
-                            padding: element.style.padding,
-                            borderRadius: element.style.borderRadius,
-                            width: '100%',
-                            height: '100%',
-                            fontSize: element.style.fontSize || 14,
-                            fontWeight: element.style.fontWeight || 'medium',
-                            fontFamily: element.style.fontFamily,
-                            fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration,
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
-                            resize: 'none',
-                            overflow: 'hidden',
-                            textAlign: 'center'
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            backgroundColor: element.style.backgroundColor,
-                            color: element.style.color,
-                            padding: element.style.padding,
-                            borderRadius: element.style.borderRadius,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'text',
-                            fontSize: element.style.fontSize || 14,
-                            fontWeight: element.style.fontWeight || 'medium',
-                            fontFamily: element.style.fontFamily,
-                            fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration
-                          }}
-                          onDoubleClick={(e) => {
-                            e.stopPropagation()
-                            startEditingText(element.id)
-                          }}
-                        >
-                          {element.content}
-                        </div>
-                      )}
-                    </>
-                  )}
-                  
-                  {element.type === 'video' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        backgroundColor: '#f3f4f6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: element.videoData?.thumbnailUrl ? 'none' : '2px dashed #d1d5db',
-                        borderRadius: element.style.borderRadius,
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {(element.videoData?.thumbnailUrl || element.videoData?.customThumbnail) ? (
-                        <div className="relative w-full h-full">
-                          <img
-                            src={element.videoData.customThumbnail || element.videoData.thumbnailUrl}
-                            alt={element.videoData.title}
+                      document.addEventListener('mousemove', handleMouseMove)
+                      document.addEventListener('mouseup', handleMouseUp)
+                    }}
+                  >
+                    {element.type === 'text' && (
+                      <>
+                        {editingTextElement === element.id ? (
+                          <textarea
+                            ref={textEditRef}
+                            value={tempTextContent}
+                            onChange={(e) => setTempTextContent(e.target.value)}
+                            onKeyDown={handleTextEditKeyDown}
+                            onBlur={finishEditingText}
                             style={{
+                              fontSize: element.style.fontSize,
+                              fontWeight: element.style.fontWeight,
+                              fontFamily: element.style.fontFamily,
+                              fontStyle: element.style.fontStyle,
+                              textDecoration: element.style.textDecoration,
+                              color: element.style.color,
+                              backgroundColor: element.style.backgroundColor,
+                              padding: element.style.padding,
+                              borderRadius: element.style.borderRadius,
+                              textAlign: element.style.textAlign,
                               width: '100%',
                               height: '100%',
-                              objectFit: 'cover',
-                              borderRadius: element.style.borderRadius
+                              border: '2px solid #3b82f6',
+                              outline: 'none',
+                              resize: 'none',
+                              overflow: 'hidden'
                             }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity">
-                            <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
-                              <svg className="w-6 h-6 text-gray-800 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z"/>
-                              </svg>
-                            </div>
-                          </div>
-                          {/* Removed video platform/title labels */}
-                        </div>
-                      ) : (
-                        <div className="text-center">
-                          <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          <p className="text-sm text-gray-500">Add Video URL</p>
-                          <p className="text-xs text-gray-400">YouTube, Vimeo, Facebook</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {element.type === 'divider' && (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        backgroundColor: element.style.backgroundColor,
-                        borderRadius: element.style.borderRadius
-                      }}
-                    />
-                  )}
-                  
-                  {selectedElement === element.id && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteElement(element.id)
-                        }}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 text-xs z-20"
-                      >
-                        ×
-                      </button>
-                      
-                      {/* Resize handles for all elements */}
-                      <>
-                        {/* Corner handles */}
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-nw-resize z-10"
-                          style={{ top: -6, left: -6 }}
-                          onMouseDown={createResizeHandler(element.id, 'nw')}
-                        />
-                        
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-ne-resize z-10"
-                          style={{ top: -6, right: -6 }}
-                          onMouseDown={createResizeHandler(element.id, 'ne')}
-                        />
-                        
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-sw-resize z-10"
-                          style={{ bottom: -6, left: -6 }}
-                          onMouseDown={createResizeHandler(element.id, 'sw')}
-                        />
-                        
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-se-resize z-10"
-                          style={{ bottom: -6, right: -6 }}
-                          onMouseDown={createResizeHandler(element.id, 'se')}
-                        />
-                        
-                        {/* Edge handles */}
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-n-resize z-10"
-                          style={{ top: -6, left: '50%', transform: 'translateX(-50%)' }}
-                          onMouseDown={createResizeHandler(element.id, 'n')}
-                        />
-                        
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-s-resize z-10"
-                          style={{ bottom: -6, left: '50%', transform: 'translateX(-50%)' }}
-                          onMouseDown={createResizeHandler(element.id, 's')}
-                        />
-                        
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-w-resize z-10"
-                          style={{ top: '50%', left: -6, transform: 'translateY(-50%)' }}
-                          onMouseDown={createResizeHandler(element.id, 'w')}
-                        />
-                        
-                        <div
-                          className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-e-resize z-10"
-                          style={{ top: '50%', right: -6, transform: 'translateY(-50%)' }}
-                          onMouseDown={createResizeHandler(element.id, 'e')}
-                        />
-                      </>
-                    </>
-                  )}
-                </div>
-              ))}
-              
-              {editorElements.length === 0 && (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <p className="text-gray-500 text-lg">Start by adding elements from the sidebar</p>
-                    <p className="text-gray-400 text-sm mt-2">Drag and drop elements to build your email template</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            )}
-          </div>
-        </div>
-
-        {/* Resize Handle */}
-        {selectedElement && (
-          <div 
-            className={`w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 relative transition-colors ${
-              isResizing ? 'bg-blue-500' : ''
-            }`}
-            onMouseDown={handleResizeStart}
-            onDoubleClick={handleResizeDoubleClick}
-            title="Drag to resize, double-click to reset"
-          >
-            <div className="absolute inset-y-0 left-0 w-1 bg-blue-500 opacity-0 hover:opacity-100 transition-opacity" />
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full shadow-sm opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-              </svg>
-            </div>
-          </div>
-        )}
-
-        {/* Floating expand button when collapsed */}
-        {propertiesCollapsed && (
-          <button
-            type="button"
-            onClick={() => setPropertiesCollapsed(false)}
-            className="fixed right-2 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-sm rounded px-2 py-1 text-xs hover:bg-gray-50"
-            title="Expand properties panel"
-          >
-            Expand
-          </button>
-        )}
-
-        {/* Properties Panel */}
-        {/* Always show properties panel */}
-        {true && (
-          <div 
-            className="bg-white border-l flex-shrink-0 overflow-hidden"
-            style={{ width: propertiesCollapsed ? 28 : propertiesPanelWidth }}
-          >
-            <div className="h-full overflow-y-auto">
-              <div className={`sticky top-0 bg-white border-b p-3 z-10 ${propertiesCollapsed ? 'hidden' : ''}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="font-medium text-gray-900">Element Properties</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 hidden sm:inline">{propertiesPanelWidth}px</span>
-                    <button
-                      type="button"
-                      onClick={() => setPropertiesCollapsed(prev => !prev)}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                      title="Collapse/expand properties"
-                    >
-                      {propertiesCollapsed ? 'Expand' : 'Collapse'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className={`p-4 transition-[max-height,opacity] duration-200 ease-out ${propertiesCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[calc(100vh-6rem)] opacity-100'}`}>
-                {/* Gmail Design Warnings Panel */}
-                {gmailSafeMode && designWarnings.length > 0 && (
-                  <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <h5 className="font-medium text-orange-800 mb-2 flex items-center">
-                      ⚠️ Gmail Compatibility Issues
-                    </h5>
-                    <div className="space-y-2">
-                      {designWarnings.map((warning, index) => (
-                        <div key={index} className="text-sm text-orange-700 flex items-start">
-                          <span className="text-orange-500 mr-2">•</span>
-                          <span>{warning}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 text-xs text-orange-600">
-                      💡 Tip: Side-by-side elements will stack vertically in Gmail. Consider vertical layouts for critical content.
-                    </div>
-                  </div>
-                )}
-
-                {/* Gmail Safe Design Tips */}
-                {gmailSafeMode && designWarnings.length === 0 && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h5 className="font-medium text-green-800 mb-2 flex items-center">
-                      ✅ Gmail-Safe Design
-                    </h5>
-                    <div className="text-sm text-green-700">
-                      Your template follows Gmail-friendly design patterns!
-                    </div>
-                  </div>
-                )}
-
-              {previewMode ? (
-                /* Email Client Selection in Preview Mode */
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-3">Email Client Preview</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Select an email client to see how your template will render:
-                  </p>
-                  <div className="space-y-2">
-                    {[
-                      { id: 'gmail', name: 'Gmail', description: 'Limited CSS support, strips many styles' },
-                      { id: 'outlook', name: 'Outlook', description: 'Uses Word engine, requires VML for advanced features' },
-                      { id: 'apple', name: 'Apple Mail', description: 'Full CSS support, best rendering' },
-                      { id: 'generic', name: 'Generic Client', description: 'Standard email client rendering' }
-                    ].map((client) => (
-                      <label key={client.id} className="flex items-start space-x-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="emailClient"
-                          value={client.id}
-                          checked={selectedEmailClient === client.id}
-                          onChange={(e) => setSelectedEmailClient(e.target.value as any)}
-                          className="mt-1 w-4 h-4 text-blue-600"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900">{client.name}</div>
-                          <div className="text-xs text-gray-500 mt-1">{client.description}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="text-xs text-blue-700">
-                      <strong>Current Preview:</strong> {selectedEmailClient.charAt(0).toUpperCase() + selectedEmailClient.slice(1)} rendering. 
-                      Button positioning and styles will vary between clients.
-                    </div>
-                  </div>
-                </div>
-              ) : selectedElement ? (() => {
-                const element = editorElements.find(el => el.id === selectedElement)
-                if (!element) return null
-                
-                return (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                      {element.type === 'text' || element.type === 'heading' ? (
-                        <textarea
-                          value={element.content}
-                          onChange={(e) => updateElement(element.id, { content: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          rows={3}
-                        />
-                      ) : element.type === 'button' ? (
-                        <input
-                          type="text"
-                          value={element.content}
-                          onChange={(e) => updateElement(element.id, { content: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          placeholder="Button text"
-                        />
-                      ) : element.type === 'image' ? (
-                        <div className="space-y-2">
-                          <input
-                            type="url"
-                            value={element.content}
-                            onChange={(e) => updateElement(element.id, { content: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                            placeholder="Enter image URL"
-                          />
-                          <button
-                            onClick={() => handleImageUpload(element.id)}
-                            className="w-full px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                          >
-                            Upload Image
-                          </button>
-                        </div>
-                      ) : element.type === 'video' ? (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Video Platform</label>
-                            <select
-                              value={element.videoData?.platform || 'custom'}
-                              onChange={(e) => {
-                                const platform = e.target.value as 'youtube' | 'vimeo' | 'facebook' | 'custom'
-                                updateVideoElement(element.id, element.content, platform)
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                            >
-                              <option value="custom">Custom URL</option>
-                              <option value="youtube">YouTube</option>
-                              <option value="vimeo">Vimeo</option>
-                              <option value="facebook">Facebook</option>
-                            </select>
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
-                            <input
-                              type="url"
-                              value={element.content}
-                              onChange={(e) => updateVideoElement(element.id, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                              placeholder={
-                                element.videoData?.platform === 'youtube' ? 'https://www.youtube.com/watch?v=...' :
-                                element.videoData?.platform === 'vimeo' ? 'https://vimeo.com/...' :
-                                element.videoData?.platform === 'facebook' ? 'https://www.facebook.com/.../videos/...' :
-                                'Enter video URL'
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: element.style.fontSize,
+                              fontWeight: element.style.fontWeight,
+                              fontFamily: element.style.fontFamily,
+                              fontStyle: element.style.fontStyle,
+                              textDecoration: element.style.textDecoration,
+                              color: element.style.color,
+                              backgroundColor: element.style.backgroundColor,
+                              padding: element.style.padding,
+                              borderRadius: element.style.borderRadius,
+                              textAlign: element.style.textAlign,
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
+                              border: '1px solid #e5e7eb',
+                              cursor: 'text'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Start editing immediately on single click, but only if not dragging
+                              if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                                startEditingText(element.id)
                               }
-                            />
+                            }}
+                          >
+                            {element.content}
                           </div>
-                          
-                          {element.videoData?.platform && element.videoData.platform !== 'custom' && (
-                            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                              <strong>Tips for {element.videoData.platform.charAt(0).toUpperCase() + element.videoData.platform.slice(1)}:</strong>
-                              <br />
-                              {element.videoData.platform === 'youtube' && 'Use full YouTube URL (watch?v= or youtu.be/)'}
-                              {element.videoData.platform === 'vimeo' && 'Use standard Vimeo URL (vimeo.com/video-id)'}
-                              {element.videoData.platform === 'facebook' && 'Use Facebook video URL from the video page'}
-                            </div>
-                          )}
-                          
-                          {element.videoData?.thumbnailUrl && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Video Preview</label>
-                              <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
-                                <img
-                                  src={element.videoData.customThumbnail || element.videoData.thumbnailUrl}
-                                  alt="Video thumbnail"
-                                  className="w-full h-20 object-cover rounded"
-                                />
-                                <p className="text-xs text-gray-600 mt-1">
-                                  {element.videoData.platform?.toUpperCase()} Video
-                                  {element.videoData.customThumbnail && (
-                                    <span className="text-green-600 ml-1">(Custom thumbnail)</span>
-                                  )}
-                                </p>
+                        )}
+                      </>
+                    )}
+                    
+                    {element.type === 'heading' && (
+                      <>
+                        {editingTextElement === element.id ? (
+                          <textarea
+                            ref={textEditRef}
+                            value={tempTextContent}
+                            onChange={(e) => setTempTextContent(e.target.value)}
+                            onKeyDown={handleTextEditKeyDown}
+                            onBlur={finishEditingText}
+                            style={{
+                              fontSize: element.style.fontSize,
+                              fontWeight: element.style.fontWeight,
+                              fontFamily: element.style.fontFamily,
+                              fontStyle: element.style.fontStyle,
+                              textDecoration: element.style.textDecoration,
+                              color: element.style.color,
+                              backgroundColor: element.style.backgroundColor,
+                              padding: element.style.padding,
+                              borderRadius: element.style.borderRadius,
+                              textAlign: element.style.textAlign,
+                              width: '100%',
+                              height: '100%',
+                              border: '2px solid #3b82f6',
+                              outline: 'none',
+                              resize: 'none',
+                              overflow: 'hidden'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: element.style.fontSize,
+                              fontWeight: element.style.fontWeight,
+                              fontFamily: element.style.fontFamily,
+                              fontStyle: element.style.fontStyle,
+                              textDecoration: element.style.textDecoration,
+                              color: element.style.color,
+                              backgroundColor: element.style.backgroundColor,
+                              padding: element.style.padding,
+                              borderRadius: element.style.borderRadius,
+                              textAlign: element.style.textAlign,
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
+                              border: '1px solid #e5e7eb',
+                              cursor: 'text'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Start editing immediately on single click, but only if not dragging
+                              if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                                startEditingText(element.id)
+                              }
+                            }}
+                          >
+                            {element.content}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {element.type === 'image' && (
+                      <img 
+                        src={element.content} 
+                        alt="Template Image"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          borderRadius: element.style.borderRadius
+                        }}
+                      />
+                    )}
+                    
+                    {element.type === 'button' && (
+                      <>
+                        {editingTextElement === element.id ? (
+                          <textarea
+                            ref={textEditRef}
+                            value={tempTextContent}
+                            onChange={(e) => setTempTextContent(e.target.value)}
+                            onKeyDown={handleTextEditKeyDown}
+                            onBlur={finishEditingText}
+                            style={{
+                              backgroundColor: element.style.backgroundColor,
+                              color: element.style.color,
+                              padding: element.style.padding,
+                              borderRadius: element.style.borderRadius,
+                              width: '100%',
+                              height: '100%',
+                              fontSize: element.style.fontSize || 14,
+                              fontWeight: element.style.fontWeight || 'medium',
+                              fontFamily: element.style.fontFamily,
+                              fontStyle: element.style.fontStyle,
+                              textDecoration: element.style.textDecoration,
+                              border: '2px solid #3b82f6',
+                              outline: 'none',
+                              resize: 'none',
+                              overflow: 'hidden',
+                              textAlign: 'center'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              backgroundColor: element.style.backgroundColor,
+                              color: element.style.color,
+                              padding: element.style.padding,
+                              borderRadius: element.style.borderRadius,
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'text',
+                              fontSize: element.style.fontSize || 14,
+                              fontWeight: element.style.fontWeight || 'medium',
+                              fontFamily: element.style.fontFamily,
+                              fontStyle: element.style.fontStyle,
+                              textDecoration: element.style.textDecoration
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation()
+                              startEditingText(element.id)
+                            }}
+                          >
+                            {element.content}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {element.type === 'video' && (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: '#f3f4f6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: element.videoData?.thumbnailUrl ? 'none' : '2px dashed #d1d5db',
+                          borderRadius: element.style.borderRadius,
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {(element.videoData?.thumbnailUrl || element.videoData?.customThumbnail) ? (
+                          <div className="relative w-full h-full">
+                            <img
+                              src={element.videoData.customThumbnail || element.videoData.thumbnailUrl}
+                              alt={element.videoData.title}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                borderRadius: element.style.borderRadius
+                              }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 hover:bg-opacity-50 transition-opacity">
+                              <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-gray-800 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z"/>
+                                </svg>
                               </div>
                             </div>
-                          )}
+                            {/* Removed video platform/title labels */}
+                          </div>
+                        ) : (
+                          <div className="text-center">
+                            <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-sm text-gray-500">Add Video URL</p>
+                            <p className="text-xs text-gray-400">YouTube, Vimeo, Facebook</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {element.type === 'divider' && (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: element.style.backgroundColor,
+                          borderRadius: element.style.borderRadius
+                        }}
+                      />
+                    )}
+                    
+                    {selectedElement === element.id && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteElement(element.id)
+                          }}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 text-xs z-20"
+                        >
+                          ×
+                        </button>
+                        
+                        {/* Resize handles for all elements */}
+                        <>
+                          {/* Corner handles */}
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-nw-resize z-10"
+                            style={{ top: -6, left: -6 }}
+                            onMouseDown={createResizeHandler(element.id, 'nw')}
+                          />
                           
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Custom Thumbnail (Optional)</label>
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-ne-resize z-10"
+                            style={{ top: -6, right: -6 }}
+                            onMouseDown={createResizeHandler(element.id, 'ne')}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-sw-resize z-10"
+                            style={{ bottom: -6, left: -6 }}
+                            onMouseDown={createResizeHandler(element.id, 'sw')}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-se-resize z-10"
+                            style={{ bottom: -6, right: -6 }}
+                            onMouseDown={createResizeHandler(element.id, 'se')}
+                          />
+                          
+                          {/* Edge handles */}
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-n-resize z-10"
+                            style={{ top: -6, left: '50%', transform: 'translateX(-50%)' }}
+                            onMouseDown={createResizeHandler(element.id, 'n')}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-s-resize z-10"
+                            style={{ bottom: -6, left: '50%', transform: 'translateX(-50%)' }}
+                            onMouseDown={createResizeHandler(element.id, 's')}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-w-resize z-10"
+                            style={{ top: '50%', left: -6, transform: 'translateY(-50%)' }}
+                            onMouseDown={createResizeHandler(element.id, 'w')}
+                          />
+                          
+                          <div
+                            className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-e-resize z-10"
+                            style={{ top: '50%', right: -6, transform: 'translateY(-50%)' }}
+                            onMouseDown={createResizeHandler(element.id, 'e')}
+                          />
+                        </>
+                      </>
+                    )}
+                  </div>
+                ))}
+                
+                {editorElements.length === 0 && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      <p className="text-gray-500 text-lg">Start by adding elements from the sidebar</p>
+                      <p className="text-gray-400 text-sm mt-2">Drag and drop elements to build your email template</p>
+                    </div>
+                  </div>
+                )}
+                </div>
+              </div>
+            </div>
+
+            {/* Resize Handle */}
+            {selectedElement && (
+              <div 
+                className={`w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 relative transition-colors ${
+                  isResizing ? 'bg-blue-500' : ''
+                }`}
+                onMouseDown={handleResizeStart}
+                onDoubleClick={handleResizeDoubleClick}
+                title="Drag to resize, double-click to reset"
+              >
+                <div className="absolute inset-y-0 left-0 w-1 bg-blue-500 opacity-0 hover:opacity-100 transition-opacity" />
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full shadow-sm opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                  </svg>
+                </div>
+              </div>
+            )}
+
+            {/* Floating expand button when collapsed */}
+            {propertiesCollapsed && (
+              <button
+                type="button"
+                onClick={() => setPropertiesCollapsed(false)}
+                className="fixed right-2 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-sm rounded px-2 py-1 text-xs hover:bg-gray-50"
+                title="Expand properties panel"
+              >
+                Expand
+              </button>
+            )}
+
+            {/* Properties Panel */}
+            {/* Always show properties panel */}
+            {true && (
+              <div 
+                className="bg-white border-l flex-shrink-0 overflow-hidden"
+                style={{ width: propertiesCollapsed ? 28 : propertiesPanelWidth }}
+              >
+                <div className="h-full overflow-y-auto">
+                  <div className={`sticky top-0 bg-white border-b p-3 z-10 ${propertiesCollapsed ? 'hidden' : ''}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="font-medium text-gray-900">Element Properties</h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 hidden sm:inline">{propertiesPanelWidth}px</span>
+                        <button
+                          type="button"
+                          onClick={() => setPropertiesCollapsed(prev => !prev)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          title="Collapse/expand properties"
+                        >
+                          {propertiesCollapsed ? 'Expand' : 'Collapse'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`p-4 transition-[max-height,opacity] duration-200 ease-out ${propertiesCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[calc(100vh-6rem)] opacity-100'}`}>
+                    {/* Gmail Design Warnings Panel */}
+                    {gmailSafeMode && designWarnings.length > 0 && (
+                      <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                        <h5 className="font-medium text-orange-800 mb-2 flex items-center">
+                          ⚠️ Gmail Compatibility Issues
+                        </h5>
+                        <div className="space-y-2">
+                          {designWarnings.map((warning, index) => (
+                            <div key={index} className="text-sm text-orange-700 flex items-start">
+                              <span className="text-orange-500 mr-2">•</span>
+                              <span>{warning}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 text-xs text-orange-600">
+                          💡 Tip: Side-by-side elements will stack vertically in Gmail. Consider vertical layouts for critical content.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gmail Safe Design Tips */}
+                    {gmailSafeMode && designWarnings.length === 0 && (
+                      <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <h5 className="font-medium text-green-800 mb-2 flex items-center">
+                          ✅ Gmail-Safe Design
+                        </h5>
+                        <div className="text-sm text-green-700">
+                          Your template follows Gmail-friendly design patterns!
+                        </div>
+                      </div>
+                    )}
+
+                  {previewMode ? (
+                    /* Email Client Selection in Preview Mode */
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-3">Email Client Preview</h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Select an email client to see how your template will render:
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          { id: 'gmail', name: 'Gmail', description: 'Limited CSS support, strips many styles' },
+                          { id: 'outlook', name: 'Outlook', description: 'Uses Word engine, requires VML for advanced features' },
+                          { id: 'apple', name: 'Apple Mail', description: 'Full CSS support, best rendering' },
+                          { id: 'generic', name: 'Generic Client', description: 'Standard email client rendering' }
+                        ].map((client) => (
+                          <label key={client.id} className="flex items-start space-x-3 p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="emailClient"
+                              value={client.id}
+                              checked={selectedEmailClient === client.id}
+                              onChange={(e) => setSelectedEmailClient(e.target.value as any)}
+                              className="mt-1 w-4 h-4 text-blue-600"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-sm text-gray-900">{client.name}</div>
+                              <div className="text-xs text-gray-500 mt-1">{client.description}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div className="text-xs text-blue-700">
+                          <strong>Current Preview:</strong> {selectedEmailClient.charAt(0).toUpperCase() + selectedEmailClient.slice(1)} rendering. 
+                          Button positioning and styles will vary between clients.
+                        </div>
+                      </div>
+                    </div>
+                  ) : selectedElement ? (() => {
+                    const element = editorElements.find(el => el.id === selectedElement)
+                    if (!element) return null
+                    
+                    return (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                          {element.type === 'text' || element.type === 'heading' ? (
+                            <textarea
+                              value={element.content}
+                              onChange={(e) => updateElement(element.id, { content: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                              rows={3}
+                            />
+                          ) : element.type === 'button' ? (
+                            <input
+                              type="text"
+                              value={element.content}
+                              onChange={(e) => updateElement(element.id, { content: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                              placeholder="Button text"
+                            />
+                          ) : element.type === 'image' ? (
                             <div className="space-y-2">
                               <input
                                 type="url"
-                                value={element.videoData?.customThumbnail || ''}
-                                onChange={(e) => updateElement(element.id, {
-                                  videoData: {
-                                    platform: element.videoData?.platform || 'custom',
-                                    url: element.videoData?.url || '',
-                                    ...element.videoData,
-                                    customThumbnail: e.target.value
-                                  }
-                                })}
+                                value={element.content}
+                                onChange={(e) => updateElement(element.id, { content: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                placeholder="https://example.com/custom-thumbnail.jpg"
+                                placeholder="Enter image URL"
                               />
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => handleImageUpload(element.id, 'thumbnail')}
-                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                              <button
+                                onClick={() => handleImageUpload(element.id)}
+                                className="w-full px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                              >
+                                Upload Image
+                              </button>
+                            </div>
+                          ) : element.type === 'video' ? (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Video Platform</label>
+                                <select
+                                  value={element.videoData?.platform || 'custom'}
+                                  onChange={(e) => {
+                                    const platform = e.target.value as 'youtube' | 'vimeo' | 'facebook' | 'custom'
+                                    updateVideoElement(element.id, element.content, platform)
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                                 >
-                                  Upload Image
-                                </button>
-                                {element.videoData?.customThumbnail && (
-                                  <button
-                                    onClick={() => updateElement(element.id, {
+                                  <option value="custom">Custom URL</option>
+                                  <option value="youtube">YouTube</option>
+                                  <option value="vimeo">Vimeo</option>
+                                  <option value="facebook">Facebook</option>
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
+                                <input
+                                  type="url"
+                                  value={element.content}
+                                  onChange={(e) => updateVideoElement(element.id, e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                  placeholder={
+                                    element.videoData?.platform === 'youtube' ? 'https://www.youtube.com/watch?v=...' :
+                                    element.videoData?.platform === 'vimeo' ? 'https://vimeo.com/...' :
+                                    element.videoData?.platform === 'facebook' ? 'https://www.facebook.com/.../videos/...' :
+                                    'Enter video URL'
+                                  }
+                                />
+                              </div>
+                              
+                              {element.videoData?.platform && element.videoData.platform !== 'custom' && (
+                                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                  <strong>Tips for {element.videoData.platform.charAt(0).toUpperCase() + element.videoData.platform.slice(1)}:</strong>
+                                  <br />
+                                  {element.videoData.platform === 'youtube' && 'Use full YouTube URL (watch?v= or youtu.be/)'}
+                                  {element.videoData.platform === 'vimeo' && 'Use standard Vimeo URL (vimeo.com/video-id)'}
+                                  {element.videoData.platform === 'facebook' && 'Use Facebook video URL from the video page'}
+                                </div>
+                              )}
+                              
+                              {element.videoData?.thumbnailUrl && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Video Preview</label>
+                                  <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
+                                    <img
+                                      src={element.videoData.customThumbnail || element.videoData.thumbnailUrl}
+                                      alt="Video thumbnail"
+                                      className="w-full h-20 object-cover rounded"
+                                    />
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      {element.videoData.platform?.toUpperCase()} Video
+                                      {element.videoData.customThumbnail && (
+                                        <span className="text-green-600 ml-1">(Custom thumbnail)</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Custom Thumbnail (Optional)</label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="url"
+                                    value={element.videoData?.customThumbnail || ''}
+                                    onChange={(e) => updateElement(element.id, {
                                       videoData: {
                                         platform: element.videoData?.platform || 'custom',
                                         url: element.videoData?.url || '',
                                         ...element.videoData,
-                                        customThumbnail: undefined
+                                        customThumbnail: e.target.value
                                       }
                                     })}
-                                    className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
-                                  >
-                                    Remove
-                                  </button>
-                                )}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    placeholder="https://example.com/custom-thumbnail.jpg"
+                                  />
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={() => handleImageUpload(element.id, 'thumbnail')}
+                                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                                    >
+                                      Upload Image
+                                    </button>
+                                    {element.videoData?.customThumbnail && (
+                                      <button
+                                        onClick={() => updateElement(element.id, {
+                                          videoData: {
+                                            platform: element.videoData?.platform || 'custom',
+                                            url: element.videoData?.url || '',
+                                            ...element.videoData,
+                                            customThumbnail: undefined
+                                          }
+                                        })}
+                                        className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                    
-                    {/* Button Link Properties */}
-                    {element.type === 'button' && (
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Button URL</label>
-                          <input
-                            type="url"
-                            value={element.buttonData?.url || ''}
-                            onChange={(e) => updateElement(element.id, { 
-                              buttonData: { 
-                                ...element.buttonData,
-                                url: e.target.value,
-                                openInNewTab: element.buttonData?.openInNewTab ?? true
-                              } 
-                            })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                            placeholder="https://example.com"
-                          />
+                          ) : null}
                         </div>
                         
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={element.buttonData?.openInNewTab ?? true}
-                            onChange={(e) => updateElement(element.id, { 
-                              buttonData: { 
-                                ...element.buttonData,
-                                url: element.buttonData?.url || '#',
-                                openInNewTab: e.target.checked
-                              } 
-                            })}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                          />
-                          <label className="ml-2 text-sm text-gray-700">Open in new tab</label>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Width</label>
-                        <input
-                          type="number"
-                          value={element.style.width}
-                          onChange={(e) => updateElement(element.id, {
-                            style: { ...element.style, width: parseInt(e.target.value) }
-                          })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Height</label>
-                        <input
-                          type="number"
-                          value={element.style.height}
-                          onChange={(e) => updateElement(element.id, {
-                            style: { ...element.style, height: parseInt(e.target.value) }
-                          })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        />
-                      </div>
-                    </div>
-
-
-                    
-                    {element.type === 'heading' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Heading Level</label>
-                        <select
-                          value={element.headingLevel || 1}
-                          onChange={(e) => updateElement(element.id, {
-                            headingLevel: parseInt(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6
-                          })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        >
-                          <option value={1}>H1 - Main Heading</option>
-                          <option value={2}>H2 - Section Heading</option>
-                          <option value={3}>H3 - Sub Heading</option>
-                          <option value={4}>H4 - Minor Heading</option>
-                          <option value={5}>H5 - Small Heading</option>
-                          <option value={6}>H6 - Smallest Heading</option>
-                        </select>
-                      </div>
-                    )}
-                    
-                    {(element.type === 'text' || element.type === 'heading' || element.type === 'button') && (
-                      <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
-                          <select
-                            value={element.style.fontFamily || 'Arial, sans-serif'}
-                            onChange={(e) => updateElement(element.id, {
-                              style: { ...element.style, fontFamily: e.target.value }
-                            })}
-                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                          >
-                            <option value="Arial, sans-serif">Arial</option>
-                            <option value="Helvetica, sans-serif">Helvetica</option>
-                            <option value="Georgia, serif">Georgia</option>
-                            <option value="'Times New Roman', serif">Times New Roman</option>
-                            <option value="'Courier New', monospace">Courier New</option>
-                            <option value="Verdana, sans-serif">Verdana</option>
-                            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                            <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
-                            <option value="Impact, sans-serif">Impact</option>
-                            <option value="'Lucida Sans', sans-serif">Lucida Sans</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Font Size</label>
-                          <input
-                            type="number"
-                            value={element.style.fontSize || 16}
-                            onChange={(e) => updateElement(element.id, {
-                              style: { ...element.style, fontSize: parseInt(e.target.value) }
-                            })}
-                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                          />
-                        </div>
-
+                        {/* Button Link Properties */}
+                        {element.type === 'button' && (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Button URL</label>
+                              <input
+                                type="url"
+                                value={element.buttonData?.url || ''}
+                                onChange={(e) => updateElement(element.id, { 
+                                  buttonData: { 
+                                    ...element.buttonData,
+                                    url: e.target.value,
+                                    openInNewTab: element.buttonData?.openInNewTab ?? true
+                                  } 
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                placeholder="https://example.com"
+                              />
+                            </div>
+                            
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={element.buttonData?.openInNewTab ?? true}
+                                onChange={(e) => updateElement(element.id, { 
+                                  buttonData: { 
+                                    ...element.buttonData,
+                                    url: element.buttonData?.url || '#',
+                                    openInNewTab: e.target.checked
+                                  } 
+                                })}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                              />
+                              <label className="ml-2 text-sm text-gray-700">Open in new tab</label>
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Font Weight</label>
-                            <select
-                              value={element.style.fontWeight || 'normal'}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Width</label>
+                            <input
+                              type="number"
+                              value={element.style.width}
                               onChange={(e) => updateElement(element.id, {
-                                style: { ...element.style, fontWeight: e.target.value }
+                                style: { ...element.style, width: parseInt(e.target.value) }
                               })}
                               className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                            >
-                              <option value="normal">Normal</option>
-                              <option value="bold">Bold</option>
-                              <option value="lighter">Lighter</option>
-                              <option value="bolder">Bolder</option>
-                            </select>
+                            />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Font Style</label>
-                            <select
-                              value={element.style.fontStyle || 'normal'}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Height</label>
+                            <input
+                              type="number"
+                              value={element.style.height}
                               onChange={(e) => updateElement(element.id, {
-                                style: { ...element.style, fontStyle: e.target.value as 'normal' | 'italic' }
+                                style: { ...element.style, height: parseInt(e.target.value) }
                               })}
                               className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                            >
-                              <option value="normal">Normal</option>
-                              <option value="italic">Italic</option>
-                            </select>
+                            />
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Text Decoration</label>
-                          <select
-                            value={element.style.textDecoration || 'none'}
-                            onChange={(e) => updateElement(element.id, {
-                              style: { ...element.style, textDecoration: e.target.value as 'none' | 'underline' | 'line-through' }
-                            })}
-                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                          >
-                            <option value="none">None</option>
-                            <option value="underline">Underline</option>
-                            <option value="line-through">Strike-through</option>
-                          </select>
-                        </div>
-                        
-                        <div className="relative color-picker-container">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
-                          <button
-                            onClick={() => setShowColorPicker({elementId: element.id, property: 'color'})}
-                            className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-4 h-4 rounded border border-gray-300"
-                                style={{ backgroundColor: element.style.color || '#000000' }}
-                              />
-                              <span className="text-sm">{element.style.color || '#000000'}</span>
-                            </div>
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          {showColorPicker?.elementId === element.id && showColorPicker?.property === 'color' && (
-                            <div className="absolute top-full left-0 mt-1 z-50">
-                              <ColorPicker
-                                elementId={element.id}
-                                property="color"
-                                currentColor={element.style.color || '#000000'}
-                                onClose={() => setShowColorPicker(null)}
-                              />
-                            </div>
-                          )}
-                        </div>
 
-                        {(element.type === 'text' || element.type === 'heading') && (
+                        
+                        {element.type === 'heading' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Heading Level</label>
+                            <select
+                              value={element.headingLevel || 1}
+                              onChange={(e) => updateElement(element.id, {
+                                headingLevel: parseInt(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6
+                              })}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value={1}>H1 - Main Heading</option>
+                              <option value={2}>H2 - Section Heading</option>
+                              <option value={3}>H3 - Sub Heading</option>
+                              <option value={4}>H4 - Minor Heading</option>
+                              <option value={5}>H5 - Small Heading</option>
+                              <option value={6}>H6 - Smallest Heading</option>
+                            </select>
+                          </div>
+                        )}
+                        
+                        {(element.type === 'text' || element.type === 'heading' || element.type === 'button') && (
                           <>
-                            <div className="relative color-picker-container">
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                              <div className="space-y-2">
-                                {/* Transparency toggle */}
-                                <div className="flex items-center space-x-2">
-                                  <input
-                                    type="checkbox"
-                                    id={`transparent-${element.id}`}
-                                    checked={element.style.backgroundColor === 'transparent'}
-                                    onChange={(e) => updateElement(element.id, {
-                                      style: { ...element.style, backgroundColor: e.target.checked ? 'transparent' : '#f9fafb' }
-                                    })}
-                                    className="w-4 h-4"
-                                  />
-                                  <label htmlFor={`transparent-${element.id}`} className="text-sm text-gray-700">
-                                    Transparent background
-                                  </label>
-                                </div>
-                                
-                                {/* Color picker (only show if not transparent) */}
-                                {element.style.backgroundColor !== 'transparent' && (
-                                  <button
-                                    onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
-                                    className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div
-                                        className="w-4 h-4 rounded border border-gray-300"
-                                        style={{ backgroundColor: element.style.backgroundColor || '#f9fafb' }}
-                                      />
-                                      <span className="text-sm">{element.style.backgroundColor || '#f9fafb'}</span>
-                                    </div>
-                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  </button>
-                                )}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
+                              <select
+                                value={element.style.fontFamily || 'Arial, sans-serif'}
+                                onChange={(e) => updateElement(element.id, {
+                                  style: { ...element.style, fontFamily: e.target.value }
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                              >
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="Helvetica, sans-serif">Helvetica</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="'Courier New', monospace">Courier New</option>
+                                <option value="Verdana, sans-serif">Verdana</option>
+                                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                                <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                                <option value="Impact, sans-serif">Impact</option>
+                                <option value="'Lucida Sans', sans-serif">Lucida Sans</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Font Size</label>
+                              <input
+                                type="number"
+                                value={element.style.fontSize || 16}
+                                onChange={(e) => updateElement(element.id, {
+                                  style: { ...element.style, fontSize: parseInt(e.target.value) }
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Font Weight</label>
+                                <select
+                                  value={element.style.fontWeight || 'normal'}
+                                  onChange={(e) => updateElement(element.id, {
+                                    style: { ...element.style, fontWeight: e.target.value }
+                                  })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                >
+                                  <option value="normal">Normal</option>
+                                  <option value="bold">Bold</option>
+                                  <option value="lighter">Lighter</option>
+                                  <option value="bolder">Bolder</option>
+                                </select>
                               </div>
-                              {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Font Style</label>
+                                <select
+                                  value={element.style.fontStyle || 'normal'}
+                                  onChange={(e) => updateElement(element.id, {
+                                    style: { ...element.style, fontStyle: e.target.value as 'normal' | 'italic' }
+                                  })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                >
+                                  <option value="normal">Normal</option>
+                                  <option value="italic">Italic</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Text Decoration</label>
+                              <select
+                                value={element.style.textDecoration || 'none'}
+                                onChange={(e) => updateElement(element.id, {
+                                  style: { ...element.style, textDecoration: e.target.value as 'none' | 'underline' | 'line-through' }
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                              >
+                                <option value="none">None</option>
+                                <option value="underline">Underline</option>
+                                <option value="line-through">Strike-through</option>
+                              </select>
+                            </div>
+                            
+                            <div className="relative color-picker-container">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
+                              <button
+                                onClick={() => setShowColorPicker({elementId: element.id, property: 'color'})}
+                                className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-4 h-4 rounded border border-gray-300"
+                                    style={{ backgroundColor: element.style.color || '#000000' }}
+                                  />
+                                  <span className="text-sm">{element.style.color || '#000000'}</span>
+                                </div>
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                              {showColorPicker?.elementId === element.id && showColorPicker?.property === 'color' && (
                                 <div className="absolute top-full left-0 mt-1 z-50">
                                   <ColorPicker
                                     elementId={element.id}
-                                    property="backgroundColor"
-                                    currentColor={element.style.backgroundColor || '#f9fafb'}
+                                    property="color"
+                                    currentColor={element.style.color || '#000000'}
                                     onClose={() => setShowColorPicker(null)}
                                   />
                                 </div>
                               )}
                             </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Text Align</label>
-                              <select
-                                value={element.style.textAlign || 'left'}
-                                onChange={(e) => updateElement(element.id, {
-                                  style: { ...element.style, textAlign: e.target.value as any }
-                                })}
-                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                              >
-                                <option value="left">Left</option>
-                                <option value="center">Center</option>
-                                <option value="right">Right</option>
-                              </select>
-                            </div>
+
+                            {(element.type === 'text' || element.type === 'heading') && (
+                              <>
+                                <div className="relative color-picker-container">
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+                                  <div className="space-y-2">
+                                    {/* Transparency toggle */}
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id={`transparent-${element.id}`}
+                                        checked={element.style.backgroundColor === 'transparent'}
+                                        onChange={(e) => updateElement(element.id, {
+                                          style: { ...element.style, backgroundColor: e.target.checked ? 'transparent' : '#f9fafb' }
+                                        })}
+                                        className="w-4 h-4"
+                                      />
+                                      <label htmlFor={`transparent-${element.id}`} className="text-sm text-gray-700">
+                                        Transparent background
+                                      </label>
+                                    </div>
+                                    
+                                    {/* Color picker (only show if not transparent) */}
+                                    {element.style.backgroundColor !== 'transparent' && (
+                                      <button
+                                        onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
+                                        className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                            className="w-4 h-4 rounded border border-gray-300"
+                                            style={{ backgroundColor: element.style.backgroundColor || '#f9fafb' }}
+                                          />
+                                          <span className="text-sm">{element.style.backgroundColor || '#f9fafb'}</span>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
+                                    <div className="absolute top-full left-0 mt-1 z-50">
+                                      <ColorPicker
+                                        elementId={element.id}
+                                        property="backgroundColor"
+                                        currentColor={element.style.backgroundColor || '#f9fafb'}
+                                        onClose={() => setShowColorPicker(null)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Text Align</label>
+                                  <select
+                                    value={element.style.textAlign || 'left'}
+                                    onChange={(e) => updateElement(element.id, {
+                                      style: { ...element.style, textAlign: e.target.value as any }
+                                    })}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                  >
+                                    <option value="left">Left</option>
+                                    <option value="center">Center</option>
+                                    <option value="right">Right</option>
+                                  </select>
+                                </div>
+                              </>
+                            )}
                           </>
                         )}
-                      </>
-                    )}
-                    
-                    {(element.type === 'button' || element.type === 'divider') && (
-                      <div className="relative color-picker-container">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                        <div className="space-y-2">
-                          {/* Transparency toggle for buttons and dividers */}
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`transparent-${element.id}`}
-                              checked={element.style.backgroundColor === 'transparent'}
-                              onChange={(e) => updateElement(element.id, {
-                                style: { ...element.style, backgroundColor: e.target.checked ? 'transparent' : (element.type === 'button' ? '#3b82f6' : '#e5e7eb') }
-                              })}
-                              className="w-4 h-4"
-                            />
-                            <label htmlFor={`transparent-${element.id}`} className="text-sm text-gray-700">
-                              Transparent background
-                            </label>
-                          </div>
-                          
-                          {/* Color picker (only show if not transparent) */}
-                          {element.style.backgroundColor !== 'transparent' && (
-                            <button
-                              onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
-                              className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-4 h-4 rounded border border-gray-300"
-                                  style={{ backgroundColor: element.style.backgroundColor || '#3b82f6' }}
+                        
+                        {(element.type === 'button' || element.type === 'divider') && (
+                          <div className="relative color-picker-container">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+                            <div className="space-y-2">
+                              {/* Transparency toggle for buttons and dividers */}
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  id={`transparent-${element.id}`}
+                                  checked={element.style.backgroundColor === 'transparent'}
+                                  onChange={(e) => updateElement(element.id, {
+                                    style: { ...element.style, backgroundColor: e.target.checked ? 'transparent' : (element.type === 'button' ? '#3b82f6' : '#e5e7eb') }
+                                  })}
+                                  className="w-4 h-4"
                                 />
-                                <span className="text-sm">{element.style.backgroundColor || '#3b82f6'}</span>
+                                <label htmlFor={`transparent-${element.id}`} className="text-sm text-gray-700">
+                                  Transparent background
+                                </label>
                               </div>
-                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                        {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
-                          <div className="absolute top-full left-0 mt-1 z-50">
-                            <ColorPicker
-                              elementId={element.id}
-                              property="backgroundColor"
-                              currentColor={element.style.backgroundColor || '#3b82f6'}
-                              onClose={() => setShowColorPicker(null)}
-                            />
+                              
+                              {/* Color picker (only show if not transparent) */}
+                              {element.style.backgroundColor !== 'transparent' && (
+                                <button
+                                  onClick={() => setShowColorPicker({elementId: element.id, property: 'backgroundColor'})}
+                                  className="w-full h-8 border border-gray-300 rounded-md flex items-center justify-between px-3 hover:bg-gray-50 color-picker-container"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-4 h-4 rounded border border-gray-300"
+                                      style={{ backgroundColor: element.style.backgroundColor || '#3b82f6' }}
+                                    />
+                                    <span className="text-sm">{element.style.backgroundColor || '#3b82f6'}</span>
+                                  </div>
+                                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                            {showColorPicker?.elementId === element.id && showColorPicker?.property === 'backgroundColor' && (
+                              <div className="absolute top-full left-0 mt-1 z-50">
+                                <ColorPicker
+                                  elementId={element.id}
+                                  property="backgroundColor"
+                                  currentColor={element.style.backgroundColor || '#3b82f6'}
+                                  onClose={() => setShowColorPicker(null)}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
-                    )}
 
-                    {/* Precise Positioning Controls */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Precise Positioning</label>
-                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        {/* Precise Positioning Controls */}
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">X Position</label>
-                          <input
-                            type="number"
-                            value={element.style.position.x}
-                            onChange={(e) => updateElement(element.id, {
-                              style: { ...element.style, position: { ...element.style.position, x: parseInt(e.target.value) || 0 } }
-                            })}
-                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                            min="0"
-                            max={canvasSize.width - element.style.width}
-                          />
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Precise Positioning</label>
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">X Position</label>
+                              <input
+                                type="number"
+                                value={element.style.position.x}
+                                onChange={(e) => updateElement(element.id, {
+                                  style: { ...element.style, position: { ...element.style.position, x: parseInt(e.target.value) || 0 } }
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                min="0"
+                                max={canvasSize.width - element.style.width}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Y Position</label>
+                              <input
+                                type="number"
+                                value={element.style.position.y}
+                                onChange={(e) => updateElement(element.id, {
+                                  style: { ...element.style, position: { ...element.style.position, y: parseInt(e.target.value) || 0 } }
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                min="0"
+                                max={canvasSize.height - element.style.height}
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Edge Alignment Buttons */}
+                          <div className="grid grid-cols-3 gap-1 mb-2">
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { ...element.style, position: { ...element.style.position, x: 0 } }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Align to Left Edge"
+                            >
+                              ← Left
+                            </button>
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { ...element.style, position: { ...element.style.position, x: (canvasSize.width - element.style.width) / 2 } }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Center Horizontally"
+                            >
+                              ↔️ Center
+                            </button>
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { ...element.style, position: { ...element.style.position, x: canvasSize.width - element.style.width } }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Align to Right Edge"
+                            >
+                              Right →
+                            </button>
+                            
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { ...element.style, position: { ...element.style.position, y: 0 } }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Align to Top Edge"
+                            >
+                              ↑ Top
+                            </button>
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { ...element.style, position: { ...element.style.position, y: (canvasSize.height - element.style.height) / 2 } }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Center Vertically"
+                            >
+                              ↕️ Middle
+                            </button>
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { ...element.style, position: { ...element.style.position, y: canvasSize.height - element.style.height } }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Align to Bottom Edge"
+                            >
+                              ↓ Bottom
+                            </button>
+                          </div>
+                          
+                          {/* Stretch to Edges */}
+                          <div className="grid grid-cols-2 gap-1">
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { 
+                                  ...element.style, 
+                                  position: { ...element.style.position, x: 0 },
+                                  width: canvasSize.width
+                                }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Stretch Full Width"
+                            >
+                              ↔️ Full Width
+                            </button>
+                            <button
+                              onClick={() => updateElement(element.id, {
+                                style: { 
+                                  ...element.style, 
+                                  position: { ...element.style.position, y: 0 },
+                                  height: canvasSize.height
+                                }
+                              })}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              title="Stretch Full Height"
+                            >
+                              ↕️ Full Height
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Y Position</label>
-                          <input
-                            type="number"
-                            value={element.style.position.y}
-                            onChange={(e) => updateElement(element.id, {
-                              style: { ...element.style, position: { ...element.style.position, y: parseInt(e.target.value) || 0 } }
-                            })}
-                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                            min="0"
-                            max={canvasSize.height - element.style.height}
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Edge Alignment Buttons */}
-                      <div className="grid grid-cols-3 gap-1 mb-2">
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { ...element.style, position: { ...element.style.position, x: 0 } }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Align to Left Edge"
-                        >
-                          ← Left
-                        </button>
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { ...element.style, position: { ...element.style.position, x: (canvasSize.width - element.style.width) / 2 } }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Center Horizontally"
-                        >
-                          ↔️ Center
-                        </button>
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { ...element.style, position: { ...element.style.position, x: canvasSize.width - element.style.width } }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Align to Right Edge"
-                        >
-                          Right →
-                        </button>
-                        
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { ...element.style, position: { ...element.style.position, y: 0 } }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Align to Top Edge"
-                        >
-                          ↑ Top
-                        </button>
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { ...element.style, position: { ...element.style.position, y: (canvasSize.height - element.style.height) / 2 } }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Center Vertically"
-                        >
-                          ↕️ Middle
-                        </button>
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { ...element.style, position: { ...element.style.position, y: canvasSize.height - element.style.height } }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Align to Bottom Edge"
-                        >
-                          ↓ Bottom
-                        </button>
-                      </div>
-                      
-                      {/* Stretch to Edges */}
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { 
-                              ...element.style, 
-                              position: { ...element.style.position, x: 0 },
-                              width: canvasSize.width
-                            }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Stretch Full Width"
-                        >
-                          ↔️ Full Width
-                        </button>
-                        <button
-                          onClick={() => updateElement(element.id, {
-                            style: { 
-                              ...element.style, 
-                              position: { ...element.style.position, y: 0 },
-                              height: canvasSize.height
-                            }
-                          })}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                          title="Stretch Full Height"
-                        >
-                          ↕️ Full Height
-                        </button>
                       </div>
                     </div>
+                  )
+                })() : (
+                  /* Empty state when no element is selected */
+                  <div className="flex flex-col items-center justify-center h-64 text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">No Element Selected</h4>
+                    <p className="text-sm text-gray-500 mb-4 max-w-xs">
+                      Click on any element in the canvas to view and edit its properties.
+                    </p>
+                    <div className="text-xs text-gray-400">
+                      <p>Available elements:</p>
+                      <p>Text • Heading • Image • Video • Button • Divider</p>
+                    </div>
                   </div>
-                )
-              })() : (
-                /* Empty state when no element is selected */
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">No Element Selected</h4>
-                  <p className="text-sm text-gray-500 mb-4 max-w-xs">
-                    Click on any element in the canvas to view and edit its properties.
-                  </p>
-                  <div className="text-xs text-gray-400">
-                    <p>Available elements:</p>
-                    <p>Text • Heading • Image • Video • Button • Divider</p>
-                  </div>
+                )}
                 </div>
-              )}
               </div>
             </div>
           </div>

@@ -2605,10 +2605,10 @@ export default function TemplateEditorPage() {
         {true && (
           <div 
             className="bg-white border-l flex-shrink-0 overflow-hidden"
-            style={{ width: propertiesPanelWidth }}
+            style={{ width: propertiesCollapsed ? 28 : propertiesPanelWidth }}
           >
             <div className="h-full overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b p-3 z-10">
+              <div className={`sticky top-0 bg-white border-b p-3 z-10 ${propertiesCollapsed ? 'hidden' : ''}`}>
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="font-medium text-gray-900">Element Properties</h4>
                   <div className="flex items-center gap-2">

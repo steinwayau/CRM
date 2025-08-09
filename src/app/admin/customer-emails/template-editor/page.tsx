@@ -519,7 +519,6 @@ export default function TemplateEditorPage() {
         const targetCenterX = (left.style.position.x + left.style.width + right.style.position.x) / 2 - draggedElement.style.width / 2
         if (Math.abs(gapLeft - gapRight) <= threshold) {
           snappedX = targetCenterX
-          guides.push({ type: 'vertical', position: snappedX + draggedElement.style.width / 2, label: 'Equal gap' })
         }
       }
       // Equal-gap snapping (vertical)
@@ -538,33 +537,62 @@ export default function TemplateEditorPage() {
         const targetCenterY = (above.style.position.y + above.style.height + below.style.position.y) / 2 - draggedElement.style.height / 2
         if (Math.abs(gapTop - gapBottom) <= threshold) {
           snappedY = targetCenterY
-          guides.push({ type: 'horizontal', position: snappedY + draggedElement.style.height / 2, label: 'Equal gap' })
         }
       }
     }
     
-    // Apply snapping based on guides
-    guides.forEach(guide => {
-      if (guide.type === 'vertical') {
-        const elementCenterX = snappedX + draggedElement.style.width / 2
-        if (Math.abs(elementCenterX - guide.position) < threshold) {
-          snappedX = guide.position - draggedElement.style.width / 2
-        } else if (Math.abs(snappedX - guide.position) < threshold) {
-          snappedX = guide.position
-        } else if (Math.abs(snappedX + draggedElement.style.width - guide.position) < threshold) {
-          snappedX = guide.position - draggedElement.style.width
-        }
-      } else if (guide.type === 'horizontal') {
-        const elementCenterY = snappedY + draggedElement.style.height / 2
-        if (Math.abs(elementCenterY - guide.position) < threshold) {
-          snappedY = guide.position - draggedElement.style.height / 2
-        } else if (Math.abs(snappedY - guide.position) < threshold) {
-          snappedY = guide.position
-        } else if (Math.abs(snappedY + draggedElement.style.height - guide.position) < threshold) {
-          snappedY = guide.position - draggedElement.style.height
-        }
+    // Choose a single best guide per axis
+    const elementCenterX = snappedX + draggedElement.style.width / 2
+    const elementCenterY = snappedY + draggedElement.style.height / 2
+    const vCandidates = guides.filter(g => g.type === 'vertical')
+    const hCandidates = guides.filter(g => g.type === 'horizontal')
+    const distX = (pos:number) => Math.min(
+      Math.abs(elementCenterX - pos),
+      Math.abs(snappedX - pos),
+      Math.abs(snappedX + draggedElement.style.width - pos)
+    )
+    const distY = (pos:number) => Math.min(
+      Math.abs(elementCenterY - pos),
+      Math.abs(snappedY - pos),
+      Math.abs(snappedY + draggedElement.style.height - pos)
+    )
+    let bestV = vCandidates.sort((a,b)=> distX(a.position) - distX(b.position))[0]
+    if (bestV && distX(bestV.position) < threshold) {
+      // Snap X to the closest feature on this vertical line
+      const dCenter = Math.abs(elementCenterX - bestV.position)
+      const dLeft = Math.abs(snappedX - bestV.position)
+      const dRight = Math.abs(snappedX + draggedElement.style.width - bestV.position)
+      if (dCenter <= dLeft && dCenter <= dRight) {
+        snappedX = bestV.position - draggedElement.style.width / 2
+        measurements.push({ x1: bestV.position, y1: snappedY - 16, x2: elementCenterX, y2: snappedY - 16, label: `${Math.round(dCenter)}px` })
+      } else if (dLeft <= dRight) {
+        measurements.push({ x1: bestV.position, y1: snappedY - 16, x2: snappedX, y2: snappedY - 16, label: `${Math.round(dLeft)}px` })
+        snappedX = bestV.position
+      } else {
+        measurements.push({ x1: snappedX + draggedElement.style.width, y1: snappedY - 16, x2: bestV.position, y2: snappedY - 16, label: `${Math.round(dRight)}px` })
+        snappedX = bestV.position - draggedElement.style.width
       }
-    })
+    } else {
+      bestV = undefined as any
+    }
+    let bestH = hCandidates.sort((a,b)=> distY(a.position) - distY(b.position))[0]
+    if (bestH && distY(bestH.position) < threshold) {
+      const dCenter = Math.abs(elementCenterY - bestH.position)
+      const dTop = Math.abs(snappedY - bestH.position)
+      const dBottom = Math.abs(snappedY + draggedElement.style.height - bestH.position)
+      if (dCenter <= dTop && dCenter <= dBottom) {
+        snappedY = bestH.position - draggedElement.style.height / 2
+        measurements.push({ x1: snappedX - 16, y1: bestH.position, x2: snappedX - 16, y2: elementCenterY, label: `${Math.round(dCenter)}px` })
+      } else if (dTop <= dBottom) {
+        measurements.push({ x1: snappedX - 16, y1: bestH.position, x2: snappedY, y2: bestH.position, label: `${Math.round(dTop)}px` })
+        snappedY = bestH.position
+      } else {
+        measurements.push({ x1: snappedX - 16, y1: snappedY + draggedElement.style.height, x2: snappedX - 16, y2: bestH.position, label: `${Math.round(dBottom)}px` })
+        snappedY = bestH.position - draggedElement.style.height
+      }
+    } else {
+      bestH = undefined as any
+    }
     
     // Keep within canvas bounds with edge snapping
     const edgeThreshold = SNAP_TOLERANCE // pixels from edge to trigger snapping
@@ -572,24 +600,24 @@ export default function TemplateEditorPage() {
     // Snap to left edge
     if (snappedX <= edgeThreshold) {
       snappedX = 0
-      guides.push({ type: 'vertical', position: 0, label: 'Left Edge' })
+      bestV = { type: 'vertical', position: 0, label: 'Left Edge' } as any
       measurements.push({ x1: 0, y1: snappedY - 12, x2: snappedX, y2: snappedY - 12, label: `${Math.round(snappedX)}px` })
     }
     // Snap to right edge  
     else if (snappedX + draggedElement.style.width >= canvasSize.width - edgeThreshold) {
       snappedX = canvasSize.width - draggedElement.style.width
-      guides.push({ type: 'vertical', position: canvasSize.width, label: 'Right Edge' })
+      bestV = { type: 'vertical', position: canvasSize.width, label: 'Right Edge' } as any
     }
     
     // Snap to top edge
     if (snappedY <= edgeThreshold) {
       snappedY = 0
-      guides.push({ type: 'horizontal', position: 0, label: 'Top Edge' })
+      bestH = { type: 'horizontal', position: 0, label: 'Top Edge' } as any
     }
     // Snap to bottom edge
     else if (snappedY + draggedElement.style.height >= canvasSize.height - edgeThreshold) {
       snappedY = canvasSize.height - draggedElement.style.height
-      guides.push({ type: 'horizontal', position: canvasSize.height, label: 'Bottom Edge' })
+      bestH = { type: 'horizontal', position: canvasSize.height, label: 'Bottom Edge' } as any
     }
     
     // Finally quantize to grid (so alignment wins, then grid refines)
@@ -600,7 +628,8 @@ export default function TemplateEditorPage() {
     snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))
     snappedY = Math.max(0, Math.min(canvasSize.height - draggedElement.style.height, snappedY))
     
-    return { x: snappedX, y: snappedY, guides, measurements }
+    const finalGuides = [bestV, bestH].filter(Boolean) as any
+    return { x: snappedX, y: snappedY, guides: finalGuides, measurements }
   }
 
   // Create smooth resize handler

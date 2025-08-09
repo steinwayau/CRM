@@ -73,7 +73,7 @@ interface Campaign {
   sentCount: number
   openRate?: number
   clickRate?: number
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused'
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'archived'
   recipientType: 'all' | 'filtered' | 'selected' | 'custom'
   customEmails?: string
   textContent?: string // Temporary storage for custom emails
@@ -161,10 +161,13 @@ export default function CustomerEmailsPage() {
   const [campaignSearch, setCampaignSearch] = useState('')
   const [previousCampaigns, setPreviousCampaigns] = useState<any[]>([])
   const [prevTotal, setPrevTotal] = useState(0)
+  const [prevPage, setPrevPage] = useState(1)
+  const [prevPageSize, setPrevPageSize] = useState(20)
   const [showResetModal, setShowResetModal] = useState(false)
-  const [resetScope, setResetScope] = useState<'current'|'all'|'custom'>('current')
+  const [resetDatePreset, setResetDatePreset] = useState<'all'|'today'|'yesterday'|'1w'|'1m'|'3m'|'6m'|'9m'|'12m'|'fy'|'ly'|'custom'>('all')
   const [resetFrom, setResetFrom] = useState('')
   const [resetTo, setResetTo] = useState('')
+  const [viewContext, setViewContext] = useState<'campaigns'|'previous'>('campaigns')
 
   const computeDateRange = () => {
     const now = new Date()
@@ -1828,12 +1831,9 @@ export default function CustomerEmailsPage() {
             </div>
           </div>
         )}
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">Search campaigns</label>
-          <div className="flex gap-2">
-            <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
-            <button onClick={() => { loadOverallDetailedAnalytics(); loadPreviousCampaigns(); }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
-          </div>
+        <div className="ml-auto flex items-end gap-2">
+          <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+          <button onClick={() => { loadPreviousCampaigns() }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
         </div>
       </div>
 
@@ -1996,6 +1996,47 @@ export default function CustomerEmailsPage() {
           <button onClick={loadPreviousCampaigns} className="px-3 py-2 bg-gray-100 border rounded">Refresh</button>
         </div>
         <div className="overflow-x-auto">
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Date range</label>
+              <select
+                value={datePreset}
+                onChange={(e) => {
+                  setDatePreset(e.target.value as any)
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="1w">1 week</option>
+                <option value="1m">1 month</option>
+                <option value="3m">3 months</option>
+                <option value="6m">6 months</option>
+                <option value="9m">9 months</option>
+                <option value="12m">12 months</option>
+                <option value="fy">Last financial year</option>
+                <option value="ly">Last year</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+            {datePreset === 'custom' && (
+              <div className="flex items-end gap-3">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">From</label>
+                  <input type="date" value={customFrom} onChange={(e)=>setCustomFrom(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">To</label>
+                  <input type="date" value={customTo} onChange={(e)=>setCustomTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                </div>
+              </div>
+            )}
+            <div className="ml-auto flex items-end gap-2">
+              <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              <button onClick={() => { loadPreviousCampaigns() }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
+            </div>
+          </div>
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -2004,20 +2045,49 @@ export default function CustomerEmailsPage() {
                 <th className="px-3 py-2 text-left text-gray-600">Status</th>
                 <th className="px-3 py-2 text-right text-gray-600">Sent</th>
                 <th className="px-3 py-2 text-right text-gray-600">Created</th>
+                <th className="px-3 py-2 text-right text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {previousCampaigns.map((c:any) => (
-                <tr key={c.id}>
+                <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={async () => {
+                  setViewContext('previous')
+                  // Try to get fuller campaign info from the main list; if not found, use row data
+                  const full = campaigns.find(x => x.id === c.id) || c
+                  await handleViewCampaign(full)
+                }}>
                   <td className="px-3 py-2">{c.name}</td>
                   <td className="px-3 py-2">{c.subject}</td>
                   <td className="px-3 py-2">{c.status}</td>
                   <td className="px-3 py-2 text-right">{c.sentCount}</td>
                   <td className="px-3 py-2 text-right">{new Date(c.createdAt).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right" onClick={(e)=>e.stopPropagation()}>
+                    <button className="px-2 py-1 text-sm text-blue-600 hover:underline mr-2" onClick={async ()=>{
+                      setViewContext('previous')
+                      const full = campaigns.find(x => x.id === c.id) || c
+                      await handleViewCampaign(full)
+                    }}>View</button>
+                    <button className="px-2 py-1 text-sm text-red-600 hover:underline" onClick={async ()=>{
+                      if (!confirm('Permanently delete this campaign? This cannot be undone.')) return
+                      const resp = await fetch(`/api/admin/campaigns?id=${c.id}`, { method: 'DELETE' })
+                      if (resp.ok) {
+                        await loadPreviousCampaigns()
+                      } else {
+                        alert('Failed to delete campaign')
+                      }
+                    }}>Delete Permanently</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <div className="flex items-center justify-between mt-3 text-sm">
+            <div>Page {prevPage} of {Math.max(1, Math.ceil(prevTotal / prevPageSize))} • {prevTotal} total</div>
+            <div className="space-x-2">
+              <button disabled={prevPage<=1} onClick={()=> setPrevPage(p => Math.max(1, p-1))} className={`px-3 py-1 border rounded ${prevPage<=1 ? 'opacity-50 cursor-not-allowed' : ''}`}>Prev</button>
+              <button disabled={prevPage>=Math.ceil(prevTotal/prevPageSize)} onClick={()=> setPrevPage(p => p+1)} className={`px-3 py-1 border rounded ${prevPage>=Math.ceil(prevTotal/prevPageSize) ? 'opacity-50 cursor-not-allowed' : ''}`}>Next</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2029,6 +2099,8 @@ export default function CustomerEmailsPage() {
     const { start, end } = computeDateRange()
     if (start) params.set('start', start)
     if (end) params.set('end', end)
+    params.set('page', String(prevPage))
+    params.set('pageSize', String(prevPageSize))
     const res = await fetch(`/api/admin/campaigns/search?${params.toString()}`, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
@@ -2039,14 +2111,35 @@ export default function CustomerEmailsPage() {
 
   const handleReset = async () => {
     const payload:any = {}
-    if (resetScope === 'current') {
-      const { start, end } = computeDateRange()
-      if (start) payload.start = start
-      if (end) payload.end = end
-    } else if (resetScope === 'custom') {
-      if (resetFrom) payload.start = new Date(resetFrom).toISOString()
-      if (resetTo) payload.end = new Date(resetTo).toISOString()
+    // derive range from resetDatePreset
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    let from: Date | null = null
+    let to: Date | null = new Date()
+    switch (resetDatePreset) {
+      case 'all': from = null; to = null; break
+      case 'today': from = startOfToday; break
+      case 'yesterday': from = new Date(startOfToday.getTime() - 86400000); to = startOfToday; break
+      case '1w': from = new Date(now.getTime() - 7*86400000); break
+      case '1m': from = new Date(now); from.setMonth(now.getMonth()-1); break
+      case '3m': from = new Date(now); from.setMonth(now.getMonth()-3); break
+      case '6m': from = new Date(now); from.setMonth(now.getMonth()-6); break
+      case '9m': from = new Date(now); from.setMonth(now.getMonth()-9); break
+      case '12m': from = new Date(now); from.setMonth(now.getMonth()-12); break
+      case 'fy': {
+        const year = now.getMonth() >= 6 ? now.getFullYear()-1 : now.getFullYear()-2
+        from = new Date(year, 6, 1); to = new Date(year+1, 5, 30, 23, 59, 59)
+        break
+      }
+      case 'ly': from = new Date(now.getFullYear()-1, 0, 1); to = new Date(now.getFullYear()-1, 11, 31, 23, 59, 59); break
+      case 'custom':
+        from = resetFrom ? new Date(resetFrom) : null
+        to = resetTo ? new Date(resetTo) : null
+        break
     }
+    if (from) payload.start = from.toISOString()
+    if (to) payload.end = to.toISOString()
+    if (!confirm('This will permanently delete analytics events in the selected range. Are you sure?')) return
     try {
       const res = await fetch('/api/admin/analytics/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) {
@@ -2070,7 +2163,7 @@ export default function CustomerEmailsPage() {
       loadPreviousCampaigns()
     }, 400)
     return () => clearTimeout(t)
-  }, [campaignSearch, datePreset, customFrom, customTo, activeTab])
+  }, [campaignSearch, datePreset, customFrom, customTo, activeTab, prevPage, prevPageSize])
 
   if (loading) {
     return (
@@ -2751,30 +2844,58 @@ export default function CustomerEmailsPage() {
                 <div className="flex space-x-3">
                   {!editingCampaign && (
                     <>
-                      <button
-                        onClick={async () => {
-                          if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-                            try {
-                              const response = await fetch(`/api/admin/campaigns?id=${viewingCampaign.id}`, {
-                                method: 'DELETE'
-                              })
-                              
-                              if (response.ok) {
-                                setCampaigns(campaigns.filter(c => c.id !== viewingCampaign.id))
-                                setShowCampaignView(false)
-                              } else {
+                      {viewContext === 'campaigns' ? (
+                        <button
+                          onClick={async () => {
+                            if (confirm('Archive this campaign? It will be removed from Campaigns but remain searchable in Previous Campaigns.')) {
+                              try {
+                                const response = await fetch(`/api/admin/campaigns?id=${viewingCampaign.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'archived' })
+                                })
+                                if (response.ok) {
+                                  const updated = campaigns.map(c => c.id === viewingCampaign.id ? { ...c, status: 'archived' as const } : c)
+                                  setCampaigns(updated)
+                                  setShowCampaignView(false)
+                                } else {
+                                  alert('Failed to archive campaign')
+                                }
+                              } catch (error) {
+                                console.error('Error archiving campaign:', error)
+                                alert('Failed to archive campaign')
+                              }
+                            }
+                          }}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+                        >
+                          Archive Campaign
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (confirm('Permanently delete this campaign? This cannot be undone.')) {
+                              try {
+                                const response = await fetch(`/api/admin/campaigns?id=${viewingCampaign.id}`, {
+                                  method: 'DELETE'
+                                })
+                                if (response.ok) {
+                                  await loadPreviousCampaigns()
+                                  setShowCampaignView(false)
+                                } else {
+                                  alert('Failed to delete campaign')
+                                }
+                              } catch (error) {
+                                console.error('Error deleting campaign:', error)
                                 alert('Failed to delete campaign')
                               }
-                            } catch (error) {
-                              console.error('Error deleting campaign:', error)
-                              alert('Failed to delete campaign')
                             }
-                          }
-                        }}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                      >
-                        Delete Campaign
-                      </button>
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                        >
+                          Delete Permanently
+                        </button>
+                      )}
                       <button
                         onClick={handleEditCampaign}
                         className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"

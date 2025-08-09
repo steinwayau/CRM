@@ -1633,7 +1633,7 @@ export default function TemplateEditorPage() {
         </div>
       </div>
     )
-  }
+  };
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isResizing ? 'select-none' : ''}`}>

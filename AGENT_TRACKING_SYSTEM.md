@@ -1,5 +1,10 @@
 # 🤖 AGENT TRACKING SYSTEM
 
+### Agent — Canva Positioning Update (Aug 10)
+- Deployed to production (main): single-best-guide snapping, measurement overlays, initial equal-gap, aspect-preserving corner resize, rotation handle with snapping, Cmd/Ctrl disables snap.
+- Next steps left for new agent: resize-edge snapping to neighbor edges/centers; equal-gap polish; Zoom + Fit/Center; Alignment/Distribution panel; rulers + draggable guides; margins/safe area; grouping; layers; constraints.
+
+
 ### **AGENT #60 - [FAILED - IMMEDIATE ROLLBACK] ❌**
 
 **Date**: August 8th, 2025  

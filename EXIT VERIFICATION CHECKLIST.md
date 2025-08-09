@@ -1371,3 +1371,19 @@ By this exit verification, I acknowledge that:
 - Avoid hardcoded base URLs for server-side internal fetches; prefer relative paths or `VERCEL_URL`.
 
 ---
+
+## Exit Note — Canva-style Positioning (Aug 10)
+- Work completed (production):
+  - Drag snapping picks single best guide per axis (alignment first, grid after)
+  - Distance measurement overlays (drag); initial equal-gap detection/labels
+  - Corner resize preserves aspect; Alt=freeform, Alt+Shift=center
+  - Rotation handle with snapping (0/15/30/45/60/90) and live angle tooltip
+  - Cmd/Ctrl disables snapping during drag
+- Outstanding (hand-off for next agent):
+  1) Resize-edge snapping to neighbor edges/centers (anchor fixed)
+  2) Equal-gap guide polish (fade, zoom-aware suppression)
+  3) Zoom + Fit/Center controls (visual-only scale; edit at 100%)
+  4) Alignment/Distribution panel; grouping basics
+  5) Rulers + draggable guides; margins/safe area snapping
+  6) Layers and constraints; undo/redo stack
+- Notes: All changes are UI-only in `src/app/admin/customer-emails/template-editor/page.tsx`. Production deploys via GitHub main auto-deploy (verify build on Vercel). Hard-refresh after deploy to clear cached assets.

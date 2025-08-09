@@ -2,8 +2,8 @@
 
 ## **CURRENT STABLE VERSION**
 
-**Git Commit**: `6f6cef3` ✅ VERIFIED DEPLOYED  
-**Date**: August 9, 2025  
+**Git Commit**: `2ad0871` ✅ VERIFIED DEPLOYED  
+**Date**: August 10, 2025  
 **Status**: 🟢 PRODUCTION RUNNING
 
 ### **✅ CONFIRMED WORKING FEATURES:**
@@ -24,8 +24,8 @@
 ### **📋 DEPLOYMENT INFO:**
 
 **Production URL**: https://crm.steinway.com.au  
-**Last Deployment**: August 9, 2025  
-**Commit**: 6f6cef3 — "Analytics UI: add Reset analytics dialog (current/all/custom range) with confirmation; endpoint supports start/end; list refresh after reset"
+**Last Deployment**: August 10, 2025  
+**Commit**: 2ad0871 — "Guides: pick single best guide per axis"
 
 ---
 
@@ -41,10 +41,10 @@
 
 Revert to this commit if needed:
 ```bash
-git reset --hard 6f6cef3
+git reset --hard 2ad0871
 git push origin main --force
 npx vercel --prod
 ```
 
-**Last Updated**: August 9, 2025 by Agent  
+**Last Updated**: August 10, 2025 by Agent  
 **Verification**: ✅ APIs live; dashboard renders; unsubscribe works 

@@ -475,3 +475,18 @@ By this exit verification, I acknowledge that:
 ## Notes
 - Analytics filters now apply server-side; API returns `meta` echo (filtersActive/start/end/events) for verification.  
 - Date presets are local; identical results can occur if data lies entirely in a recent window. 
+
+## Template Editor — Canva-style Positioning (Status)
+- Deployed:
+  - Stronger drag snapping (single best guide per axis)
+  - Distance measurement overlays (drag)
+  - Equal-gap detection (initial) and labels
+  - Aspect-preserving corner resize; Alt=freeform, Alt+Shift=center
+  - Rotation handle with snapping (0/15/30/45/60/90) and angle readout
+  - Cmd/Ctrl disables snapping during drag
+- In progress (next):
+  1) Resize-edge snapping to neighbor edges/centers (anchor edge fixed)
+  2) Equal-gap polish (fade, zoom-aware suppression)
+  3) Zoom + Fit/Center controls
+  4) Alignment/Distribution panel
+- Notes: Production deployments are auto-triggered from GitHub main; verify build status before testing. Hard-refresh the editor to bust cached JS. 

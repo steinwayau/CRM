@@ -1,81 +1,37 @@
 # TODO LIST — EPG CRM Comprehensive Audit
 
-Last Updated: 2025-08-09
+Last Updated: 2025-08-10
 Owner: Current agent (investigation-only)
 Scope: Read-only audit; no code changes or deployments performed
 
-Summary (counts)
-- P0 bugs (fix next): 2
-  1) Analytics “Reset” action wiring appears ineffective in UI
-  2) “Previous Campaigns” search UX not fully wired (initial load/apply/debounce/pagination)
-- P1 UX/cleanup: 2
-  3) Template editor preview uses placeholder `href="#"` links (no-op; can jump to top)
-  4) `scripts/test-urls.sh` BASE_URL points to legacy domain
-- Incomplete/TODOs in code: 9
-  - Resend webhooks TODOs (8 items: status/delivery/bounce/complaint/open/click logging)
-  - Email analytics route TODO (1 item: update behavior post-schema)
-- Placeholder anchors in preview: 3 occurrences (preview-only)
-- Explicit error throw sites (intentional; ensure user-friendly surfacing): multiple across admin import, template editor, customer emails
+Canva-style Editor — Remaining Tasks (simple, numbered)
+1) Best-in-class resize snapping: moving edge snaps to neighbor edges/centers; anchor edge fixed; show single guide + pixel label per axis.
+2) Equal-gap polish: dual labels (left/right or top/bottom) with fade; snap when gaps equal within tolerance; suppress at low zoom.
+3) Zoom + Fit/Center controls: 50/75/100/125% with visual-only scaling; editing enabled only at 100%; Fit-to-window and Center canvas.
+4) Alignment & Distribution panel: Align Left/Right/Top/Bottom/Vertical Center/Horizontal Center; Distribute with equal gap (respect locked).
+5) Rulers & draggable guides: top/left rulers with draggable guide lines; snap-to-guide; toggle; density auto at zoom.
+6) Canvas margins/safe-area: configurable margins/bleed; guides appear; snapping respects them.
+7) Properties panel fields: Rotation (done), add Opacity, Z-index, Lock Aspect toggle; live numeric editing with undo/redo.
+8) Grouping and multi-select: marquee/Shift-click; group bounds snapping; align/distribute inside group; lock/hide on group members.
+9) Layers panel: rename, lock, hide, reorder; Bring to Front/Back and Step Forward/Back.
+10) Constraints (pinning): pin to top/left/right/bottom; scale with canvas; fixed size; predictable behavior on canvas resize.
+11) Distance/redlining mode: while dragging or holding Space, show redline measurements to nearest neighbors and canvas edges.
+12) Rotation UX polish: larger handle target, degree ring at hover, configurable snap angles.
+13) High-contrast mode: toggle increases guide/label contrast and thickness for accessibility.
+14) Keyboard shortcuts: Cmd/Ctrl disable snap (done), Arrows/Shift (done), Alt-drag duplicate (done); add: Cmd/Ctrl+G group, Cmd/Ctrl+Shift+G ungroup, Esc cancel transform.
+15) Undo/Redo stack: capture all transforms and property edits; Ctrl/Cmd+Z / Shift+Z.
+16) Performance: spatial index (quadtree/R-tree) for nearest-neighbor queries; cache bounds; rAF-only updates; avoid layout thrash.
+17) Precision/pixel snapping: store sub-pixel state but render snapped to whole pixels to avoid blur; text boxes prefer integer sizes.
+18) Guide engine config: expose constants (SNAP_TOLERANCE, BIG_NUDGE, ROTATE_SNAP_DEGREES, GUIDE_FADE_MS, MAX_NEIGHBORS_FOR_SNAP) with comments.
+19) Resize behavior for text boxes: fixed width, auto-height; snapping/measurement uses visual bounds.
+20) Help/shortcuts modal: quick reference for guides, snapping rules, and shortcuts.
 
-Details & proposed (safe) remediation plans
-
-P0-1) Analytics “Reset” button
-- Symptom: User reports clicking reset does nothing
-- Current: Modal triggers `handleReset()` which computes payload (current/custom range → start/end ISO) and POSTs to `/api/admin/analytics/reset`, then reloads analytics + previous campaigns
-- Backend: Route exists, enforces admin, deletes by range or truncates `email_tracking`, returns `{ ok, deleted, ... }`
-- Likely causes:
-  - Confirm button not wired to `handleReset()` (modal action mismatch)
-  - `resetScope` default not set → payload always empty/unexpected
-  - No success/failure surfacing → user perceives “nothing happened”
-- Plan (no code yet):
-  - Verify modal confirm calls `handleReset()`
-  - Ensure `resetScope` defaults to one of [all/current/custom]; validate date pickers when custom
-  - Await POST, display toast with deleted row count; refresh charts/tables after success
-
-P0-2) “Previous Campaigns” search UX
-- Symptom: API exists; UI table under Analytics should mirror filters and auto-load on Apply; likely not wired fully
-- Current: `loadPreviousCampaigns()` composes query from search text + computed date range, sets `previousCampaigns` and `total`
-- Gaps:
-  - Not invoked on initial render
-  - Not triggered from Analytics “Apply”
-  - No debounce on search input
-  - No pagination controls (API supports `page/pageSize`)
-- Plan (no code yet):
-  - Call `loadPreviousCampaigns()` on mount and on Analytics Apply
-  - Add 300–500ms debounce on search text
-  - Add pagination UI (prev/next) using `total/page/pageSize`
-
-P1-3) Template editor preview placeholder links
-- Issue: Preview HTML uses `href="#"` anchors that can scroll page to top when clicked
-- Scope: Preview-only (not sent emails)
-- Plan:
-  - Prevent default in preview click handler or set `pointer-events: none` on preview container links
-
-P1-4) `scripts/test-urls.sh` BASE_URL outdated
-- Issue: Script references `https://epg-crm.vercel.app` (legacy)
-- Plan: Update to `https://crm.steinway.com.au` and adjust protected URLs if needed. (Documentation-only utility)
-
-Follow-ups (not urgent; trackable tasks)
-- Webhooks (Resend) TODOs — implement when analytics model solidified:
-  - Update campaign status upon events
-  - Update delivery status
-  - Handle/record complaints
-  - Log bounces (type-aware)
-  - Log opens/clicks as alternative/complement to pixel/redirect tracking
-- Email analytics route TODO marker — confirm whether still needed post-latest schema deployment and remove/update accordingly
-
-Error/exception hotspots (verify UX surfacing)
-- Admin Import page: throws on large files/timeouts/invalid JSON; ensure errors surfaced as user-friendly notifications
-- Customer Emails page: throws on template/campaign failures; verify toasts/modal errors
-- Template Editor: throws on upload/DB save; verify user feedback
-- General API/libs: console.error logging exists; for critical flows ensure UI messaging accompanies failures
-
-Manual UX verification checklist (for QA)
-- Admin → Customer Emails: Campaigns, Customers, Templates, Analytics (filters, reset, previous campaigns)
-- Admin → Analytics page, Database, Duplicates, Import, Settings, Staff, Staff Unified, Staff Test, Users
-- Public/Staff portals: Login, Staff pages, Submitted forms (enquiry data, follow-up)
-- File upload: Image upload in template editor; API upload endpoint
-- Email: Send-campaign happy path, unsubscribe link working, tracking endpoints reachable
+Other Open Items (non-Canva)
+A1) Resend webhooks TODOs (8 items): status/delivery/bounce/complaint/open/click logging — implement after analytics model finalised.
+A2) Email analytics route TODO: confirm relevance post-latest schema; clean up or complete behaviour accordingly.
+A3) Preview placeholder links: change `href="#"` behaviour in preview-only context to prevent scrolling (minor polish).
+A4) `scripts/test-urls.sh` BASE_URL: update legacy domain reference (doc utility only).
+A5) Error surfacing pass: ensure critical throws in admin flows surface as user-friendly toasts (import/template/campaign).
 
 Notes
-- This document is a read-only audit artifact to guide safe, surgical edits. No changes have been made. 
+- Production deploys auto-trigger from GitHub main; hard-refresh after deploy to clear cached assets. 

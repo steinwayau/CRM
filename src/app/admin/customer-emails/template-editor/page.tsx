@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+import { SNAP_TOLERANCE, ROTATE_SNAP_DEGREES, MAX_NEIGHBORS_FOR_SNAP, GRID_CELL_SIZE } from '@/src/lib/editor-constants'
+import { SpatialIndex } from '@/src/lib/spatial-index'
+
 interface EmailTemplate {
   id: string
   name: string
@@ -391,18 +394,73 @@ export default function TemplateEditorPage() {
     return Math.round(value / gridSize) * gridSize
   }
 
-  const SNAP_TOLERANCE = 8
-  const ROTATE_SNAP_DEGREES = [0, 15, 30, 45, 60, 90]
-
   const disableSnapRef = useRef(false)
   const [angleHint, setAngleHint] = useState<number | null>(null)
   const [measureOverlays, setMeasureOverlays] = useState<Array<{ x1: number, y1: number, x2: number, y2: number, label: string }>>([])
   const MAX_NEIGHBORS_FOR_SNAP = 40
 
+  // Spatial index for performance (rebuilt whenever elements change)
+  const spatialRef = useRef(new SpatialIndex<EditorElement>(GRID_CELL_SIZE))
+  useEffect(() => {
+    try {
+      spatialRef.current.build(editorElements)
+    } catch {
+      // no-op safeguard
+    }
+  }, [editorElements])
+
+  // Simple undo/redo history for element edits
+  const historyRef = useRef<EditorElement[][]>([])
+  const futureRef = useRef<EditorElement[][]>([])
+  const interactionRef = useRef<{ active: boolean; pushed: boolean }>({ active: false, pushed: false })
+  const pushHistory = () => {
+    // Deep clone minimal: JSON structured form is sufficient here
+    const snapshot: EditorElement[] = JSON.parse(JSON.stringify(editorElements))
+    historyRef.current.push(snapshot)
+    if (historyRef.current.length > 50) historyRef.current.shift()
+    futureRef.current = []
+  }
+  const undo = () => {
+    const prev = historyRef.current.pop()
+    if (!prev) return
+    const current = JSON.parse(JSON.stringify(editorElements))
+    futureRef.current.push(current)
+    setEditorElements(prev)
+  }
+  const redo = () => {
+    const next = futureRef.current.pop()
+    if (!next) return
+    const current = JSON.parse(JSON.stringify(editorElements))
+    historyRef.current.push(current)
+    setEditorElements(next)
+  }
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey
+      if (!isMod) return
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y')) {
+        e.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editorElements])
+
   const getAlignmentGuides = (draggedElement: EditorElement, newX: number, newY: number) => {
-    const guides = []
+    const guides = [] as Array<{ type: 'vertical' | 'horizontal'; position: number; label: string }>
     const threshold = SNAP_TOLERANCE // pixels
-    const otherElements = editorElements.filter(el => el.id !== draggedElement.id)
+    // Query nearby elements for performance
+    const neighborhood = spatialRef.current.queryNeighbors({
+      x: newX - 300,
+      y: newY - 300,
+      width: draggedElement.style.width + 600,
+      height: draggedElement.style.height + 600
+    }, MAX_NEIGHBORS_FOR_SNAP)
+    const otherElements = neighborhood.filter(el => el.id !== draggedElement.id)
     
     // Canvas center lines
     const canvasCenterX = canvasSize.width / 2
@@ -697,7 +755,9 @@ export default function TemplateEditorPage() {
         }
 
         // Size-match snapping: match width/height of nearest elements within 2px
-        const others = editorElements.filter(el => el.id !== elementId).slice(0, MAX_NEIGHBORS_FOR_SNAP)
+        const others = spatialRef.current
+          .queryNeighbors({ x: newStyle.position?.x ?? element.style.position.x, y: newStyle.position?.y ?? element.style.position.y, width: newStyle.width, height: newStyle.height }, MAX_NEIGHBORS_FOR_SNAP)
+          .filter(el => el.id !== elementId)
         for (const other of others) {
           if (Math.abs(other.style.width - newStyle.width) <= 2) {
             newStyle.width = other.style.width
@@ -769,9 +829,9 @@ export default function TemplateEditorPage() {
     }
     const onUp = () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
-      setAngleHint(null)
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
+      setAngleHint(null)
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -1035,6 +1095,7 @@ export default function TemplateEditorPage() {
 
   // Visual editor functions
   const addElement = (type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading') => {
+    pushHistory()
     const position = getNextElementPosition(type)
     
     const newElement: EditorElement = {
@@ -1085,6 +1146,12 @@ export default function TemplateEditorPage() {
   }
 
   const updateElement = (id: string, updates: Partial<EditorElement>) => {
+    if (!interactionRef.current.active) {
+      pushHistory()
+    } else if (interactionRef.current.active && !interactionRef.current.pushed) {
+      pushHistory()
+      interactionRef.current.pushed = true
+    }
     setEditorElements(prevElements => prevElements.map(el => 
       el.id === id ? { ...el, ...updates } : el
     ))
@@ -1096,6 +1163,7 @@ export default function TemplateEditorPage() {
   }
 
   const deleteElement = (id: string) => {
+    pushHistory()
     setEditorElements(editorElements.filter(el => el.id !== id))
     setSelectedElement(null)
   }

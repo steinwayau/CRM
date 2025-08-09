@@ -396,6 +396,8 @@ export default function TemplateEditorPage() {
 
   const disableSnapRef = useRef(false)
   const [angleHint, setAngleHint] = useState<number | null>(null)
+  const [measureOverlays, setMeasureOverlays] = useState<Array<{ x1: number, y1: number, x2: number, y2: number, label: string }>>([])
+  const MAX_NEIGHBORS_FOR_SNAP = 40
 
   const getAlignmentGuides = (draggedElement: EditorElement, newX: number, newY: number) => {
     const guides = []
@@ -451,6 +453,46 @@ export default function TemplateEditorPage() {
     return guides
   }
 
+  // Helpers: nearest neighbors horizontally/vertically that overlap on the orthogonal axis
+  const getHorizontalNeighbors = (dragged: EditorElement) => {
+    const candidates = editorElements.filter(el => el.id !== dragged.id)
+      .filter(el => {
+        // overlap vertically
+        const aTop = dragged.style.position.y
+        const aBottom = dragged.style.position.y + dragged.style.height
+        const bTop = el.style.position.y
+        const bBottom = el.style.position.y + el.style.height
+        return !(aBottom < bTop || aTop > bBottom)
+      })
+      .slice(0, MAX_NEIGHBORS_FOR_SNAP)
+    const left = candidates
+      .filter(el => el.style.position.x + el.style.width <= dragged.style.position.x)
+      .sort((a,b)=> (dragged.style.position.x - (a.style.position.x + a.style.width)) - (dragged.style.position.x - (b.style.position.x + b.style.width)))[0]
+    const right = candidates
+      .filter(el => el.style.position.x >= dragged.style.position.x + dragged.style.width)
+      .sort((a,b)=> (a.style.position.x - (dragged.style.position.x + dragged.style.width)) - (b.style.position.x - (dragged.style.position.x + dragged.style.width)))[0]
+    return { left, right }
+  }
+  const getVerticalNeighbors = (dragged: EditorElement) => {
+    const candidates = editorElements.filter(el => el.id !== dragged.id)
+      .filter(el => {
+        // overlap horizontally
+        const aLeft = dragged.style.position.x
+        const aRight = dragged.style.position.x + dragged.style.width
+        const bLeft = el.style.position.x
+        const bRight = el.style.position.x + el.style.width
+        return !(aRight < bLeft || aLeft > bRight)
+      })
+      .slice(0, MAX_NEIGHBORS_FOR_SNAP)
+    const above = candidates
+      .filter(el => el.style.position.y + el.style.height <= dragged.style.position.y)
+      .sort((a,b)=> (dragged.style.position.y - (a.style.position.y + a.style.height)) - (dragged.style.position.y - (b.style.position.y + b.style.height)))[0]
+    const below = candidates
+      .filter(el => el.style.position.y >= dragged.style.position.y + dragged.style.height)
+      .sort((a,b)=> (a.style.position.y - (dragged.style.position.y + dragged.style.height)) - (b.style.position.y - (dragged.style.position.y + dragged.style.height)))[0]
+    return { above, below }
+  }
+
   const snapPosition = (draggedElement: EditorElement, newX: number, newY: number) => {
     // First compute guide-based snapping using raw coordinates
     let snappedX = newX
@@ -458,6 +500,48 @@ export default function TemplateEditorPage() {
     
     const guides = disableSnapRef.current ? [] : getAlignmentGuides(draggedElement, snappedX, snappedY)
     const threshold = SNAP_TOLERANCE
+    const measurements: Array<{ x1:number,y1:number,x2:number,y2:number,label:string }> = []
+    
+    // Equal-gap snapping (horizontal)
+    if (!disableSnapRef.current) {
+      const { left, right } = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      if (left && right) {
+        const gapLeft = snappedX - (left.style.position.x + left.style.width)
+        const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
+        measurements.push({
+          x1: left.style.position.x + left.style.width, y1: draggedElement.style.position.y - 12,
+          x2: snappedX, y2: draggedElement.style.position.y - 12, label: `${Math.round(gapLeft)}px`
+        })
+        measurements.push({
+          x1: snappedX + draggedElement.style.width, y1: draggedElement.style.position.y - 12,
+          x2: right.style.position.x, y2: draggedElement.style.position.y - 12, label: `${Math.round(gapRight)}px`
+        })
+        const targetCenterX = (left.style.position.x + left.style.width + right.style.position.x) / 2 - draggedElement.style.width / 2
+        if (Math.abs(gapLeft - gapRight) <= threshold) {
+          snappedX = targetCenterX
+          guides.push({ type: 'vertical', position: snappedX + draggedElement.style.width / 2, label: 'Equal gap' })
+        }
+      }
+      // Equal-gap snapping (vertical)
+      const { above, below } = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      if (above && below) {
+        const gapTop = snappedY - (above.style.position.y + above.style.height)
+        const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
+        measurements.push({
+          x1: draggedElement.style.position.x - 12, y1: above.style.position.y + above.style.height,
+          x2: draggedElement.style.position.x - 12, y2: snappedY, label: `${Math.round(gapTop)}px`
+        })
+        measurements.push({
+          x1: draggedElement.style.position.x - 12, y1: snappedY + draggedElement.style.height,
+          x2: draggedElement.style.position.x - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`
+        })
+        const targetCenterY = (above.style.position.y + above.style.height + below.style.position.y) / 2 - draggedElement.style.height / 2
+        if (Math.abs(gapTop - gapBottom) <= threshold) {
+          snappedY = targetCenterY
+          guides.push({ type: 'horizontal', position: snappedY + draggedElement.style.height / 2, label: 'Equal gap' })
+        }
+      }
+    }
     
     // Apply snapping based on guides
     guides.forEach(guide => {
@@ -489,6 +573,7 @@ export default function TemplateEditorPage() {
     if (snappedX <= edgeThreshold) {
       snappedX = 0
       guides.push({ type: 'vertical', position: 0, label: 'Left Edge' })
+      measurements.push({ x1: 0, y1: snappedY - 12, x2: snappedX, y2: snappedY - 12, label: `${Math.round(snappedX)}px` })
     }
     // Snap to right edge  
     else if (snappedX + draggedElement.style.width >= canvasSize.width - edgeThreshold) {
@@ -515,7 +600,7 @@ export default function TemplateEditorPage() {
     snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))
     snappedY = Math.max(0, Math.min(canvasSize.height - draggedElement.style.height, snappedY))
     
-    return { x: snappedX, y: snappedY, guides }
+    return { x: snappedX, y: snappedY, guides, measurements }
   }
 
   // Create smooth resize handler
@@ -579,6 +664,23 @@ export default function TemplateEditorPage() {
           } else {
             // too tall; adjust height from width
             newStyle.height = Math.round(newStyle.width / startAspect)
+          }
+        }
+
+        // Size-match snapping: match width/height of nearest elements within 2px
+        const others = editorElements.filter(el => el.id !== elementId).slice(0, MAX_NEIGHBORS_FOR_SNAP)
+        for (const other of others) {
+          if (Math.abs(other.style.width - newStyle.width) <= 2) {
+            newStyle.width = other.style.width
+            setShowAlignmentGuides(g => [...g, { type:'vertical', position: element.style.position.x + other.style.width, label:'Match width' }])
+            break
+          }
+        }
+        for (const other of others) {
+          if (Math.abs(other.style.height - newStyle.height) <= 2) {
+            newStyle.height = other.style.height
+            setShowAlignmentGuides(g => [...g, { type:'horizontal', position: element.style.position.y + other.style.height, label:'Match height' }])
+            break
           }
         }
 
@@ -2312,9 +2414,10 @@ export default function TemplateEditorPage() {
                           const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - current.style.width))
                           const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - current.style.height))
                           
-                          const { x: newX, y: newY, guides } = snapPosition(current, constrainedX, constrainedY)
+                          const { x: newX, y: newY, guides, measurements } = snapPosition(current, constrainedX, constrainedY)
                           
                           setShowAlignmentGuides(guides)
+                          setMeasureOverlays(measurements)
                           
                           updateElement(element.id, {
                             style: {
@@ -2335,6 +2438,7 @@ export default function TemplateEditorPage() {
                       setIsDragging(false)
                       setDraggedElement(null)
                       setShowAlignmentGuides([])
+                      setMeasureOverlays([])
                       disableSnapRef.current = false
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)

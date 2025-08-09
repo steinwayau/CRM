@@ -2226,7 +2226,62 @@ export default function CustomerEmailsPage() {
           {activeTab === 'analytics' && renderAnalytics()}
         </div>
 
-                {/* Template editor now uses full page at /admin/customer-emails/template-editor */}
+        {/* Reset Analytics Modal */}
+        {showResetModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg w-full max-w-lg mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Reset analytics</h3>
+                <button onClick={() => setShowResetModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Choose a date range to permanently delete analytics events in that range. Campaigns are not affected.</p>
+
+              <div className="space-y-3 mb-4">
+                <label className="block text-sm text-gray-600 mb-1">Date range</label>
+                <select
+                  value={resetDatePreset}
+                  onChange={(e) => setResetDatePreset(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="1w">1 week</option>
+                  <option value="1m">1 month</option>
+                  <option value="3m">3 months</option>
+                  <option value="6m">6 months</option>
+                  <option value="9m">9 months</option>
+                  <option value="12m">12 months</option>
+                  <option value="fy">Last financial year</option>
+                  <option value="ly">Last year</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+
+              {resetDatePreset === 'custom' && (
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">From</label>
+                    <input type="date" value={resetFrom} onChange={(e)=>setResetFrom(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">To</label>
+                    <input type="date" value={resetTo} onChange={(e)=>setResetTo(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowResetModal(false)} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+                <button onClick={handleReset} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Reset</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Template editor now uses full page at /admin/customer-emails/template-editor */}
 
         {/* Template Preview Modal */}
         {showTemplatePreview && previewTemplate && (

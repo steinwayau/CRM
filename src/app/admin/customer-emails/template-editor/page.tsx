@@ -516,6 +516,12 @@ export default function TemplateEditorPage() {
     
     let animationFrameId: number
     
+    // Capture initial style for aspect ratio
+    const startElement = editorElements.find(el => el.id === elementId)
+    const startWidth = startElement?.style.width || 1
+    const startHeight = startElement?.style.height || 1
+    const startAspect = startWidth / Math.max(1, startHeight)
+    
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault()
       
@@ -531,16 +537,47 @@ export default function TemplateEditorPage() {
         if (!element) return
         const newStyle = { ...element.style }
         
-        // Handle-based resizing
+        // Canva-like behavior
+        const isCorner = /(nw|ne|sw|se)/.test(handle)
+        const keepAspect = isCorner && !e.altKey // default preserve aspect on corners; Alt = freeform
+        const resizeFromCenter = e.altKey && e.shiftKey // optional: Alt+Shift resize from center
+
+        // Horizontal
         if (handle.includes('e')) newStyle.width = Math.max(10, element.style.width + dx)
-        if (handle.includes('s')) newStyle.height = Math.max(10, element.style.height + dy)
         if (handle.includes('w')) {
-          newStyle.width = Math.max(10, element.style.width - dx)
-          newStyle.position = { ...newStyle.position, x: element.style.position.x + dx }
+          const newW = Math.max(10, element.style.width - dx)
+          const deltaW = newW - element.style.width
+          newStyle.width = newW
+          newStyle.position = { ...newStyle.position, x: element.style.position.x - deltaW }
         }
+        // Vertical
+        if (handle.includes('s')) newStyle.height = Math.max(10, element.style.height + dy)
         if (handle.includes('n')) {
-          newStyle.height = Math.max(10, element.style.height - dy)
-          newStyle.position = { ...newStyle.position, y: element.style.position.y + dy }
+          const newH = Math.max(10, element.style.height - dy)
+          const deltaH = newH - element.style.height
+          newStyle.height = newH
+          newStyle.position = { ...newStyle.position, y: element.style.position.y - deltaH }
+        }
+
+        // Preserve aspect ratio for corner handles
+        if (keepAspect) {
+          if (newStyle.width / Math.max(1, newStyle.height) > startAspect) {
+            // too wide; adjust width from height
+            newStyle.width = Math.round(newStyle.height * startAspect)
+          } else {
+            // too tall; adjust height from width
+            newStyle.height = Math.round(newStyle.width / startAspect)
+          }
+        }
+
+        // Optional center-resize: adjust position to keep center fixed
+        if (resizeFromCenter) {
+          const cx = element.style.position.x + element.style.width / 2
+          const cy = element.style.position.y + element.style.height / 2
+          newStyle.position = {
+            x: Math.max(0, cx - newStyle.width / 2),
+            y: Math.max(0, cy - newStyle.height / 2)
+          }
         }
         
         updateElement(elementId, { style: newStyle })

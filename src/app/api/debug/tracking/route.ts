@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const end = searchParams.get('end')
 
     const overall = await sql`SELECT COUNT(*) AS total, COUNT(DISTINCT campaign_id) AS campaigns FROM email_tracking`
+    const range = await sql`SELECT MIN(created_at) AS earliest, MAX(created_at) AS latest FROM email_tracking`
 
     const filtered = await sql`
       SELECT COUNT(*) AS total, COUNT(DISTINCT campaign_id) AS campaigns
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       overall: overall.rows[0],
+      range: range.rows[0],
       filtered: filtered.rows[0],
       start,
       end

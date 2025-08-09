@@ -445,8 +445,9 @@ export default function TemplateEditorPage() {
   }
 
   const snapPosition = (draggedElement: EditorElement, newX: number, newY: number) => {
-    let snappedX = snapToGridValue(newX)
-    let snappedY = snapToGridValue(newY)
+    // First compute guide-based snapping using raw coordinates
+    let snappedX = newX
+    let snappedY = newY
     
     const guides = getAlignmentGuides(draggedElement, snappedX, snappedY)
     const threshold = 8 // slightly more forgiving
@@ -498,6 +499,10 @@ export default function TemplateEditorPage() {
       snappedY = canvasSize.height - draggedElement.style.height
       guides.push({ type: 'horizontal', position: canvasSize.height, label: 'Bottom Edge' })
     }
+    
+    // Finally quantize to grid (so alignment wins, then grid refines)
+    snappedX = snapToGridValue(snappedX)
+    snappedY = snapToGridValue(snappedY)
     
     // Ensure elements stay within bounds
     snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))

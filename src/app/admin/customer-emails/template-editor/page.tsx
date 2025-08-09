@@ -1910,6 +1910,15 @@ export default function TemplateEditorPage() {
                       />
                     </div>
                   )}
+                  {/* Properties panel toggle (always accessible) */}
+                  <button
+                    type="button"
+                    onClick={() => setPropertiesCollapsed(prev => !prev)}
+                    className="h-8 px-3 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    title={propertiesCollapsed ? 'Show properties panel' : 'Hide properties panel'}
+                  >
+                    {propertiesCollapsed ? 'Show Properties' : 'Hide Properties'}
+                  </button>
                 </div>
                 
                 <div className="flex items-center space-x-2">
@@ -2598,6 +2607,18 @@ export default function TemplateEditorPage() {
               </svg>
             </div>
           </div>
+        )}
+
+        {/* Floating expand button when collapsed */}
+        {propertiesCollapsed && (
+          <button
+            type="button"
+            onClick={() => setPropertiesCollapsed(false)}
+            className="fixed right-2 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-sm rounded px-2 py-1 text-xs hover:bg-gray-50"
+            title="Expand properties panel"
+          >
+            Expand
+          </button>
         )}
 
         {/* Properties Panel */}

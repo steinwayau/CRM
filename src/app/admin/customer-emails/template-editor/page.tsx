@@ -2027,6 +2027,8 @@ export default function TemplateEditorPage() {
     )
   }
 
+  const BUILD_VERSION = 'e9d7ffb'
+
   return (
     <div className={`min-h-screen bg-gray-50 ${isResizing ? 'select-none' : ''}`}>
       {/* Header */}
@@ -2273,6 +2275,7 @@ export default function TemplateEditorPage() {
               </div>
               
               <div className="flex flex-wrap items-center gap-3">
+                <div className="text-xs text-gray-500 px-2 py-1 border border-gray-200 rounded bg-white">Editor v{BUILD_VERSION}</div>
                 {/* Design Warnings */}
                 {designWarnings.length > 0 && (
                   <div className="flex items-center gap-2">

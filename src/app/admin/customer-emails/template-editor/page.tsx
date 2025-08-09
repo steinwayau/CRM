@@ -50,6 +50,7 @@ interface EditorElement {
     padding?: number
     borderRadius?: number
     textAlign?: 'left' | 'center' | 'right'
+    rotation?: number
   }
 }
 
@@ -390,9 +391,15 @@ export default function TemplateEditorPage() {
     return Math.round(value / gridSize) * gridSize
   }
 
+  const SNAP_TOLERANCE = 8
+  const ROTATE_SNAP_DEGREES = [0, 15, 30, 45, 60, 90]
+
+  const disableSnapRef = useRef(false)
+  const [angleHint, setAngleHint] = useState<number | null>(null)
+
   const getAlignmentGuides = (draggedElement: EditorElement, newX: number, newY: number) => {
     const guides = []
-    const threshold = 5 // pixels
+    const threshold = SNAP_TOLERANCE // pixels
     const otherElements = editorElements.filter(el => el.id !== draggedElement.id)
     
     // Canvas center lines
@@ -449,8 +456,8 @@ export default function TemplateEditorPage() {
     let snappedX = newX
     let snappedY = newY
     
-    const guides = getAlignmentGuides(draggedElement, snappedX, snappedY)
-    const threshold = 8 // slightly more forgiving
+    const guides = disableSnapRef.current ? [] : getAlignmentGuides(draggedElement, snappedX, snappedY)
+    const threshold = SNAP_TOLERANCE
     
     // Apply snapping based on guides
     guides.forEach(guide => {
@@ -476,7 +483,7 @@ export default function TemplateEditorPage() {
     })
     
     // Keep within canvas bounds with edge snapping
-    const edgeThreshold = 8 // pixels from edge to trigger snapping
+    const edgeThreshold = SNAP_TOLERANCE // pixels from edge to trigger snapping
     
     // Snap to left edge
     if (snappedX <= edgeThreshold) {
@@ -600,6 +607,43 @@ export default function TemplateEditorPage() {
     
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+  }
+
+  // Rotation handler
+  const createRotateHandler = (elementId: string) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const element = editorElements.find(el => el.id === elementId)
+    if (!element) return
+    const rectCenter = {
+      x: element.style.position.x + element.style.width / 2,
+      y: element.style.position.y + element.style.height / 2
+    }
+    let animationFrameId: number
+    const onMove = (me: MouseEvent) => {
+      me.preventDefault()
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+      animationFrameId = requestAnimationFrame(() => {
+        const angleRad = Math.atan2(me.clientY - rectCenter.y, me.clientX - rectCenter.x)
+        let angleDeg = Math.round((angleRad * 180) / Math.PI)
+        if (angleDeg < 0) angleDeg += 360
+        // Snap to common angles
+        const snapped = ROTATE_SNAP_DEGREES.reduce((best, d) => {
+          return Math.abs(d - angleDeg) < Math.abs(best - angleDeg) ? d : best
+        }, ROTATE_SNAP_DEGREES[0])
+        if (Math.abs(snapped - angleDeg) <= 5) angleDeg = snapped
+        setAngleHint(angleDeg)
+        updateElement(elementId, { style: { ...element.style, rotation: angleDeg } })
+      })
+    }
+    const onUp = () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+      setAngleHint(null)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
   }
 
   // Handle element resizing
@@ -2194,7 +2238,9 @@ export default function TemplateEditorPage() {
                     width: element.style.width,
                     height: element.style.height,
                     zIndex: selectedElement === element.id ? 10 : 1,
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    transform: element.style.rotation ? `rotate(${element.style.rotation}deg)` : undefined,
+                    transformOrigin: 'center center'
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -2227,8 +2273,9 @@ export default function TemplateEditorPage() {
                       clearTimeout(dragTimeoutRef.current)
                     }
                     
-                    const startX = e.clientX - element.style.position.x
-                    const startY = e.clientY - element.style.position.y
+                    const base = editorElements.find(el => el.id === element.id) || element
+                    const startX = e.clientX - base.style.position.x
+                    const startY = e.clientY - base.style.position.y
                     const startMouseX = e.clientX
                     const startMouseY = e.clientY
                     
@@ -2236,6 +2283,7 @@ export default function TemplateEditorPage() {
                     
                     const handleMouseMove = (e: MouseEvent) => {
                       e.preventDefault()
+                      disableSnapRef.current = e.metaKey || e.ctrlKey
                       
                       // Calculate how far mouse has moved
                       const deltaX = Math.abs(e.clientX - startMouseX)
@@ -2260,16 +2308,17 @@ export default function TemplateEditorPage() {
                           const rawY = e.clientY - startY
                           
                           // Constrain to canvas bounds
-                          const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - element.style.width))
-                          const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - element.style.height))
+                          const current = editorElements.find(el => el.id === element.id) || element
+                          const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - current.style.width))
+                          const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - current.style.height))
                           
-                          const { x: newX, y: newY, guides } = snapPosition(element, constrainedX, constrainedY)
+                          const { x: newX, y: newY, guides } = snapPosition(current, constrainedX, constrainedY)
                           
                           setShowAlignmentGuides(guides)
                           
                           updateElement(element.id, {
                             style: {
-                              ...element.style,
+                              ...current.style,
                               position: { x: newX, y: newY }
                             }
                           })
@@ -2286,6 +2335,7 @@ export default function TemplateEditorPage() {
                       setIsDragging(false)
                       setDraggedElement(null)
                       setShowAlignmentGuides([])
+                      disableSnapRef.current = false
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
                       
@@ -2628,6 +2678,21 @@ export default function TemplateEditorPage() {
                           onMouseDown={createResizeHandler(element.id, 'e')}
                         />
                       </>
+                      {/* Rotation handle */}
+                      {selectedElement === element.id && (
+                        <div
+                          className="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border border-gray-300 rounded-full cursor-crosshair flex items-center justify-center"
+                          onMouseDown={createRotateHandler(element.id)}
+                          title="Rotate (snaps to 0/15/30/45/60/90)"
+                        >
+                          <svg className="w-3 h-3 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 10-7 11"/></svg>
+                        </div>
+                      )}
+                      {angleHint !== null && selectedElement === element.id && (
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded shadow">
+                          {angleHint}°
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

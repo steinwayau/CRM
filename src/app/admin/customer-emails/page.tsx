@@ -1832,23 +1832,7 @@ export default function CustomerEmailsPage() {
             </div>
           </div>
         )}
-        <div className="ml-auto flex items-end gap-2">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Status</label>
-            <select value={prevStatus} onChange={(e)=>setPrevStatus(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-md text-sm">
-              <option value="all">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="sending">Sending</option>
-              <option value="sent">Sent</option>
-              <option value="paused">Paused</option>
-              <option value="archived">Archived</option>
-              <option value="deleted">Deleted</option>
-            </select>
-          </div>
-          <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
-          <button onClick={() => { loadPreviousCampaigns() }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
-        </div>
+        {/* Removed duplicate campaign search and status filters from Analytics */}
       </div>
 
       {/* Overview cards */}

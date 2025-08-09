@@ -1816,11 +1816,11 @@ export default function TemplateEditorPage() {
         {/* Canvas Area */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="p-4 bg-white border-b">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="text-sm text-gray-600">Canvas Size:</span>
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500">Width:</span>
                     <select 
                       value={canvasSize.width}
@@ -1832,7 +1832,7 @@ export default function TemplateEditorPage() {
                       <option value="1000">1000px (Professional)</option>
                     </select>
                   </div>
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500">Height:</span>
                     <select 
                       value={canvasSize.height}
@@ -1850,42 +1850,44 @@ export default function TemplateEditorPage() {
                 </div>
 
                 {/* Gmail Constraints Toggle */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <label className="flex items-center space-x-2">
                     <input
                       type="checkbox"
                       checked={showGmailConstraints}
                       onChange={(e) => setShowGmailConstraints(e.target.checked)}
                       className="rounded"
+                      title="Toggle Gmail preview zone width overlay"
                     />
                                          <span className="text-sm text-gray-600">Gmail Preview Zone</span>
                   </label>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <label className="flex items-center space-x-2">
                     <input
                       type="checkbox"
                       checked={gmailSafeMode}
                       onChange={(e) => setGmailSafeMode(e.target.checked)}
                       className="rounded"
+                      title="Enable Gmail-safe hints and warnings"
                     />
                     <span className="text-sm text-gray-600">Gmail Safe Mode</span>
                   </label>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-wrap items-center gap-3">
                 {/* Design Warnings */}
                 {designWarnings.length > 0 && (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <div className="text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs border border-orange-200">
                       ⚠️ {designWarnings.length} Gmail issue{designWarnings.length !== 1 ? 's' : ''}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center space-x-2 relative">
+                <div className="flex items-center gap-2 relative">
                   <span className="text-sm text-gray-600">Background:</span>
                   <button
                     onClick={() => setShowColorPicker({elementId: 'canvas', property: 'backgroundColor'})}

@@ -81,6 +81,7 @@ export default function TemplateEditorPage() {
   const [gmailSafeMode, setGmailSafeMode] = useState(true)
   const [designWarnings, setDesignWarnings] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState<{elementId: string, property: string} | null>(null)
   const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -2607,13 +2608,23 @@ export default function TemplateEditorPage() {
             style={{ width: propertiesPanelWidth }}
           >
             <div className="h-full overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b p-4 z-10">
-                <div className="flex items-center justify-between">
+              <div className="sticky top-0 bg-white border-b p-3 z-10">
+                <div className="flex items-center justify-between gap-2">
                   <h4 className="font-medium text-gray-900">Element Properties</h4>
-                  <span className="text-xs text-gray-500">{propertiesPanelWidth}px</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 hidden sm:inline">{propertiesPanelWidth}px</span>
+                    <button
+                      type="button"
+                      onClick={() => setPropertiesCollapsed(prev => !prev)}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                      title="Collapse/expand properties"
+                    >
+                      {propertiesCollapsed ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="p-4">
+              <div className={`p-4 transition-[max-height,opacity] duration-200 ease-out ${propertiesCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[calc(100vh-6rem)] opacity-100'}`}>
                 {/* Gmail Design Warnings Panel */}
                 {gmailSafeMode && designWarnings.length > 0 && (
                   <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
@@ -2628,9 +2639,9 @@ export default function TemplateEditorPage() {
                         </div>
                       ))}
                     </div>
-                                         <div className="mt-3 text-xs text-orange-600">
-                       💡 Tip: Side-by-side elements will stack vertically in Gmail. Consider vertical layouts for critical content.
-                     </div>
+                    <div className="mt-3 text-xs text-orange-600">
+                      💡 Tip: Side-by-side elements will stack vertically in Gmail. Consider vertical layouts for critical content.
+                    </div>
                   </div>
                 )}
 

@@ -2355,6 +2355,46 @@ export default function TemplateEditorPage() {
                     <option value="25">25px</option>
                   </select>
                 </div>
+                {/* Zoom controls */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Zoom:</span>
+                  <div className="flex items-center gap-1">
+                    {[50, 75, 100, 125].map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setZoom(v as 50 | 75 | 100 | 125)}
+                        className={`px-2 py-1 text-sm border rounded ${zoom === v ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        {v}%
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                    onClick={() => {
+                      const container = document.getElementById('canvas-scroll')
+                      if (container) {
+                        const padding = 64
+                        const avail = container.clientWidth - padding
+                        const zRaw = Math.round((avail / canvasSize.width) * 100)
+                        const allowed = [50, 75, 100, 125] as const
+                        const closest = allowed.reduce((b, a) => (Math.abs(a - zRaw) < Math.abs(b - zRaw) ? a : b), allowed[0])
+                        setZoom(closest)
+                      }
+                    }}
+                  >
+                    Fit
+                  </button>
+                  <button
+                    className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                    onClick={() => {
+                      const container = document.getElementById('canvas-scroll')
+                      if (container) container.scrollTo({ left: 0, top: 0, behavior: 'smooth' })
+                    }}
+                  >
+                    Center
+                  </button>
+                </div>
               </div>
             </div>
           </div>

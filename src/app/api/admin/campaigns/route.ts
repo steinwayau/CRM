@@ -6,6 +6,7 @@ const prisma = new PrismaClient()
 export async function GET() {
   try {
     const campaigns = await prisma.emailCampaign.findMany({
+      where: { NOT: { status: 'deleted' } },
       orderBy: {
         createdAt: 'desc'
       }
@@ -92,8 +93,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await prisma.emailCampaign.delete({
-      where: { id }
+    // Soft delete: mark as deleted but keep record for analytics integrity
+    await prisma.emailCampaign.update({
+      where: { id },
+      data: { status: 'deleted' }
     })
 
     return NextResponse.json({ success: true })

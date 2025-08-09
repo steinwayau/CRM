@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const start = searchParams.get('start')
     const end = searchParams.get('end')
 
-    const where: any = {}
+    const where: any = { NOT: { status: 'deleted' } }
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },

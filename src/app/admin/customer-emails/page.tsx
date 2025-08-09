@@ -168,6 +168,7 @@ export default function CustomerEmailsPage() {
   const [resetFrom, setResetFrom] = useState('')
   const [resetTo, setResetTo] = useState('')
   const [viewContext, setViewContext] = useState<'campaigns'|'previous'>('campaigns')
+  const [prevStatus, setPrevStatus] = useState<'all'|'draft'|'scheduled'|'sending'|'sent'|'paused'|'archived'|'deleted'>('all')
 
   const computeDateRange = () => {
     const now = new Date()
@@ -1832,6 +1833,19 @@ export default function CustomerEmailsPage() {
           </div>
         )}
         <div className="ml-auto flex items-end gap-2">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Status</label>
+            <select value={prevStatus} onChange={(e)=>setPrevStatus(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-md text-sm">
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="sending">Sending</option>
+              <option value="sent">Sent</option>
+              <option value="paused">Paused</option>
+              <option value="archived">Archived</option>
+              <option value="deleted">Deleted</option>
+            </select>
+          </div>
           <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
           <button onClick={() => { loadPreviousCampaigns() }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
         </div>
@@ -2033,6 +2047,19 @@ export default function CustomerEmailsPage() {
               </div>
             )}
             <div className="ml-auto flex items-end gap-2">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Status</label>
+                <select value={prevStatus} onChange={(e)=>setPrevStatus(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                  <option value="all">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="sending">Sending</option>
+                  <option value="sent">Sent</option>
+                  <option value="paused">Paused</option>
+                  <option value="archived">Archived</option>
+                  <option value="deleted">Deleted</option>
+                </select>
+              </div>
               <input value={campaignSearch} onChange={(e)=>setCampaignSearch(e.target.value)} placeholder="Type name or subject…" className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
               <button onClick={() => { loadPreviousCampaigns() }} className="px-3 py-2 bg-gray-900 text-white rounded-md">Apply</button>
             </div>
@@ -2101,6 +2128,7 @@ export default function CustomerEmailsPage() {
     if (end) params.set('end', end)
     params.set('page', String(prevPage))
     params.set('pageSize', String(prevPageSize))
+    if (prevStatus) params.set('status', prevStatus)
     const res = await fetch(`/api/admin/campaigns/search?${params.toString()}`, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
@@ -2164,6 +2192,11 @@ export default function CustomerEmailsPage() {
     }, 400)
     return () => clearTimeout(t)
   }, [campaignSearch, datePreset, customFrom, customTo, activeTab, prevPage, prevPageSize])
+
+  useEffect(() => {
+    if (activeTab !== 'analytics') return
+    loadPreviousCampaigns()
+  }, [prevStatus])
 
   if (loading) {
     return (

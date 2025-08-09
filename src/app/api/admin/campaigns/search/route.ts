@@ -12,8 +12,19 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(50, parseInt(searchParams.get('pageSize') || '20'))
     const start = searchParams.get('start')
     const end = searchParams.get('end')
+    const status = (searchParams.get('status') || '').trim().toLowerCase()
 
-    const where: any = { NOT: { status: 'deleted' } }
+    // Default: exclude deleted
+    const where: any = status === 'all' ? {} : { NOT: { status: 'deleted' } }
+
+    // Optional specific status filter
+    if (status && status !== 'all') {
+      // allow deleted or any known status
+      where.status = status
+      // if we set explicit status, remove NOT deleted guard to avoid conflict
+      if (status === 'deleted') delete where.NOT
+    }
+
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },

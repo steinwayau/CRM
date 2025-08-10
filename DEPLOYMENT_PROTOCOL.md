@@ -294,3 +294,63 @@ npx vercel --prod  # Deploy to production
 ---
 
 **🚨 REMEMBER: This protocol exists because 55+ agents have failed with deployment issues. Following it exactly is not optional - it's mandatory for success. 🚨** 
+
+---
+
+## 🔒 Single Source of Truth (SST) Deployment Flow
+
+Follow this exact order. Do not mix paths.
+
+1) Commit and push to GitHub main
+```
+git add -A
+git commit -m "DEPLOY: <short description>"
+git push origin main
+```
+2) Watch Vercel Deployments page until the new Production build is Ready
+- Project: `epg-crm`
+- Branch: `main`
+- Status: Ready
+
+3) Verify alias points to the new deployment (must be the custom domain)
+```
+npx vercel inspect crm.steinway.com.au | cat
+# Expect: Aliases section includes https://crm.steinway.com.au on the NEW deployment URL
+```
+If alias is NOT on the new deployment (or UI looks stale), do ONE of the following, not both:
+- A) Promote the new deployment to the alias
+```
+npx vercel alias set <new-deployment>.vercel.app crm.steinway.com.au | cat
+```
+- B) Force a cache-bypassed rebuild, then re-alias
+```
+npx vercel --prod --force | cat
+npx vercel alias set <forced-deployment>.vercel.app crm.steinway.com.au | cat
+```
+
+4) Validate on production without forcing user cache clears
+- Add a tiny version chip change (e.g., "Editor v <shortSHA> · EG vX.Y") so the new UI is visually obvious
+- Open `https://crm.steinway.com.au/?v=<shortSHA>` to bypass intermediate caching safely
+
+5) Record the deployment
+- Paste deployment URL and time into the task comment or doc
+- Example: `Deployed epg-ot4595o12… → crm.steinway.com.au (13:14 AEST)`
+
+---
+
+## ✅ Operator Checklist (must tick each)
+- [ ] Pushed to GitHub `main` and saw commit on GitHub
+- [ ] Vercel Deployment for `main` shows Ready
+- [ ] `vercel inspect crm.steinway.com.au` shows the new deployment URL under Aliases
+- [ ] If not, ran `vercel alias set … crm.steinway.com.au` against the intended deployment
+- [ ] Verified visually on the main domain (version chip updated)
+- [ ] Posted deployment ID + timestamp in the task
+
+---
+
+## 🧯 Troubleshooting playbook (fast)
+- Seeing old UI but deployment says Ready:
+  - Confirm alias via: `vercel inspect crm.steinway.com.au`
+  - If alias is old, run: `vercel alias set <new>.vercel.app crm.steinway.com.au`
+  - If still stale, run: `vercel --prod --force` then alias set again
+- Never tell the user “deployed” until alias inspect confirms the mapping. 

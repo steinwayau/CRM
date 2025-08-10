@@ -44,7 +44,13 @@ When you make changes to the CRM:
 
 ### **Check Deployment Status**
 - **Vercel Dashboard**: https://vercel.com/dashboard
-- **Live URL**: https://epg-5ntmuif34-louie-veleskis-projects-15c3bc4c.vercel.app
+- **Production URL**: https://crm.steinway.com.au
+
+#### Verify alias is correct (required)
+```
+npx vercel inspect crm.steinway.com.au | cat
+# Aliases must include https://crm.steinway.com.au on the latest deployment
+```
 
 ### **Email Reminders**
 - Still working via GitHub Actions cron job (every hour)

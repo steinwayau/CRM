@@ -598,8 +598,11 @@ export default function TemplateEditorPage() {
     
     const guides = disableSnapRef.current ? [] : getAlignmentGuides(draggedElement, snappedX, snappedY)
     const threshold = SNAP_TOLERANCE
+    const equalTolerance = 1 // px: strict equality for green + snap
     const measurements: Array<{ x1:number,y1:number,x2:number,y2:number,label:string,color?:string }> = []
     const neighborRects: Array<{ x:number,y:number,w:number,h:number }> = []
+    let eqX = false
+    let eqY = false
     
     // Equal-gap snapping (horizontal)
     if (!disableSnapRef.current) {
@@ -607,22 +610,23 @@ export default function TemplateEditorPage() {
       if (left && right) {
         const gapLeft = snappedX - (left.style.position.x + left.style.width)
         const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
-        const equalNow = Math.abs(gapLeft - gapRight) <= threshold
+        const equalVisual = Math.abs(gapLeft - gapRight) <= equalTolerance
         measurements.push({
           x1: left.style.position.x + left.style.width, y1: snappedY - 12,
-          x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: equalNow ? '#10b981' : '#3b82f6'
+          x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: equalVisual ? '#10b981' : '#3b82f6'
         })
         measurements.push({
           x1: snappedX + draggedElement.style.width, y1: snappedY - 12,
-          x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: equalNow ? '#10b981' : '#3b82f6'
+          x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: equalVisual ? '#10b981' : '#3b82f6'
         })
         neighborRects.push(
           { x: left.style.position.x, y: left.style.position.y, w: left.style.width, h: left.style.height },
           { x: right.style.position.x, y: right.style.position.y, w: right.style.width, h: right.style.height }
         )
         const targetCenterX = (left.style.position.x + left.style.width + right.style.position.x) / 2 - draggedElement.style.width / 2
-        if (equalNow) {
+        if (equalVisual) {
           snappedX = targetCenterX
+          eqX = true
         }
       }
       // Equal-gap snapping (vertical)
@@ -630,27 +634,28 @@ export default function TemplateEditorPage() {
       if (above && below) {
         const gapTop = snappedY - (above.style.position.y + above.style.height)
         const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
-        const equalNowV = Math.abs(gapTop - gapBottom) <= threshold
+        const equalVisualV = Math.abs(gapTop - gapBottom) <= equalTolerance
         measurements.push({
           x1: snappedX - 12, y1: above.style.position.y + above.style.height,
-          x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: equalNowV ? '#10b981' : '#3b82f6'
+          x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: equalVisualV ? '#10b981' : '#3b82f6'
         })
         measurements.push({
           x1: snappedX - 12, y1: snappedY + draggedElement.style.height,
-          x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: equalNowV ? '#10b981' : '#3b82f6'
+          x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: equalVisualV ? '#10b981' : '#3b82f6'
         })
         neighborRects.push(
           { x: above.style.position.x, y: above.style.position.y, w: above.style.width, h: above.style.height },
           { x: below.style.position.x, y: below.style.position.y, w: below.style.width, h: below.style.height }
         )
         const targetCenterY = (above.style.position.y + above.style.height + below.style.position.y) / 2 - draggedElement.style.height / 2
-        if (equalNowV) {
+        if (equalVisualV) {
           snappedY = targetCenterY
+          eqY = true
         }
       }
     }
     
-    // Choose a single best guide per axis
+    // Choose a single best guide per axis (skip when equal-gap already engaged)
     const elementCenterX = snappedX + draggedElement.style.width / 2
     const elementCenterY = snappedY + draggedElement.style.height / 2
     const vCandidates = guides.filter(g => g.type === 'vertical')
@@ -666,23 +671,25 @@ export default function TemplateEditorPage() {
       Math.abs(snappedY + draggedElement.style.height - pos)
     )
     let bestV = vCandidates.sort((a,b)=> distX(a.position) - distX(b.position))[0]
-    if (bestV && distX(bestV.position) < threshold) {
+    if (!eqX && bestV && distX(bestV.position) < threshold) {
       // Snap X to the closest feature on this vertical line
       const dCenter = Math.abs(elementCenterX - bestV.position)
       const dLeft = Math.abs(snappedX - bestV.position)
       const dRight = Math.abs(snappedX + draggedElement.style.width - bestV.position)
-              if (dCenter <= dLeft && dCenter <= dRight) {
-          snappedX = bestV.position - draggedElement.style.width / 2
-        } else if (dLeft <= dRight) {
-          snappedX = bestV.position
-        } else {
-          snappedX = bestV.position - draggedElement.style.width
-        }
+      if (dCenter <= dLeft && dCenter <= dRight) {
+        snappedX = bestV.position - draggedElement.style.width / 2
+      } else if (dLeft <= dRight) {
+        snappedX = bestV.position
+      } else {
+        snappedX = bestV.position - draggedElement.style.width
+      }
+    } else if (eqX) {
+      bestV = undefined as any
     } else {
       bestV = undefined as any
     }
     let bestH = hCandidates.sort((a,b)=> distY(a.position) - distY(b.position))[0]
-    if (bestH && distY(bestH.position) < threshold) {
+    if (!eqY && bestH && distY(bestH.position) < threshold) {
       const dCenter = Math.abs(elementCenterY - bestH.position)
       const dTop = Math.abs(snappedY - bestH.position)
       const dBottom = Math.abs(snappedY + draggedElement.style.height - bestH.position)
@@ -693,6 +700,8 @@ export default function TemplateEditorPage() {
       } else {
         snappedY = bestH.position - draggedElement.style.height
       }
+    } else if (eqY) {
+      bestH = undefined as any
     } else {
       bestH = undefined as any
     }

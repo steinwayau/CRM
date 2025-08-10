@@ -550,7 +550,7 @@ export default function TemplateEditorPage() {
         const bLeft = el.style.position.x
         const bRight = el.style.position.x + el.style.width
         const overlap = Math.min(aRight, bRight) - Math.max(aLeft, bLeft)
-        return overlap >= -20 // allow slight misalignment
+        return overlap >= -200 // allow significant misalignment for narrow elements (e.g., buttons)
       })
       .slice(0, MAX_NEIGHBORS_FOR_SNAP)
     const above = candidates
@@ -2964,7 +2964,8 @@ export default function TemplateEditorPage() {
                             fontWeight: element.style.fontWeight || 'medium',
                             fontFamily: element.style.fontFamily,
                             fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration
+                            textDecoration: element.style.textDecoration,
+                            pointerEvents: 'none' // allow measurement overlays to show unobstructed on top of buttons
                           }}
                           onDoubleClick={(e) => {
                             e.stopPropagation()

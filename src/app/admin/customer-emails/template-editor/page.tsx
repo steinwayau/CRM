@@ -398,6 +398,8 @@ export default function TemplateEditorPage() {
   const [angleHint, setAngleHint] = useState<number | null>(null)
   const [measureOverlays, setMeasureOverlays] = useState<Array<{ x1: number, y1: number, x2: number, y2: number, label: string, color?: string }>>([])
   const [neighborHighlights, setNeighborHighlights] = useState<Array<{ x: number, y: number, w: number, h: number }>>([])
+  // Remember last used spacing (for Canva-like consistent spacing)
+  const lastGapRef = useRef<{ vertical: number | null; horizontal: number | null }>({ vertical: null, horizontal: null })
   const MAX_NEIGHBORS_FOR_SNAP = 40
   const [zoom, setZoom] = useState<50 | 75 | 100 | 125>(100)
   const [fadeTick, setFadeTick] = useState(0) // changes to trigger label fade timing
@@ -606,18 +608,40 @@ export default function TemplateEditorPage() {
     
     // Equal-gap snapping (horizontal)
     if (!disableSnapRef.current) {
-      const { left, right } = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const hr1 = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const left1 = hr1.left; const right1 = hr1.right;
+      if (left1 || right1) {
+        const memH = lastGapRef.current.horizontal
+        // Prefer memory-based target if present against the nearest neighbor
+        if (memH != null) {
+          // If left neighbor exists, target x so left gap = memH
+          if (left1 && Math.abs((snappedX - (left1.style.position.x + left1.style.width)) - memH) <= threshold) {
+            snappedX = left1.style.position.x + left1.style.width + memH
+            eqX = true
+          }
+          // If right neighbor exists, target x so right gap = memH
+          if (!eqX && right1 && Math.abs((right1.style.position.x - (snappedX + draggedElement.style.width)) - memH) <= threshold) {
+            snappedX = right1.style.position.x - draggedElement.style.width - memH
+            eqX = true
+          }
+        }
+      }
+      const hr2 = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const left = hr2.left; const right = hr2.right;
       if (left && right) {
         const gapLeft = snappedX - (left.style.position.x + left.style.width)
         const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
         const equalVisual = Math.abs(gapLeft - gapRight) <= equalTolerance
+        const memH = lastGapRef.current.horizontal
+        const matchLeftMem = memH != null && Math.abs(gapLeft - memH) <= threshold
+        const matchRightMem = memH != null && Math.abs(gapRight - memH) <= threshold
         measurements.push({
           x1: left.style.position.x + left.style.width, y1: snappedY - 12,
-          x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: equalVisual ? '#10b981' : '#3b82f6'
+          x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: (equalVisual || matchLeftMem) ? '#10b981' : '#3b82f6'
         })
         measurements.push({
           x1: snappedX + draggedElement.style.width, y1: snappedY - 12,
-          x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: equalVisual ? '#10b981' : '#3b82f6'
+          x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: (equalVisual || matchRightMem) ? '#10b981' : '#3b82f6'
         })
         neighborRects.push(
           { x: left.style.position.x, y: left.style.position.y, w: left.style.width, h: left.style.height },
@@ -629,19 +653,38 @@ export default function TemplateEditorPage() {
           eqX = true
         }
       }
-      // Equal-gap snapping (vertical)
-      const { above, below } = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      // Equal-gap + memory snapping (vertical)
+      const vr1 = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const above1 = vr1.above; const below1 = vr1.below;
+      if (above1 || below1) {
+        const memV = lastGapRef.current.vertical
+        if (memV != null) {
+          if (above1 && Math.abs((snappedY - (above1.style.position.y + above1.style.height)) - memV) <= threshold) {
+            snappedY = above1.style.position.y + above1.style.height + memV
+            eqY = true
+          }
+          if (!eqY && below1 && Math.abs((below1.style.position.y - (snappedY + draggedElement.style.height)) - memV) <= threshold) {
+            snappedY = below1.style.position.y - draggedElement.style.height - memV
+            eqY = true
+          }
+        }
+      }
+      const vr2 = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const above = vr2.above; const below = vr2.below;
       if (above && below) {
         const gapTop = snappedY - (above.style.position.y + above.style.height)
         const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
         const equalVisualV = Math.abs(gapTop - gapBottom) <= equalTolerance
+        const memV = lastGapRef.current.vertical
+        const matchTopMem = memV != null && Math.abs(gapTop - memV) <= threshold
+        const matchBottomMem = memV != null && Math.abs(gapBottom - memV) <= threshold
         measurements.push({
           x1: snappedX - 12, y1: above.style.position.y + above.style.height,
-          x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: equalVisualV ? '#10b981' : '#3b82f6'
+          x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: (equalVisualV || matchTopMem) ? '#10b981' : '#3b82f6'
         })
         measurements.push({
           x1: snappedX - 12, y1: snappedY + draggedElement.style.height,
-          x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: equalVisualV ? '#10b981' : '#3b82f6'
+          x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: (equalVisualV || matchBottomMem) ? '#10b981' : '#3b82f6'
         })
         neighborRects.push(
           { x: above.style.position.x, y: above.style.position.y, w: above.style.width, h: above.style.height },
@@ -2722,6 +2765,28 @@ export default function TemplateEditorPage() {
                       setMeasureOverlays([])
                       setNeighborHighlights([])
                       disableSnapRef.current = false
+                      // Update spacing memory based on final position
+                      const currentFinal = editorElements.find(el => el.id === element.id) || element
+                      if (currentFinal) {
+                        const { above, below } = getVerticalNeighbors(currentFinal)
+                        if (above || below) {
+                          const gapTop = above ? (currentFinal.style.position.y - (above.style.position.y + above.style.height)) : Number.POSITIVE_INFINITY
+                          const gapBottom = below ? (below.style.position.y - (currentFinal.style.position.y + currentFinal.style.height)) : Number.POSITIVE_INFINITY
+                          const chosenV = Math.min(Math.abs(gapTop), Math.abs(gapBottom))
+                          if (Number.isFinite(chosenV)) {
+                            lastGapRef.current.vertical = Math.round(chosenV)
+                          }
+                        }
+                        const { left, right } = getHorizontalNeighbors(currentFinal)
+                        if (left || right) {
+                          const gapLeft = left ? (currentFinal.style.position.x - (left.style.position.x + left.style.width)) : Number.POSITIVE_INFINITY
+                          const gapRight = right ? (right.style.position.x - (currentFinal.style.position.x + currentFinal.style.width)) : Number.POSITIVE_INFINITY
+                          const chosenH = Math.min(Math.abs(gapLeft), Math.abs(gapRight))
+                          if (Number.isFinite(chosenH)) {
+                            lastGapRef.current.horizontal = Math.round(chosenH)
+                          }
+                        }
+                      }
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
                       interactionRef.current = { active: false, pushed: false }

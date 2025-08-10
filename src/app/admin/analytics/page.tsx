@@ -1,37 +1,42 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+
+interface AnalyticsData {
+  enquiries: { total: number; thisMonth: number; growth: number; conversionRate?: number }
+  sources: Array<{ name: string; count: number; percentage: number }>
+  products: Array<{ name: string; count: number; percentage: number }>
+  staff: Array<{ name: string; enquiries: number; rating: number }>
+}
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState('30days')
-  
-  // Mock data - in real app this would come from API
-  const analytics = {
-    enquiries: {
-      total: 245,
-      thisMonth: 89,
-      growth: 12.5
-    },
-    sources: [
-      { name: 'Website', count: 125, percentage: 51 },
-      { name: 'Referral', count: 78, percentage: 32 },
-      { name: 'Social Media', count: 42, percentage: 17 }
-    ],
-    products: [
-      { name: 'Steinway Grand', count: 45, percentage: 18 },
-      { name: 'Boston Upright', count: 38, percentage: 16 },
-      { name: 'Kawai Digital', count: 32, percentage: 13 },
-      { name: 'Roland Electric', count: 28, percentage: 11 },
-      { name: 'Other', count: 102, percentage: 42 }
-    ],
-    staff: [
-      { name: 'June', enquiries: 34, rating: 4.8 },
-      { name: 'Chris', enquiries: 28, rating: 4.6 },
-      { name: 'Mike', enquiries: 25, rating: 4.7 },
-      { name: 'Alison', enquiries: 22, rating: 4.5 }
-    ]
+  const [data, setData] = useState<AnalyticsData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadData = async (range: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/email/analytics?range=${encodeURIComponent(range)}`)
+      if (!res.ok) throw new Error('Failed to load analytics')
+      const json = await res.json()
+      setData(json)
+    } catch (e: any) {
+      setError(e.message || 'Error loading analytics')
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    loadData(timeRange)
+  }, [timeRange])
+
+  const analytics = data
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -62,6 +67,14 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {loading && (
+          <div className="bg-white rounded-xl shadow-sm border p-6">Loading analytics…</div>
+        )}
+        {error && (
+          <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-4 mb-6">{error}</div>
+        )}
+        {analytics && (
+        <>
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -87,7 +100,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm font-medium text-gray-600">This Month</p>
                 <p className="text-3xl font-bold text-gray-900">{analytics.enquiries.thisMonth}</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  {Math.round((analytics.enquiries.thisMonth / analytics.enquiries.total) * 100)}% of total
+                  {Math.round((analytics.enquiries.thisMonth / Math.max(1, analytics.enquiries.total)) * 100)}% of total
                 </p>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -102,8 +115,8 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-                <p className="text-3xl font-bold text-gray-900">23.4%</p>
-                <p className="text-sm text-green-600 mt-1">+2.1% improvement</p>
+                <p className="text-3xl font-bold text-gray-900">{analytics.enquiries.conversionRate?.toFixed(1) ?? '—'}%</p>
+                <p className="text-sm text-green-600 mt-1">Based on enquiries converted to Sold</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,6 +277,8 @@ export default function AnalyticsPage() {
             </table>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

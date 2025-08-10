@@ -2548,7 +2548,7 @@ export default function TemplateEditorPage() {
                 </div>
               ))}
               {/* Distance/redline overlays (fade) */}
-              {measureOverlays.map((m, i) => (
+              {zoom >= 75 && measureOverlays.map((m, i) => (
                 <div key={`m-${i}`} className={`absolute pointer-events-none z-40 transition-opacity duration-300 ${fadeTick ? 'opacity-60':'opacity-100'}`}
                   style={{
                     left: `${Math.min(m.x1, m.x2)}px`,
@@ -2994,18 +2994,35 @@ export default function TemplateEditorPage() {
                       </>
                       {/* Rotation handle */}
                       {selectedElement === element.id && (
-                        <div
-                          className="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border border-gray-300 rounded-full cursor-crosshair flex items-center justify-center"
-                          onMouseDown={createRotateHandler(element.id)}
-                          title="Rotate (snaps to 0/15/30/45/60/90)"
-                        >
-                          <svg className="w-3 h-3 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 10-7 11"/></svg>
-                        </div>
-                      )}
-                      {angleHint !== null && selectedElement === element.id && (
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded shadow">
-                          {angleHint}°
-                        </div>
+                        <>
+                          {/* Larger rotate handle */}
+                          <div
+                            className="absolute -top-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full cursor-crosshair flex items-center justify-center"
+                            onMouseDown={createRotateHandler(element.id)}
+                            title="Rotate (snaps to 0/15/30/45/60/90)"
+                          >
+                            <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 10-7 11"/></svg>
+                          </div>
+                          {/* Degree ring and tooltip when rotating */}
+                          {angleHint !== null && (
+                            <>
+                              <div
+                                className="absolute pointer-events-none"
+                                style={{
+                                  left: -8,
+                                  top: -8,
+                                  width: element.style.width + 16,
+                                  height: element.style.height + 16,
+                                  borderRadius: '9999px',
+                                  border: '1px dashed rgba(59,130,246,0.6)'
+                                }}
+                              />
+                              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded shadow">
+                                {angleHint}°
+                              </div>
+                            </>
+                          )}
+                        </>
                       )}
                     </>
                   )}

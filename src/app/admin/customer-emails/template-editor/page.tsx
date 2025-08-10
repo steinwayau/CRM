@@ -2560,7 +2560,7 @@ export default function TemplateEditorPage() {
                 </div>
               ))}
               {/* Distance/redline overlays (fade) */}
-              {zoom >= 75 && measureOverlays.map((m, i) => (
+              {measureOverlays.map((m, i) => (
                 <div key={`m-${i}`} className={`absolute pointer-events-none z-40 transition-opacity duration-300 ${fadeTick ? 'opacity-60':'opacity-100'}`}
                   style={{
                     left: `${Math.min(m.x1, m.x2)}px`,
@@ -2572,12 +2572,12 @@ export default function TemplateEditorPage() {
                   }}
                 >
                   <div className="absolute -translate-y-1/2 -translate-x-1/2 text-white text-[10px] px-1.5 py-0.5 rounded"
-                    style={{ left: '50%', top: '50%' }}
+                    style={{ left: '50%', top: '50%', background: m.color || '#10b981' }}
                   >{m.label}</div>
                 </div>
               ))}
               {/* Neighbor highlights */}
-              {zoom >= 75 && neighborHighlights.map((r, i) => (
+              {neighborHighlights.map((r, i) => (
                 <div key={`n-${i}`} className="absolute pointer-events-none z-30"
                   style={{ left: r.x, top: r.y, width: r.w, height: r.h, border: '1px solid rgba(59,130,246,0.4)', borderRadius: 2 }}
                 />

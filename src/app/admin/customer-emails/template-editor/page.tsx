@@ -670,16 +670,13 @@ export default function TemplateEditorPage() {
       const dCenter = Math.abs(elementCenterX - bestV.position)
       const dLeft = Math.abs(snappedX - bestV.position)
       const dRight = Math.abs(snappedX + draggedElement.style.width - bestV.position)
-      if (dCenter <= dLeft && dCenter <= dRight) {
-        snappedX = bestV.position - draggedElement.style.width / 2
-        measurements.push({ x1: bestV.position, y1: snappedY - 16, x2: elementCenterX, y2: snappedY - 16, label: `${Math.round(dCenter)}px`, color: '#10b981' })
-      } else if (dLeft <= dRight) {
-        measurements.push({ x1: bestV.position, y1: snappedY - 16, x2: snappedX, y2: snappedY - 16, label: `${Math.round(dLeft)}px`, color: '#10b981' })
-        snappedX = bestV.position
-      } else {
-        measurements.push({ x1: snappedX + draggedElement.style.width, y1: snappedY - 16, x2: bestV.position, y2: snappedY - 16, label: `${Math.round(dRight)}px`, color: '#10b981' })
-        snappedX = bestV.position - draggedElement.style.width
-      }
+              if (dCenter <= dLeft && dCenter <= dRight) {
+          snappedX = bestV.position - draggedElement.style.width / 2
+        } else if (dLeft <= dRight) {
+          snappedX = bestV.position
+        } else {
+          snappedX = bestV.position - draggedElement.style.width
+        }
     } else {
       bestV = undefined as any
     }
@@ -690,12 +687,9 @@ export default function TemplateEditorPage() {
       const dBottom = Math.abs(snappedY + draggedElement.style.height - bestH.position)
       if (dCenter <= dTop && dCenter <= dBottom) {
         snappedY = bestH.position - draggedElement.style.height / 2
-        measurements.push({ x1: snappedX - 16, y1: bestH.position, x2: snappedX - 16, y2: elementCenterY, label: `${Math.round(dCenter)}px`, color: '#10b981' })
       } else if (dTop <= dBottom) {
-        measurements.push({ x1: snappedX - 16, y1: bestH.position, x2: snappedY, y2: bestH.position, label: `${Math.round(dTop)}px`, color: '#10b981' })
         snappedY = bestH.position
       } else {
-        measurements.push({ x1: snappedX - 16, y1: snappedY + draggedElement.style.height, x2: snappedX - 16, y2: bestH.position, label: `${Math.round(dBottom)}px`, color: '#10b981' })
         snappedY = bestH.position - draggedElement.style.height
       }
     } else {
@@ -736,8 +730,9 @@ export default function TemplateEditorPage() {
     snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))
     snappedY = Math.max(0, Math.min(canvasSize.height - draggedElement.style.height, snappedY))
     
-    const finalGuides = [bestV, bestH].filter(Boolean) as any
-    return { x: snappedX, y: snappedY, guides: finalGuides, measurements, neighborRects }
+         // Only keep equal-gap edge labels; remove middle-line numbers from generic snapping
+     const finalGuides = [bestV, bestH].filter(Boolean) as any
+     return { x: snappedX, y: snappedY, guides: finalGuides, measurements, neighborRects }
   }
 
   // Create smooth resize handler

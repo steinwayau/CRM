@@ -652,6 +652,28 @@ export default function TemplateEditorPage() {
           snappedX = targetCenterX
           eqX = true
         }
+      } else if (left || right) {
+        // Single-neighbor memory-based indicator & snap
+        const memH = lastGapRef.current.horizontal
+        if (left) {
+          const gapLeft = snappedX - (left.style.position.x + left.style.width)
+          const matchMem = memH != null && Math.abs(gapLeft - memH) <= threshold
+          measurements.push({
+            x1: left.style.position.x + left.style.width, y1: snappedY - 12,
+            x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: left.style.position.x, y: left.style.position.y, w: left.style.width, h: left.style.height })
+          if (matchMem) { snappedX = left.style.position.x + left.style.width + (memH as number); eqX = true }
+        } else if (right) {
+          const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
+          const matchMem = memH != null && Math.abs(gapRight - memH) <= threshold
+          measurements.push({
+            x1: snappedX + draggedElement.style.width, y1: snappedY - 12,
+            x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: right.style.position.x, y: right.style.position.y, w: right.style.width, h: right.style.height })
+          if (matchMem) { snappedX = right.style.position.x - draggedElement.style.width - (memH as number); eqX = true }
+        }
       }
       // Equal-gap + memory snapping (vertical)
       const vr1 = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
@@ -694,6 +716,28 @@ export default function TemplateEditorPage() {
         if (equalVisualV) {
           snappedY = targetCenterY
           eqY = true
+        }
+      } else if (above || below) {
+        // Single-neighbor memory-based indicator & snap
+        const memV = lastGapRef.current.vertical
+        if (above) {
+          const gapTop = snappedY - (above.style.position.y + above.style.height)
+          const matchMem = memV != null && Math.abs(gapTop - memV) <= threshold
+          measurements.push({
+            x1: snappedX - 12, y1: above.style.position.y + above.style.height,
+            x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: above.style.position.x, y: above.style.position.y, w: above.style.width, h: above.style.height })
+          if (matchMem) { snappedY = above.style.position.y + above.style.height + (memV as number); eqY = true }
+        } else if (below) {
+          const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
+          const matchMem = memV != null && Math.abs(gapBottom - memV) <= threshold
+          measurements.push({
+            x1: snappedX - 12, y1: snappedY + draggedElement.style.height,
+            x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: below.style.position.x, y: below.style.position.y, w: below.style.width, h: below.style.height })
+          if (matchMem) { snappedY = below.style.position.y - draggedElement.style.height - (memV as number); eqY = true }
         }
       }
     }

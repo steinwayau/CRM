@@ -542,12 +542,13 @@ export default function TemplateEditorPage() {
   const getVerticalNeighbors = (dragged: EditorElement) => {
     const candidates = editorElements.filter(el => el.id !== dragged.id)
       .filter(el => {
-        // overlap horizontally
+        // overlap horizontally (with small tolerance so equal-gap works like Canva)
         const aLeft = dragged.style.position.x
         const aRight = dragged.style.position.x + dragged.style.width
         const bLeft = el.style.position.x
         const bRight = el.style.position.x + el.style.width
-        return !(aRight < bLeft || aLeft > bRight)
+        const overlap = Math.min(aRight, bRight) - Math.max(aLeft, bLeft)
+        return overlap >= -20 // allow slight misalignment
       })
       .slice(0, MAX_NEIGHBORS_FOR_SNAP)
     const above = candidates
@@ -608,12 +609,12 @@ export default function TemplateEditorPage() {
         const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
         const equalNow = Math.abs(gapLeft - gapRight) <= threshold
         measurements.push({
-          x1: left.style.position.x + left.style.width, y1: draggedElement.style.position.y - 12,
-          x2: snappedX, y2: draggedElement.style.position.y - 12, label: `${Math.round(gapLeft)}px`, color: equalNow ? '#10b981' : '#3b82f6'
+          x1: left.style.position.x + left.style.width, y1: snappedY - 12,
+          x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: equalNow ? '#10b981' : '#3b82f6'
         })
         measurements.push({
-          x1: snappedX + draggedElement.style.width, y1: draggedElement.style.position.y - 12,
-          x2: right.style.position.x, y2: draggedElement.style.position.y - 12, label: `${Math.round(gapRight)}px`, color: equalNow ? '#10b981' : '#3b82f6'
+          x1: snappedX + draggedElement.style.width, y1: snappedY - 12,
+          x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: equalNow ? '#10b981' : '#3b82f6'
         })
         neighborRects.push(
           { x: left.style.position.x, y: left.style.position.y, w: left.style.width, h: left.style.height },
@@ -631,12 +632,12 @@ export default function TemplateEditorPage() {
         const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
         const equalNowV = Math.abs(gapTop - gapBottom) <= threshold
         measurements.push({
-          x1: draggedElement.style.position.x - 12, y1: above.style.position.y + above.style.height,
-          x2: draggedElement.style.position.x - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: equalNowV ? '#10b981' : '#3b82f6'
+          x1: snappedX - 12, y1: above.style.position.y + above.style.height,
+          x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: equalNowV ? '#10b981' : '#3b82f6'
         })
         measurements.push({
-          x1: draggedElement.style.position.x - 12, y1: snappedY + draggedElement.style.height,
-          x2: draggedElement.style.position.x - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: equalNowV ? '#10b981' : '#3b82f6'
+          x1: snappedX - 12, y1: snappedY + draggedElement.style.height,
+          x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: equalNowV ? '#10b981' : '#3b82f6'
         })
         neighborRects.push(
           { x: above.style.position.x, y: above.style.position.y, w: above.style.width, h: above.style.height },
@@ -877,6 +878,20 @@ export default function TemplateEditorPage() {
           newStyle.position = {
             x: Math.max(0, cx - newStyle.width / 2),
             y: Math.max(0, cy - newStyle.height / 2)
+          }
+        }
+        
+        // Heading-specific behavior: scale font size with box, top-anchored like Canva
+        if (startElement && startElement.type === 'heading') {
+          const startFont = startElement.style.fontSize || 32
+          const scaleX = newStyle.width / Math.max(1, startWidth)
+          const scaleY = newStyle.height / Math.max(1, startHeight)
+          const fontScale = Math.min(scaleX, scaleY)
+          const nextFont = Math.max(10, Math.round(startFont * fontScale))
+          newStyle.fontSize = nextFont
+          // Ensure top stays anchored when dragging bottom handle
+          if (handle === 's' || handle === 'se' || handle === 'sw') {
+            newStyle.position = { x: newStyle.position?.x ?? element.style.position.x, y: element.style.position.y }
           }
         }
         

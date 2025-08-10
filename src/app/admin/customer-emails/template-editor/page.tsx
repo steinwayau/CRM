@@ -2442,10 +2442,7 @@ export default function TemplateEditorPage() {
                   width: `${Math.round(canvasSize.width * (zoom/100))}px`, 
                   minHeight: `${Math.round(canvasSize.height * (zoom/100))}px`,
                   backgroundColor: canvasBackgroundColor,
-                  border: '1px solid #e5e7eb',
-                  backgroundImage: showGrid ? 
-                    `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
-                  backgroundSize: showGrid ? `${Math.round(gridSize * (zoom/100))}px ${Math.round(gridSize * (zoom/100))}px` : 'auto'
+                  border: '1px solid #e5e7eb'
                 }}
                 onClick={(e) => {
                   // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
@@ -2462,6 +2459,16 @@ export default function TemplateEditorPage() {
                   }
                 }}
               >
+              {/* Scale wrapper so children keep exact coordinates */}
+              <div
+                className="relative"
+                style={{
+                  width: `${canvasSize.width}px`,
+                  height: `${canvasSize.height}px`,
+                  transform: `scale(${zoom/100})`,
+                  transformOrigin: 'top left'
+                }}
+              >
               {/* Grid overlay */}
               {showGrid && (
                 <div 
@@ -2471,53 +2478,35 @@ export default function TemplateEditorPage() {
                       linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
                       linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px)
                     `,
-                    backgroundSize: `${Math.round(gridSize * (zoom/100))}px ${Math.round(gridSize * (zoom/100))}px`
+                    backgroundSize: `${gridSize}px ${gridSize}px`
                   }}
                 />
               )}
-
-              {/* Gmail 600px Constraint Overlay */}
-              {showGmailConstraints && canvasSize.width > 600 && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Gmail Safe Zone (600px centered) */}
-                  <div 
-                    className="absolute top-0 bg-blue-100 bg-opacity-30 border-2 border-blue-400 border-dashed"
-                    style={{
-                      left: `${(canvasSize.width - 600) / 2}px`,
-                      width: '600px',
-                      height: `${Math.round(canvasSize.height * (zoom/100))}px`
-                    }}
-                  >
-                                         <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                       Gmail Preview Zone (Auto-scales to 600px)
-                     </div>
-                  </div>
-                  
-                  {/* Side margins that will auto-scale in Gmail */}
-                  <div 
-                    className="absolute top-0 left-0 bg-green-100 bg-opacity-30"
-                    style={{
-                      width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${Math.round(canvasSize.height * (zoom/100))}px`
-                    }}
-                  >
-                                         <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded rotate-90 origin-bottom-left">
-                       Auto-scales to fit
-                     </div>
-                  </div>
-                  <div 
-                    className="absolute top-0 right-0 bg-green-100 bg-opacity-30"
-                    style={{
-                      width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${Math.round(canvasSize.height * (zoom/100))}px`
-                    }}
-                  >
-                                         <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
-                       Auto-scales to fit
-                     </div>
-                  </div>
+              {/* Gmail preview zone banner */}
+              <div
+                className="absolute left-1/2 -translate-x-1/2 text-xs text-gray-500"
+                style={{ top: '-24px' }}
+              >
+                Gmail Preview Zone (Auto-scales to 600px)
+              </div>
+              <div
+                className="absolute"
+                style={{
+                  left: `${(canvasSize.width - 600) / 2}px`,
+                  width: '600px',
+                  height: `${canvasSize.height}px`
+                }}
+              >
+                <div className="absolute inset-y-0 left-0 w-px bg-blue-300" />
+                <div className="absolute inset-y-0 right-0 w-px bg-blue-300" />
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded border border-blue-300 shadow-sm">
+                  Gmail Preview Zone (Auto-scales to 600px)
                 </div>
-              )}
+                {/* Watermark tag */}
+                <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
+                  Auto-scales to fit
+                </div>
+              </div>
               
               {/* Alignment guides */}
               {showAlignmentGuides.map((guide, index) => (
@@ -2526,7 +2515,7 @@ export default function TemplateEditorPage() {
                   className="absolute pointer-events-none z-50"
                   style={{
                     ...(guide.type === 'vertical' ? {
-                      left: Math.round(guide.position * (zoom/100)),
+                      left: guide.position,
                       top: 0,
                       width: '1px',
                       height: '100%',
@@ -2534,7 +2523,7 @@ export default function TemplateEditorPage() {
                       boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
                     } : {
                       left: 0,
-                      top: Math.round(guide.position * (zoom/100)),
+                      top: guide.position,
                       width: '100%',
                       height: '1px',
                       backgroundColor: '#3b82f6',
@@ -2562,10 +2551,10 @@ export default function TemplateEditorPage() {
               {measureOverlays.map((m, i) => (
                 <div key={`m-${i}`} className={`absolute pointer-events-none z-40 transition-opacity duration-300 ${fadeTick ? 'opacity-60':'opacity-100'}`}
                   style={{
-                    left: `${Math.round(Math.min(m.x1, m.x2) * (zoom/100))}px`,
-                    top: `${Math.round(Math.min(m.y1, m.y2) * (zoom/100))}px`,
-                    width: `${Math.max(1, Math.round(Math.abs(m.x2 - m.x1) * (zoom/100)))}px`,
-                    height: `${Math.max(1, Math.round(Math.abs(m.y2 - m.y1) * (zoom/100)))}px`,
+                    left: `${Math.min(m.x1, m.x2)}px`,
+                    top: `${Math.min(m.y1, m.y2)}px`,
+                    width: `${Math.max(1, Math.abs(m.x2 - m.x1))}px`,
+                    height: `${Math.max(1, Math.abs(m.y2 - m.y1))}px`,
                     borderTop: m.y1 === m.y2 ? '1px dashed #10b981' : undefined,
                     borderLeft: m.x1 === m.x2 ? '1px dashed #10b981' : undefined,
                   }}
@@ -2584,10 +2573,10 @@ export default function TemplateEditorPage() {
                     draggedElement === element.id ? 'shadow-lg opacity-80' : ''
                   }`}
                   style={{
-                    left: Math.round(element.style.position.x * (zoom/100)),
-                    top: Math.round(element.style.position.y * (zoom/100)),
-                    width: Math.round(element.style.width * (zoom/100)),
-                    height: Math.round(element.style.height * (zoom/100)),
+                    left: element.style.position.x,
+                    top: element.style.position.y,
+                    width: element.style.width,
+                    height: element.style.height,
                     zIndex: selectedElement === element.id ? 10 : 1,
                     userSelect: 'none',
                     transform: element.style.rotation ? `rotate(${element.style.rotation}deg)` : undefined,
@@ -2637,6 +2626,9 @@ export default function TemplateEditorPage() {
                     const handleMouseMove = (e: MouseEvent) => {
                       e.preventDefault()
                       disableSnapRef.current = e.metaKey || e.ctrlKey
+                      if (!interactionRef.current.active) {
+                        interactionRef.current = { active: true, pushed: false }
+                      }
                       
                       // Calculate how far mouse has moved
                       const deltaX = Math.abs(e.clientX - startMouseX)
@@ -2693,6 +2685,7 @@ export default function TemplateEditorPage() {
                       disableSnapRef.current = false
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
+                      interactionRef.current = { active: false, pushed: false }
                       
                       // Reset drag state after a delay to allow click handler to check it
                       dragTimeoutRef.current = setTimeout(() => {
@@ -2730,16 +2723,15 @@ export default function TemplateEditorPage() {
                             textAlign: element.style.textAlign,
                             width: '100%',
                             height: '100%',
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
                             resize: 'none',
+                            outline: 'none',
+                            border: 'none',
                             overflow: 'hidden'
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
                         />
                       ) : (
                         <div
+                          className="w-full h-full"
                           style={{
                             fontSize: element.style.fontSize,
                             fontWeight: element.style.fontWeight,
@@ -2750,29 +2742,15 @@ export default function TemplateEditorPage() {
                             backgroundColor: element.style.backgroundColor,
                             padding: element.style.padding,
                             borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
-                            border: '1px solid #e5e7eb',
-                            cursor: 'text'
+                            textAlign: element.style.textAlign
                           }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Start editing immediately on single click, but only if not dragging
-                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              startEditingText(element.id)
-                            }
-                          }}
+                          onDoubleClick={() => startEditingText(element.id)}
                         >
-                          {element.content}
+                          {element.content || 'Double-click to edit text'}
                         </div>
                       )}
                     </>
                   )}
-                  
                   {element.type === 'heading' && (
                     <>
                       {editingTextElement === element.id ? (
@@ -2795,16 +2773,15 @@ export default function TemplateEditorPage() {
                             textAlign: element.style.textAlign,
                             width: '100%',
                             height: '100%',
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
                             resize: 'none',
+                            outline: 'none',
+                            border: 'none',
                             overflow: 'hidden'
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
                         />
                       ) : (
                         <div
+                          className="w-full h-full"
                           style={{
                             fontSize: element.style.fontSize,
                             fontWeight: element.style.fontWeight,
@@ -2815,29 +2792,15 @@ export default function TemplateEditorPage() {
                             backgroundColor: element.style.backgroundColor,
                             padding: element.style.padding,
                             borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
-                            border: '1px solid #e5e7eb',
-                            cursor: 'text'
+                            textAlign: element.style.textAlign
                           }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Start editing immediately on single click, but only if not dragging
-                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              startEditingText(element.id)
-                            }
-                          }}
+                          onDoubleClick={() => startEditingText(element.id)}
                         >
-                          {element.content}
+                          {element.content || 'Double-click to edit text'}
                         </div>
                       )}
                     </>
                   )}
-                  
                   {element.type === 'image' && (
                     <img 
                       src={element.content} 
@@ -2850,7 +2813,6 @@ export default function TemplateEditorPage() {
                       }}
                     />
                   )}
-                  
                   {element.type === 'button' && (
                     <>
                       {editingTextElement === element.id ? (
@@ -2910,7 +2872,6 @@ export default function TemplateEditorPage() {
                       )}
                     </>
                   )}
-                  
                   {element.type === 'video' && (
                     <div
                       style={{
@@ -2957,7 +2918,6 @@ export default function TemplateEditorPage() {
                       )}
                     </div>
                   )}
-                  
                   {element.type === 'divider' && (
                     <div
                       style={{
@@ -2968,7 +2928,6 @@ export default function TemplateEditorPage() {
                       }}
                     />
                   )}
-                  
                   {selectedElement === element.id && (
                     <>
                       <button
@@ -3052,6 +3011,7 @@ export default function TemplateEditorPage() {
                   )}
                 </div>
               ))}
+              </div>{/* end scale wrapper */}
               
               {editorElements.length === 0 && (
                 <div className="flex items-center justify-center h-full">
@@ -3059,8 +3019,7 @@ export default function TemplateEditorPage() {
                     <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    <p className="text-gray-500 text-lg">Start by adding elements from the sidebar</p>
-                    <p className="text-gray-400 text-sm mt-2">Drag and drop elements to build your email template</p>
+                    <p className="text-gray-600">Start by selecting an element on the left.</p>
                   </div>
                 </div>
               )}

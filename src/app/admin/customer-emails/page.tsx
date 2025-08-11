@@ -303,32 +303,26 @@ export default function CustomerEmailsPage() {
       setAnalyticsLoading(true)
       console.log('🔄 Loading campaign analytics for campaigns:', campaignsList.map(c => ({ id: c.id, name: c.name, status: c.status, sentCount: c.sentCount })))
       const analyticsData: {[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}} = {}
-      
-      for (const campaign of campaignsList) {
-        console.log(`�� Fetching analytics for campaign: ${campaign.id} (${campaign.name}) status=${campaign.status}`)
-        const response = await fetch(`/api/email/analytics?campaignId=${campaign.id}`, { cache: 'no-store' })
-        if (response.ok) {
-          const data = await response.json()
-          console.log(`📈 Analytics data for ${campaign.id}:`, data)
+
+      // Fetch all per-campaign analytics in parallel
+      const responses = await Promise.all(
+        campaignsList.map(c => fetch(`/api/email/analytics?campaignId=${c.id}`, { cache: 'no-store' }).then(r => ({ id: c.id, res: r })).catch(() => ({ id: c.id, res: null as any })))
+      )
+      for (const { id, res } of responses) {
+        if (res && res.ok) {
+          const data = await res.json()
           const opens = typeof data.opens === 'number' ? data.opens : Number(data.opens) || 0
           const clicks = typeof data.clicks === 'number' ? data.clicks : Number(data.clicks) || 0
           const openRate = typeof data.openRate === 'number' ? data.openRate : Number(data.openRate) || 0
           const clickRate = typeof data.clickRate === 'number' ? data.clickRate : Number(data.clickRate) || 0
-          analyticsData[campaign.id] = { opens, clicks, openRate, clickRate }
-        } else {
-          console.error(`❌ Failed to fetch analytics for campaign ${campaign.id}:`, response.status, response.statusText)
+          analyticsData[id] = { opens, clicks, openRate, clickRate }
         }
       }
-      
-      console.log('📊 Final analytics data:', analyticsData)
-      // Debounce state application slightly to avoid UI flicker
-      await new Promise(r => setTimeout(r, 150))
+
+      console.log('📊 Final analytics data (parallel):', analyticsData)
+      await new Promise(r => setTimeout(r, 100))
       setCampaignAnalytics(analyticsData)
-      
-      // Force a re-render by updating a timestamp
       setForceRender(Date.now())
-      
-      // Also load overall analytics
       await loadOverallAnalytics()
       setAnalyticsLoading(false)
     } catch (error) {
@@ -340,87 +334,73 @@ export default function CustomerEmailsPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Load customers from API
-      const response = await fetch('/api/enquiries')
-      if (response.ok) {
-        const data = await response.json()
-        
-        // Transform enquiry data to customer format (keeping transformation logic)
-        const transformedCustomers: Customer[] = data.map((enquiry: any) => ({
-          id: enquiry.id,
-          firstName: enquiry.firstName || '',
-          lastName: enquiry.lastName || '',
-          email: enquiry.email || '',
-          phone: enquiry.phone || '',
-          state: enquiry.state || '',
-          suburb: enquiry.suburb || '',
-          nationality: enquiry.nationality || '',
-          productInterest: enquiry.pianoModel ? [enquiry.pianoModel] : [],
-          source: enquiry.enquirySource || '',
-          eventSource: enquiry.eventSource || '',
-          customerRating: enquiry.customerRating || '',
-          status: enquiry.status || 'New',
-          doNotEmail: enquiry.doNotEmail || false,
-          createdAt: enquiry.createdAt || new Date().toISOString()
+      // Load campaigns first (fast-path for Campaigns tab)
+      const campaignResponse = await fetch('/api/admin/campaigns')
+      if (campaignResponse.ok) {
+        const campaignData = await campaignResponse.json()
+        const campaignsWithCustomEmails = campaignData.map((campaign: any) => ({
+          ...campaign,
+          customEmails: campaign.textContent || ''
         }))
-        
-        console.log('Loaded', transformedCustomers.length, 'customers')
-        setCustomers(transformedCustomers)
-        
-        // Load templates from database first, fallback to localStorage
-        try {
-          const templateResponse = await fetch('/api/admin/templates')
-          if (templateResponse.ok) {
-            const dbTemplates = await templateResponse.json()
-            setTemplates(dbTemplates)
-            
-            // Check if we need to migrate localStorage templates
-            if (dbTemplates.length === 0) {
-              const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-              if (savedTemplates.length > 0) {
-                console.log('Migrating templates from localStorage to database...')
-                await migrateTemplatesFromLocalStorage()
-              }
-            }
-          } else {
-            throw new Error('Failed to load templates from database')
-          }
-        } catch (error) {
-          console.error('Error loading templates, falling back to localStorage:', error)
-          const savedTemplates = JSON.parse(localStorage.getItem('emailTemplates') || '[]')
-          setTemplates(savedTemplates)
-        }
-          
-        // Load campaigns from database
-        const campaignResponse = await fetch('/api/admin/campaigns')
-        if (campaignResponse.ok) {
-          const campaignData = await campaignResponse.json()
-          // Map textContent back to customEmails for campaigns with custom recipient type
-          const campaignsWithCustomEmails = campaignData.map((campaign: any) => ({
-            ...campaign,
-            customEmails: campaign.textContent || ''
-          }))
-          setCampaigns(campaignsWithCustomEmails)
-          
-          // 🚀 IMMEDIATELY LOAD ANALYTICS after campaigns are loaded
-          console.log('🔄 Loading analytics immediately after campaigns loaded')
-          if (campaignsWithCustomEmails.length > 0) {
-            await loadCampaignAnalyticsSync(campaignsWithCustomEmails)
-          } else {
-            // No campaigns: clear per-campaign analytics and refresh overall analytics to reset stats to 0
-            setCampaignAnalytics({})
-            await loadOverallAnalytics()
-            setAnalyticsLoading(false)
-          }
+        setCampaigns(campaignsWithCustomEmails)
+
+        // Start analytics immediately for better perceived performance
+        if (campaignsWithCustomEmails.length > 0) {
+          await loadCampaignAnalyticsSync(campaignsWithCustomEmails)
         } else {
-          console.error('Failed to load campaigns')
-          setCampaigns([])
+          setCampaignAnalytics({})
+          await loadOverallAnalytics()
+          setAnalyticsLoading(false)
         }
+
+        // End initial page loading once campaigns + analytics are ready
+        setLoading(false)
+      } else {
+        console.error('Failed to load campaigns')
+        setCampaigns([])
+        setCampaignAnalytics({})
+        await loadOverallAnalytics()
+        setLoading(false)
       }
-        
+
+      // Fetch customers & templates in background (for other tabs)
+      ;(async () => {
+        try {
+          const [enquiriesRes, templatesRes] = await Promise.all([
+            fetch('/api/enquiries').catch(() => null),
+            fetch('/api/admin/templates').catch(() => null)
+          ])
+          if (enquiriesRes && enquiriesRes.ok) {
+            const data = await enquiriesRes.json()
+            const transformedCustomers: Customer[] = data.map((enquiry: any) => ({
+              id: enquiry.id,
+              firstName: enquiry.firstName || '',
+              lastName: enquiry.lastName || '',
+              email: enquiry.email || '',
+              phone: enquiry.phone || '',
+              state: enquiry.state || '',
+              suburb: enquiry.suburb || '',
+              nationality: enquiry.nationality || '',
+              productInterest: enquiry.pianoModel ? [enquiry.pianoModel] : [],
+              source: enquiry.enquirySource || '',
+              eventSource: enquiry.eventSource || '',
+              customerRating: enquiry.customerRating || '',
+              status: enquiry.status || 'New',
+              doNotEmail: enquiry.doNotEmail || false,
+              createdAt: enquiry.createdAt || new Date().toISOString()
+            }))
+            setCustomers(transformedCustomers)
+          }
+          if (templatesRes && templatesRes.ok) {
+            const dbTemplates = await templatesRes.json()
+            setTemplates(dbTemplates)
+          }
+        } catch (bgErr) {
+          console.log('Background loads failed (non-blocking):', bgErr)
+        }
+      })()
     } catch (error) {
       console.error('Error loading data:', error)
-    } finally {
       setLoading(false)
     }
   }

@@ -1156,7 +1156,7 @@ export default function CustomerEmailsPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">Total Campaigns</p>
-              <p className="text-3xl font-bold text-gray-900">{campaigns.length}</p>
+              <p className="text-3xl font-bold text-gray-900">{campaigns.filter(c => c.status !== 'archived').length}</p>
             </div>
           </div>
         </div>
@@ -1171,7 +1171,7 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Emails Sent</p>
               <p className="text-3xl font-bold text-gray-900">
-                {overallAnalytics?.summary?.totalEmailsSent || campaigns.reduce((sum, c) => sum + c.sentCount, 0)}
+                                 {campaigns.filter(c => c.status !== 'archived').reduce((sum, c) => sum + (c.status === 'sent' ? c.sentCount : 0), 0)}
               </p>
             </div>
           </div>

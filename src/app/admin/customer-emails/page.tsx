@@ -857,39 +857,37 @@ export default function CustomerEmailsPage() {
     setEditingCampaign(false) // Ensure editing is off when viewing
     setDetailedAnalytics(null) // Clear previous detailed analytics
     
-    // Load analytics data if campaign is sent
-    if (campaign.status === 'sent') {
-      try {
-        const [analyticsResponse, detailedResponse] = await Promise.all([
-          fetch(`/api/email/analytics?campaignId=${campaign.id}`),
-          fetch(`/api/email/analytics/detailed?campaignId=${campaign.id}`)
-        ])
-        
-        let updatedCampaign = campaign
-        let detailedData = null
-        
-        if (analyticsResponse.ok) {
-          const analytics = await analyticsResponse.json()
-          updatedCampaign = {
-            ...campaign,
-            openRate: analytics.openRate || 0,
-            clickRate: analytics.clickRate || 0
-          }
+    // Always load analytics data for the selected campaign (supports archived/previous too)
+    try {
+      const [analyticsResponse, detailedResponse] = await Promise.all([
+        fetch(`/api/email/analytics?campaignId=${campaign.id}`, { cache: 'no-store' }),
+        fetch(`/api/email/analytics/detailed?campaignId=${campaign.id}`, { cache: 'no-store' })
+      ])
+      
+      let updatedCampaign = campaign
+      let detailedData = null
+      
+      if (analyticsResponse.ok) {
+        const analytics = await analyticsResponse.json()
+        updatedCampaign = {
+          ...campaign,
+          openRate: typeof analytics.openRate === 'number' ? analytics.openRate : campaign.openRate ?? 0,
+          clickRate: typeof analytics.clickRate === 'number' ? analytics.clickRate : campaign.clickRate ?? 0
         }
-        
-        if (detailedResponse.ok) {
-          detailedData = await detailedResponse.json()
-        }
-        
-        // 🎯 SURGICAL FIX: Set both campaign and detailed analytics together to prevent overwriting
-        setViewingCampaign(updatedCampaign)
-        if (detailedData) {
-          setDetailedAnalytics(detailedData)
-        }
-        
-      } catch (error) {
-        console.error('Error loading campaign analytics:', error)
       }
+      
+      if (detailedResponse.ok) {
+        detailedData = await detailedResponse.json()
+      }
+      
+      // Set both campaign and detailed analytics together
+      setViewingCampaign(updatedCampaign)
+      if (detailedData) {
+        setDetailedAnalytics(detailedData)
+      }
+      
+    } catch (error) {
+      console.error('Error loading campaign analytics:', error)
     }
   }
 
@@ -1111,7 +1109,7 @@ export default function CustomerEmailsPage() {
             setAnalyticsLoading(true)
             try {
               // Always fetch latest campaigns from API to ensure status/sentCount are current
-              const latestResp = await fetch('/api/admin/campaigns')
+              const latestResp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
               if (latestResp.ok) {
                 const latest = await latestResp.json()
                 setCampaigns(latest)

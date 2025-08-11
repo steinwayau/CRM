@@ -765,6 +765,9 @@ async function appendFooterAsync(html: string, recipientEmail: string): Promise<
   const fb = s.footerFacebook || SOCIAL_LINKS.facebook
   const ig = s.footerInstagram || SOCIAL_LINKS.instagram
   const yt = s.footerYouTube || SOCIAL_LINKS.youtube
+  const fbIcon = s.facebookIconUrl || ''
+  const igIcon = s.instagramIconUrl || ''
+  const ytIcon = s.youtubeIconUrl || ''
 
   // Simple circle “icons” (email-safe fallback without external images)
   const circle = (label: string) => 
@@ -788,9 +791,15 @@ async function appendFooterAsync(html: string, recipientEmail: string): Promise<
     </tr>
     <tr>
       <td align="center" style="padding:4px 10px 8px 10px;">
-        <a href="${fb}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('F')}</a>
-        <a href="${ig}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('IG')}</a>
-        <a href="${yt}" style="text-decoration:none" target="_blank" rel="noopener">${circle('YT')}</a>
+        <a href="${fb}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
+          ${fbIcon ? `<img src="${fbIcon}" alt="Facebook" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('F')}
+        </a>
+        <a href="${ig}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
+          ${igIcon ? `<img src="${igIcon}" alt="Instagram" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('IG')}
+        </a>
+        <a href="${yt}" style="text-decoration:none" target="_blank" rel="noopener">
+          ${ytIcon ? `<img src="${ytIcon}" alt="YouTube" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('YT')}
+        </a>
       </td>
     </tr>
   ` : ''

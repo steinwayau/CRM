@@ -96,13 +96,19 @@ export async function DELETE(request: NextRequest) {
 
     if (hard) {
       // Hard delete: remove campaign and cascade related analytics (see prisma schema onDelete: Cascade)
-      await prisma.emailCampaign.delete({ where: { id } })
+      try {
+        await prisma.emailCampaign.delete({ where: { id } })
+      } catch (e: any) {
+        // If not found, treat as already deleted (idempotent)
+        return NextResponse.json({ success: true, note: 'Record not found; treated as deleted' })
+      }
     } else {
       // Soft delete: mark as deleted but keep record for analytics integrity
-      await prisma.emailCampaign.update({
-        where: { id },
-        data: { status: 'deleted' }
-      })
+      try {
+        await prisma.emailCampaign.update({ where: { id }, data: { status: 'deleted' } })
+      } catch (e: any) {
+        return NextResponse.json({ success: true, note: 'Record not found; treated as deleted' })
+      }
     }
 
     return NextResponse.json({ success: true })

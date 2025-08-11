@@ -17,7 +17,10 @@ export default function SettingsPage() {
     footerPhoneLabel: 'National Information Line 1300 199 589',
     footerFacebook: 'https://www.facebook.com/steinwayaustralia',
     footerInstagram: 'https://www.instagram.com/steinwaygalleriesaustralia/?hl=en',
-    footerYouTube: 'https://www.youtube.com/@steinwaygalleriesaustralia8733/featured'
+    footerYouTube: 'https://www.youtube.com/@steinwaygalleriesaustralia8733/featured',
+    facebookIconUrl: '',
+    instagramIconUrl: '',
+    youtubeIconUrl: ''
   })
 
   const [isSaving, setIsSaving] = useState(false)
@@ -196,14 +199,32 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Facebook URL</label>
                     <input type="url" value={settings.footerFacebook} onChange={(e)=>setSettings({...settings, footerFacebook: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <div className="mt-2 flex items-center gap-3">
+                      <input type="file" accept="image/*" onChange={async (e)=>{
+                        const f = e.target.files?.[0]; if(!f) return; const form = new FormData(); form.append('image', f); const r = await fetch('/api/upload/image',{method:'POST',body:form}); if(r.ok){ const j=await r.json(); setSettings({...settings, facebookIconUrl:j.url}) }
+                      }} />
+                      {settings.facebookIconUrl && <img src={settings.facebookIconUrl} alt="FB" className="h-6" />}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Instagram URL</label>
                     <input type="url" value={settings.footerInstagram} onChange={(e)=>setSettings({...settings, footerInstagram: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <div className="mt-2 flex items-center gap-3">
+                      <input type="file" accept="image/*" onChange={async (e)=>{
+                        const f = e.target.files?.[0]; if(!f) return; const form = new FormData(); form.append('image', f); const r = await fetch('/api/upload/image',{method:'POST',body:form}); if(r.ok){ const j=await r.json(); setSettings({...settings, instagramIconUrl:j.url}) }
+                      }} />
+                      {settings.instagramIconUrl && <img src={settings.instagramIconUrl} alt="IG" className="h-6" />}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">YouTube URL</label>
                     <input type="url" value={settings.footerYouTube} onChange={(e)=>setSettings({...settings, footerYouTube: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <div className="mt-2 flex items-center gap-3">
+                      <input type="file" accept="image/*" onChange={async (e)=>{
+                        const f = e.target.files?.[0]; if(!f) return; const form = new FormData(); form.append('image', f); const r = await fetch('/api/upload/image',{method:'POST',body:form}); if(r.ok){ const j=await r.json(); setSettings({...settings, youtubeIconUrl:j.url}) }
+                      }} />
+                      {settings.youtubeIconUrl && <img src={settings.youtubeIconUrl} alt="YT" className="h-6" />}
+                    </div>
                   </div>
                 </div>
               </div>

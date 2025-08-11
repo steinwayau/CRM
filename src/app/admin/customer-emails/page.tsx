@@ -3043,23 +3043,33 @@ export default function CustomerEmailsPage() {
                   )}
                   {viewingCampaign.status === 'sent' && !editingCampaign && (
                     <button
-                      onClick={() => {
-                        // Create a duplicate campaign for re-sending
-                        const duplicateCampaign: Campaign = {
-                          ...viewingCampaign,
-                          id: Date.now().toString(),
-                          name: `Copy of ${viewingCampaign.name}`,
-                          status: 'draft',
-                          sentCount: 0,
-                          sentAt: undefined,
-                          openRate: undefined,
-                          clickRate: undefined,
-                          createdAt: new Date().toISOString()
+                      onClick={async () => {
+                        // Create a real duplicate on the server to avoid phantom drafts
+                        try {
+                          const resp = await fetch('/api/admin/campaigns', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              name: `Copy of ${viewingCampaign.name}`,
+                              subject: viewingCampaign.subject,
+                              templateId: viewingCampaign.templateId,
+                              templateName: viewingCampaign.templateName,
+                              recipientType: viewingCampaign.recipientType || 'custom',
+                              status: 'draft'
+                            })
+                          })
+                          if (resp.ok) {
+                            const newCamp = await resp.json()
+                            setCampaigns([newCamp, ...campaigns])
+                            setShowCampaignView(false)
+                            setViewingCampaign(newCamp)
+                            setShowCampaignView(true)
+                          } else {
+                            alert('Failed to duplicate campaign')
+                          }
+                        } catch (e) {
+                          alert('Failed to duplicate campaign')
                         }
-                        updateCampaigns([duplicateCampaign, ...campaigns])
-                        setShowCampaignView(false)
-                        setViewingCampaign(duplicateCampaign)
-                        setShowCampaignView(true)
                       }}
                       className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                     >

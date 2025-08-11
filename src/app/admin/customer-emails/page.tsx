@@ -2958,7 +2958,7 @@ export default function CustomerEmailsPage() {
                           Archive Campaign
                         </button>
                       ) : null}
-                      {viewContext === 'campaigns' && (
+                      {viewContext === 'campaigns' ? (
                         <button
                           onClick={async () => {
                             if (confirm('Permanently delete this campaign and its analytics? This cannot be undone.')) {

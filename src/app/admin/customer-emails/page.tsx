@@ -2957,6 +2957,31 @@ export default function CustomerEmailsPage() {
                         >
                           Archive Campaign
                         </button>
+                      ) : null}
+                      {viewContext === 'campaigns' && (
+                        <button
+                          onClick={async () => {
+                            if (confirm('Permanently delete this campaign and its analytics? This cannot be undone.')) {
+                              try {
+                                const response = await fetch(`/api/admin/campaigns?id=${viewingCampaign.id}&hard=true`, {
+                                  method: 'DELETE'
+                                })
+                                if (response.ok) {
+                                  await loadData()
+                                  setShowCampaignView(false)
+                                } else {
+                                  alert('Failed to delete campaign')
+                                }
+                              } catch (error) {
+                                console.error('Error deleting campaign:', error)
+                                alert('Failed to delete campaign')
+                              }
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                        >
+                          Delete Permanently
+                        </button>
                       ) : (
                         <button
                           onClick={async () => {

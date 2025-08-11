@@ -76,6 +76,7 @@ export default function TemplateEditorPage() {
   // Visual editor state
   const [editorElements, setEditorElements] = useState<EditorElement[]>([])
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 800 })
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#ffffff')
 
@@ -447,18 +448,89 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey
-      if (!isMod) return
-      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      // Undo/redo
+      if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault(); undo(); return
+      }
+      if (isMod && ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y')) {
+        e.preventDefault(); redo(); return
+      }
+      // Arrow-key nudge for multi-select (or single)
+      const nudgeKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight']
+      if (nudgeKeys.includes(e.key) && selectedIds.length > 0) {
         e.preventDefault()
-        undo()
-      } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y')) {
-        e.preventDefault()
-        redo()
+        const delta = e.shiftKey ? 10 : 1
+        const dx = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0
+        const dy = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0
+        pushHistory()
+        setEditorElements(prev => prev.map(el => {
+          if (!selectedIds.includes(el.id)) return el
+          const nx = Math.max(0, Math.min(canvasSize.width - el.style.width, el.style.position.x + dx))
+          const ny = Math.max(0, Math.min(canvasSize.height - el.style.height, el.style.position.y + dy))
+          return { ...el, style: { ...el.style, position: { x: nx, y: ny } } }
+        }))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [editorElements])
+  }, [editorElements, selectedIds, canvasSize])
+
+  // Align/Distribute helpers
+  const alignSelected = (mode: 'left'|'centerX'|'right'|'top'|'middle'|'bottom') => {
+    if (selectedIds.length < 2) return
+    pushHistory()
+    const selected = editorElements.filter(el => selectedIds.includes(el.id))
+    const minX = Math.min(...selected.map(e => e.style.position.x))
+    const maxRight = Math.max(...selected.map(e => e.style.position.x + e.style.width))
+    const minY = Math.min(...selected.map(e => e.style.position.y))
+    const maxBottom = Math.max(...selected.map(e => e.style.position.y + e.style.height))
+    const centerX = (minX + maxRight) / 2
+    const centerY = (minY + maxBottom) / 2
+    setEditorElements(prev => prev.map(el => {
+      if (!selectedIds.includes(el.id)) return el
+      let x = el.style.position.x
+      let y = el.style.position.y
+      if (mode === 'left') x = minX
+      if (mode === 'right') x = maxRight - el.style.width
+      if (mode === 'centerX') x = Math.round(centerX - el.style.width / 2)
+      if (mode === 'top') y = minY
+      if (mode === 'bottom') y = maxBottom - el.style.height
+      if (mode === 'middle') y = Math.round(centerY - el.style.height / 2)
+      return { ...el, style: { ...el.style, position: { x, y } } }
+    }))
+  }
+  const distributeSelected = (axis: 'horizontal'|'vertical') => {
+    if (selectedIds.length < 3) return
+    pushHistory()
+    const selected = editorElements.filter(el => selectedIds.includes(el.id))
+    if (axis === 'horizontal') {
+      const sorted = [...selected].sort((a,b)=> a.style.position.x - b.style.position.x)
+      const left = sorted[0].style.position.x
+      const right = sorted[sorted.length-1].style.position.x + sorted[sorted.length-1].style.width
+      const totalWidth = sorted.reduce((s,e)=> s + e.style.width, 0)
+      const gap = Math.round((right - left - totalWidth) / (sorted.length - 1))
+      let cursor = left
+      const pos: Record<string, number> = {}
+      sorted.forEach((e, idx) => {
+        pos[e.id] = cursor
+        cursor += e.style.width + gap
+      })
+      setEditorElements(prev => prev.map(el => selectedIds.includes(el.id) ? { ...el, style: { ...el.style, position: { x: pos[el.id], y: el.style.position.y } } } : el))
+    } else {
+      const sorted = [...selected].sort((a,b)=> a.style.position.y - b.style.position.y)
+      const top = sorted[0].style.position.y
+      const bottom = sorted[sorted.length-1].style.position.y + sorted[sorted.length-1].style.height
+      const totalHeight = sorted.reduce((s,e)=> s + e.style.height, 0)
+      const gap = Math.round((bottom - top - totalHeight) / (sorted.length - 1))
+      let cursor = top
+      const pos: Record<string, number> = {}
+      sorted.forEach((e, idx) => {
+        pos[e.id] = cursor
+        cursor += e.style.height + gap
+      })
+      setEditorElements(prev => prev.map(el => selectedIds.includes(el.id) ? { ...el, style: { ...el.style, position: { x: el.style.position.x, y: pos[el.id] } } } : el))
+    }
+  }
 
   const getAlignmentGuides = (draggedElement: EditorElement, newX: number, newY: number) => {
     const guides = [] as Array<{ type: 'vertical' | 'horizontal'; position: number; label: string }>
@@ -2711,9 +2783,16 @@ export default function TemplateEditorPage() {
                     e.stopPropagation()
                     // Track element interaction time
                     lastElementInteractionRef.current = Date.now()
+                    // Multi-select with Shift key
+                    if (e.shiftKey) {
+                      setSelectedIds(prev => prev.includes(element.id) ? prev.filter(id => id !== element.id) : [...prev, element.id])
+                      setSelectedElement(element.id)
+                      return
+                    }
                     // Only handle click if we haven't dragged
                     if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
                       setSelectedElement(element.id)
+                      setSelectedIds([element.id])
                     }
                   }}
                   onMouseDown={(e) => {

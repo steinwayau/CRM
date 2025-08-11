@@ -734,16 +734,61 @@ function getBaseUrl(): string {
   return 'https://crm.steinway.com.au'
 }
 
+// Social links (defaults; can be overridden with env vars)
+const SOCIAL_LINKS = {
+  facebook: process.env.BRANDED_FOOTER_FACEBOOK || 'https://www.facebook.com/steinwayaustralia',
+  instagram: process.env.BRANDED_FOOTER_INSTAGRAM || 'https://www.instagram.com/steinwaygalleriesaustralia/?hl=en',
+  youtube: process.env.BRANDED_FOOTER_YOUTUBE || 'https://www.youtube.com/@steinwaygalleriesaustralia8733/featured'
+}
+
 function appendFooter(html: string, recipientEmail: string): string {
   const base = getBaseUrl()
   const unsub = `${base}/api/email/unsubscribe?e=${encodeURIComponent(recipientEmail)}`
-  const footer = `
+
+  // Branded signature (optional)
+  const enableBranded = (process.env.ENABLE_BRANDED_FOOTER || 'false').toLowerCase() === 'true'
+  const logoUrl = `${base}/branding/logo.png`
+
+  // Simple circle “icons” (email-safe fallback without external images)
+  const circle = (label: string) => 
+    `<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:14px;border:1px solid #CBD5E1;font-family:Arial, sans-serif;font-size:12px;color:#111827;text-align:center;">${label}</span>`
+
+  const signatureBlock = enableBranded ? `
     <tr>
-      <td style="padding:20px 10px 0 10px; font-family: Arial, sans-serif; font-size:12px; color:#6b7280;">
+      <td align="center" style="padding:22px 10px 6px 10px;">
+        <img src="${logoUrl}" alt="Steinway Galleries Australia" width="220" style="display:block;max-width:220px;height:auto;border:0;outline:none;text-decoration:none;" />
+      </td>
+    </tr>
+    <tr>
+      <td align="center" style="padding:4px 10px 0 10px;font-family:Arial, sans-serif;font-size:18px;color:#111827;font-weight:bold;">
+        Steinway Galleries Australia
+      </td>
+    </tr>
+    <tr>
+      <td align="center" style="padding:2px 10px 10px 10px;font-family:Arial, sans-serif;font-size:13px;color:#475569;">
+        National Information Line 1300 199 589
+      </td>
+    </tr>
+    <tr>
+      <td align="center" style="padding:4px 10px 8px 10px;">
+        <a href="${SOCIAL_LINKS.facebook}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('F')}</a>
+        <a href="${SOCIAL_LINKS.instagram}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('IG')}</a>
+        <a href="${SOCIAL_LINKS.youtube}" style="text-decoration:none" target="_blank" rel="noopener">${circle('YT')}</a>
+      </td>
+    </tr>
+  ` : ''
+
+  // Centered unsubscribe block (always)
+  const unsubscribeBlock = `
+    <tr>
+      <td align="center" style="padding:16px 10px 24px 10px;font-family:Arial, sans-serif;font-size:12px;color:#6b7280;">
         <p style="margin:0 0 6px 0;">You are receiving this email because you subscribed to our newsletter or joined our mailing list.</p>
         <p style="margin:0;">If you prefer not to receive these emails, you can <a href="${unsub}" style="color:#111827; text-decoration:underline;">unsubscribe here</a>.</p>
       </td>
     </tr>`
+
+  const footer = `${signatureBlock}${unsubscribeBlock}`
+
   // Insert before closing container table if possible
   if (html.includes('</table>')) {
     const last = html.lastIndexOf('</table>')

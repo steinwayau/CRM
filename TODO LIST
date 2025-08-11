@@ -30,7 +30,15 @@ Canva-style Editor — Status
   10) Keyboard shortcuts: Group/Ungroup, Esc cancel transform
   11) Text boxes: fixed width, auto-height; visual bounds in snap
   12) Help/shortcuts modal
+  13) Text paste keeps formatting: preserve paragraphs, caps, line breaks on paste; add plain‑text vs keep‑format option
+  14) Element copy/paste & duplicate: Cmd/Ctrl+C/V and Cmd/Ctrl+D; right‑click context menu (Duplicate/Copy/Paste); offset pasted clone; preserve z‑index
+  15) Mobile text legibility: ensure minimum 16px font-size and comfortable line-height in mobile email render; Gmail‑safe fallbacks
+  16) Unsubscribe footer alignment: center the unsubscribe block across clients (table layout + MSO)
+  17) Branded signature block above unsubscribe: logo + company/phone + round social icons (FB/IG/YT) with links; config logo at `public/branding/logo.png`
 
 Notes
 - Editor code retained after analytics revert; no further editor changes pending analytics fix.
-- Current Issue (critical): Dashboard campaign open/click rates not rendering; Analytics page enquiries are 0, but tracking exists in `email_tracking`. Next agent should reconcile data source for opens/clicks across UI. 
+- Current Issue (critical): Dashboard campaign open/click rates not rendering; Analytics page enquiries are 0, but tracking exists in `email_tracking`. Next agent should reconcile data source for opens/clicks across UI.
+
+Maintenance
+- Audit existing editor items vs implementation; prune duplicates; mark truly “enterprise-level” items as Completed after verification. 

@@ -1247,7 +1247,7 @@ export default function CustomerEmailsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {campaigns.map((campaign) => (
+              {campaigns.filter(c => c.status !== 'archived').map((campaign) => (
                 <tr key={campaign.id}>
                   <td className="px-6 py-4">
                     <div>
@@ -1283,13 +1283,15 @@ export default function CustomerEmailsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex space-x-2">
-                      {campaign.status === 'draft' && (
+                      {campaign.status === 'draft' ? (
                         <button
                           onClick={() => handleSendCampaign(campaign.id)}
                           className="text-blue-600 hover:text-blue-800 text-sm"
                         >
                           Send Now
                         </button>
+                      ) : (
+                        <span className="text-gray-400 text-sm">{campaign.status === 'sending' ? 'Pending…' : '—'}</span>
                       )}
                       <button 
                         onClick={() => handleViewCampaign(campaign)}

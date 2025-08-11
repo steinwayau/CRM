@@ -19,6 +19,38 @@ function parseRange(range?: string) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
+    const campaignId = searchParams.get('campaignId') || undefined
+    if (campaignId) {
+      // Per-campaign analytics (Golden-State compatible)
+      const campaign = await prisma.emailCampaign.findUnique({ where: { id: campaignId } })
+      const sentCount = campaign?.sentCount || 0
+
+      // Unique opens by distinct recipientEmail
+      const uniqueOpenEmails = await prisma.emailOpen.findMany({
+        where: { campaignId },
+        select: { recipientEmail: true },
+        distinct: ['recipientEmail']
+      })
+      const uniqueClickEmails = await prisma.emailClick.findMany({
+        where: { campaignId },
+        select: { recipientEmail: true },
+        distinct: ['recipientEmail']
+      })
+      const opens = uniqueOpenEmails.length
+      const clicks = uniqueClickEmails.length
+      const openRate = sentCount === 0 ? 0 : Math.round((opens / sentCount) * 1000) / 10
+      const clickRate = sentCount === 0 ? 0 : Math.round((clicks / sentCount) * 1000) / 10
+
+      return NextResponse.json({
+        campaignId,
+        opens,
+        clicks,
+        openRate,
+        clickRate,
+        sentCount
+      })
+    }
+
     const range = searchParams.get('range') || '30days'
     const { from, to } = parseRange(range)
 

@@ -2764,7 +2764,7 @@ export default function TemplateEditorPage() {
                 <div
                   key={element.id}
                   className={`absolute cursor-move transition-shadow ${
-                    selectedElement === element.id ? 'ring-2 ring-blue-500' : ''
+                    selectedElement === element.id ? 'ring-2 ring-blue-500' : (selectedIds.includes(element.id) ? 'ring-2 ring-blue-300' : '')
                   } ${
                     draggedElement === element.id ? 'shadow-lg opacity-80' : ''
                   }`}
@@ -2778,109 +2778,68 @@ export default function TemplateEditorPage() {
                     transform: element.style.rotation ? `rotate(${element.style.rotation}deg)` : undefined,
                     transformOrigin: 'center center'
                   }}
-                  onClick={(e) => {
-                    if (zoom !== 100) return // editing disabled at non-100%
-                    e.stopPropagation()
-                    // Track element interaction time
-                    lastElementInteractionRef.current = Date.now()
-                    // Multi-select with Shift key
+                  onMouseDown={(e) => {
+                    if (zoom !== 100) return
+                    // Shift-toggle selection, do not start drag
                     if (e.shiftKey) {
+                      e.stopPropagation()
                       setSelectedIds(prev => prev.includes(element.id) ? prev.filter(id => id !== element.id) : [...prev, element.id])
                       setSelectedElement(element.id)
                       return
                     }
-                    // Only handle click if we haven't dragged
-                    if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                      setSelectedElement(element.id)
-                      setSelectedIds([element.id])
-                    }
-                  }}
-                  onMouseDown={(e) => {
-                    if (zoom !== 100) return
-                    // Don't start dragging if we're resizing
+                    // Begin drag
                     if (isResizingElement) return
-                    
                     e.preventDefault()
                     e.stopPropagation()
-                    // Track element interaction time
                     lastElementInteractionRef.current = Date.now()
                     setSelectedElement(element.id)
-                    
-                    // Reset drag state
-                    dragStateRef.current = {
-                      isDragging: false,
-                      dragStarted: false,
-                      elementId: element.id
-                    }
-                    
-                    // Clear any existing timeout
-                    if (dragTimeoutRef.current) {
-                      clearTimeout(dragTimeoutRef.current)
-                    }
-                    
+                    setSelectedIds([element.id])
+
+                    if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current)
+
                     const base = editorElements.find(el => el.id === element.id) || element
                     const startX = e.clientX - base.style.position.x
                     const startY = e.clientY - base.style.position.y
                     const startMouseX = e.clientX
                     const startMouseY = e.clientY
-                    
+
                     let animationFrameId: number
-                    
+
                     const handleMouseMove = (e: MouseEvent) => {
                       e.preventDefault()
                       disableSnapRef.current = e.metaKey || e.ctrlKey
                       if (!interactionRef.current.active) {
                         interactionRef.current = { active: true, pushed: false }
                       }
-                      
-                      // Calculate how far mouse has moved
+
                       const deltaX = Math.abs(e.clientX - startMouseX)
                       const deltaY = Math.abs(e.clientY - startMouseY)
-                      
-                      // Only start dragging if mouse has moved more than 3 pixels
                       if (!dragStateRef.current.dragStarted && (deltaX > 3 || deltaY > 3)) {
                         dragStateRef.current.dragStarted = true
                         dragStateRef.current.isDragging = true
                         setIsDragging(true)
                         setDraggedElement(element.id)
                       }
-                      
+
                       if (dragStateRef.current.dragStarted) {
-                        // Use requestAnimationFrame for smoother performance
-                        if (animationFrameId) {
-                          cancelAnimationFrame(animationFrameId)
-                        }
-                        
+                        if (animationFrameId) cancelAnimationFrame(animationFrameId)
                         animationFrameId = requestAnimationFrame(() => {
                           const rawX = e.clientX - startX
                           const rawY = e.clientY - startY
-                          
-                          // Constrain to canvas bounds
                           const current = editorElements.find(el => el.id === element.id) || element
                           const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - current.style.width))
                           const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - current.style.height))
-                          
                           const { x: newX, y: newY, guides, measurements, neighborRects } = snapPosition(current, constrainedX, constrainedY)
-                          
                           setShowAlignmentGuides(guides)
                           setMeasureOverlays(measurements)
                           setNeighborHighlights(neighborRects)
-                          
-                          updateElement(element.id, {
-                            style: {
-                              ...current.style,
-                              position: { x: newX, y: newY }
-                            }
-                          })
+                          updateElement(element.id, { style: { ...current.style, position: { x: newX, y: newY } } })
                         })
                       }
                     }
-                    
+
                     const handleMouseUp = () => {
-                      if (animationFrameId) {
-                        cancelAnimationFrame(animationFrameId)
-                      }
-                      // Track element interaction time
+                      if (animationFrameId) cancelAnimationFrame(animationFrameId)
                       lastElementInteractionRef.current = Date.now()
                       setIsDragging(false)
                       setDraggedElement(null)
@@ -2888,44 +2847,25 @@ export default function TemplateEditorPage() {
                       setMeasureOverlays([])
                       setNeighborHighlights([])
                       disableSnapRef.current = false
-                      // Update spacing memory based on final position
-                      const currentFinal = editorElements.find(el => el.id === element.id) || element
-                      if (currentFinal) {
-                        const { above, below } = getVerticalNeighbors(currentFinal)
-                        if (above || below) {
-                          const gapTop = above ? (currentFinal.style.position.y - (above.style.position.y + above.style.height)) : Number.POSITIVE_INFINITY
-                          const gapBottom = below ? (below.style.position.y - (currentFinal.style.position.y + currentFinal.style.height)) : Number.POSITIVE_INFINITY
-                          const chosenV = Math.min(Math.abs(gapTop), Math.abs(gapBottom))
-                          if (Number.isFinite(chosenV)) {
-                            lastGapRef.current.vertical = Math.round(chosenV)
-                          }
-                        }
-                        const { left, right } = getHorizontalNeighbors(currentFinal)
-                        if (left || right) {
-                          const gapLeft = left ? (currentFinal.style.position.x - (left.style.position.x + left.style.width)) : Number.POSITIVE_INFINITY
-                          const gapRight = right ? (right.style.position.x - (currentFinal.style.position.x + currentFinal.style.width)) : Number.POSITIVE_INFINITY
-                          const chosenH = Math.min(Math.abs(gapLeft), Math.abs(gapRight))
-                          if (Number.isFinite(chosenH)) {
-                            lastGapRef.current.horizontal = Math.round(chosenH)
-                          }
-                        }
-                      }
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
                       interactionRef.current = { active: false, pushed: false }
-                      
-                      // Reset drag state after a delay to allow click handler to check it
                       dragTimeoutRef.current = setTimeout(() => {
-                        dragStateRef.current = {
-                          isDragging: false,
-                          dragStarted: false,
-                          elementId: null
-                        }
+                        dragStateRef.current = { isDragging: false, dragStarted: false, elementId: null }
                       }, 50)
                     }
-                    
+
                     document.addEventListener('mousemove', handleMouseMove)
                     document.addEventListener('mouseup', handleMouseUp)
+                  }}
+                  onClick={(e) => {
+                    if (zoom !== 100) return
+                    e.stopPropagation()
+                    lastElementInteractionRef.current = Date.now()
+                    if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                      setSelectedElement(element.id)
+                      setSelectedIds([element.id])
+                    }
                   }}
                 >
                   {element.type === 'text' && (

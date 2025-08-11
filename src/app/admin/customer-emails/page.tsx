@@ -1193,11 +1193,14 @@ export default function CustomerEmailsPage() {
                 {analyticsLoading ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
-                  const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
-                                     const latest = ordered[ordered.length - 1]
-                   const analytics = latest ? campaignAnalytics[latest.id] : undefined
-                   if (analytics && typeof analytics.openRate === 'number') return analytics.openRate.toFixed(1)
-                   return overallAnalytics?.summary?.overallOpenRate?.toFixed?.(1) || '0'
+                  const active = campaigns.filter(c => c.status !== 'archived')
+                  if (active.length === 0) return '0'
+                  const ordered = [...active].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                  const latest = ordered[ordered.length - 1]
+                  const analytics = latest ? campaignAnalytics[latest.id] : undefined
+                  if (analytics && typeof analytics.openRate === 'number') return analytics.openRate.toFixed(1)
+                  // If no per-campaign analytics yet for active campaigns, show 0
+                  return '0'
                 })()}%
               </p>
             </div>
@@ -1217,11 +1220,13 @@ export default function CustomerEmailsPage() {
                 {analyticsLoading ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
-                  const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
-                                     const latest = ordered[ordered.length - 1]
-                   const analytics = latest ? campaignAnalytics[latest.id] : undefined
-                   if (analytics && typeof analytics.clickRate === 'number') return analytics.clickRate.toFixed(1)
-                   return overallAnalytics?.summary?.overallClickRate?.toFixed?.(1) || '0'
+                  const active = campaigns.filter(c => c.status !== 'archived')
+                  if (active.length === 0) return '0'
+                  const ordered = [...active].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
+                  const latest = ordered[ordered.length - 1]
+                  const analytics = latest ? campaignAnalytics[latest.id] : undefined
+                  if (analytics && typeof analytics.clickRate === 'number') return analytics.clickRate.toFixed(1)
+                  return '0'
                 })()}%
               </p>
             </div>

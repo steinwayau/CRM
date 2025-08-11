@@ -2161,6 +2161,33 @@ export default function CustomerEmailsPage() {
       }
       const data = await res.json().catch(() => ({}))
       alert(`Analytics reset successful${typeof data.deleted === 'number' ? ` — deleted ${data.deleted} record(s)` : ''}.`)
+
+      // Immediately clear per-campaign analytics to avoid stale UI
+      setCampaignAnalytics({})
+
+      // Refresh overall + per-campaign analytics
+      if (campaigns.length > 0) {
+        await loadCampaignAnalyticsSync(campaigns)
+      } else {
+        await loadOverallAnalytics()
+      }
+
+      // If a campaign is currently open in the modal, refresh its metrics too
+      if (viewingCampaign) {
+        try {
+          const analyticsResponse = await fetch(`/api/email/analytics?campaignId=${viewingCampaign.id}`, { cache: 'no-store' })
+          if (analyticsResponse.ok) {
+            const analytics = await analyticsResponse.json()
+            setViewingCampaign(prev => prev ? {
+              ...prev,
+              openRate: typeof analytics.openRate === 'number' ? analytics.openRate : prev.openRate ?? 0,
+              clickRate: typeof analytics.clickRate === 'number' ? analytics.clickRate : prev.clickRate ?? 0
+            } : prev)
+          }
+        } catch (e) {
+          console.error('Failed to refresh viewing campaign analytics after reset:', e)
+        }
+      }
     } catch (e:any) {
       alert(`Reset failed: ${e?.message || 'Unknown error'}`)
     } finally {

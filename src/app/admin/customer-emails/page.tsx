@@ -2601,7 +2601,7 @@ export default function CustomerEmailsPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">Open Rate</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {viewingCampaign.openRate ? `${viewingCampaign.openRate.toFixed(1)}%` : 'N/A'}
+                        {typeof viewingCampaign.openRate === 'number' ? `${viewingCampaign.openRate.toFixed(1)}%` : 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -2617,7 +2617,7 @@ export default function CustomerEmailsPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">Click Rate</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {viewingCampaign.clickRate ? `${viewingCampaign.clickRate.toFixed(1)}%` : 'N/A'}
+                        {typeof viewingCampaign.clickRate === 'number' ? `${viewingCampaign.clickRate.toFixed(1)}%` : 'N/A'}
                       </p>
                     </div>
                   </div>

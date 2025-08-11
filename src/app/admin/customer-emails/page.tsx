@@ -250,20 +250,24 @@ export default function CustomerEmailsPage() {
           const response = await fetch(`/api/email/analytics?campaignId=${update.campaignId}`)
           if (response.ok) {
             const analytics = await response.json()
+            const opens = typeof analytics.opens === 'number' ? analytics.opens : Number(analytics.opens) || 0
+            const clicks = typeof analytics.clicks === 'number' ? analytics.clicks : Number(analytics.clicks) || 0
+            const openRate = typeof analytics.openRate === 'number' ? analytics.openRate : Number(analytics.openRate) || 0
+            const clickRate = typeof analytics.clickRate === 'number' ? analytics.clickRate : Number(analytics.clickRate) || 0
             setCampaignAnalytics(prev => ({
               ...prev,
               [update.campaignId]: {
-                opens: analytics.opens || 0,
-                clicks: analytics.clicks || 0,
-                openRate: analytics.openRate || 0,
-                clickRate: analytics.clickRate || 0
+                opens,
+                clicks,
+                openRate,
+                clickRate
               }
             }))
             if (viewingCampaign && viewingCampaign.id === update.campaignId) {
               setViewingCampaign(prev => prev ? {
                 ...prev,
-                openRate: analytics.openRate || 0,
-                clickRate: analytics.clickRate || 0
+                openRate,
+                clickRate
               } : null)
             }
             console.log(`🎯 REAL-TIME: Fetched latest analytics for campaign ${update.campaignId}`)
@@ -276,21 +280,16 @@ export default function CustomerEmailsPage() {
     }
 
     // Backward-compat: if full analytics payload arrives, apply directly
+    const opens = typeof (update.analytics as any).opens === 'number' ? (update.analytics as any).opens : Number((update.analytics as any).opens) || 0
+    const clicks = typeof (update.analytics as any).clicks === 'number' ? (update.analytics as any).clicks : Number((update.analytics as any).clicks) || 0
+    const openRate = typeof (update.analytics as any).openRate === 'number' ? (update.analytics as any).openRate : Number((update.analytics as any).openRate) || 0
+    const clickRate = typeof (update.analytics as any).clickRate === 'number' ? (update.analytics as any).clickRate : Number((update.analytics as any).clickRate) || 0
     setCampaignAnalytics(prev => ({
       ...prev,
-      [update.campaignId]: {
-        opens: update.analytics.opens || 0,
-        clicks: update.analytics.clicks || 0,
-        openRate: update.analytics.openRate || 0,
-        clickRate: update.analytics.clickRate || 0
-      }
+      [update.campaignId]: { opens, clicks, openRate, clickRate }
     }))
     if (viewingCampaign && viewingCampaign.id === update.campaignId) {
-      setViewingCampaign(prev => prev ? {
-        ...prev,
-        openRate: update.analytics.openRate || 0,
-        clickRate: update.analytics.clickRate || 0
-      } : null)
+      setViewingCampaign(prev => prev ? { ...prev, openRate, clickRate } : null)
     }
     console.log(`🎯 REAL-TIME: Updated analytics for campaign ${update.campaignId}`)
   }
@@ -311,12 +310,11 @@ export default function CustomerEmailsPage() {
         if (response.ok) {
           const data = await response.json()
           console.log(`📈 Analytics data for ${campaign.id}:`, data)
-          analyticsData[campaign.id] = {
-            opens: data.opens || 0,
-            clicks: data.clicks || 0,
-            openRate: data.openRate || 0,
-            clickRate: data.clickRate || 0
-          }
+          const opens = typeof data.opens === 'number' ? data.opens : Number(data.opens) || 0
+          const clicks = typeof data.clicks === 'number' ? data.clicks : Number(data.clicks) || 0
+          const openRate = typeof data.openRate === 'number' ? data.openRate : Number(data.openRate) || 0
+          const clickRate = typeof data.clickRate === 'number' ? data.clickRate : Number(data.clickRate) || 0
+          analyticsData[campaign.id] = { opens, clicks, openRate, clickRate }
         } else {
           console.error(`❌ Failed to fetch analytics for campaign ${campaign.id}:`, response.status, response.statusText)
         }
@@ -806,12 +804,14 @@ export default function CustomerEmailsPage() {
             const analyticsResponse = await fetch(`/api/email/analytics?campaignId=${campaignId}`)
             if (analyticsResponse.ok) {
               const analytics = await analyticsResponse.json()
+              const coercedOpenRate = typeof analytics.openRate === 'number' ? analytics.openRate : Number(analytics.openRate) || 0
+              const coercedClickRate = typeof analytics.clickRate === 'number' ? analytics.clickRate : Number(analytics.clickRate) || 0
               updateCampaigns(campaigns.map(c => 
                 c.id === campaignId 
                   ? { 
                       ...c, 
-                      openRate: analytics.openRate || c.openRate,
-                      clickRate: analytics.clickRate || c.clickRate
+                      openRate: coercedOpenRate || c.openRate,
+                      clickRate: coercedClickRate || c.clickRate
                     }
                   : c
               ))
@@ -869,10 +869,12 @@ export default function CustomerEmailsPage() {
       
       if (analyticsResponse.ok) {
         const analytics = await analyticsResponse.json()
+        const coercedOpenRate = typeof analytics.openRate === 'number' ? analytics.openRate : Number(analytics.openRate) || 0
+        const coercedClickRate = typeof analytics.clickRate === 'number' ? analytics.clickRate : Number(analytics.clickRate) || 0
         updatedCampaign = {
           ...campaign,
-          openRate: typeof analytics.openRate === 'number' ? analytics.openRate : campaign.openRate ?? 0,
-          clickRate: typeof analytics.clickRate === 'number' ? analytics.clickRate : campaign.clickRate ?? 0
+          openRate: coercedOpenRate,
+          clickRate: coercedClickRate
         }
       }
       

@@ -335,7 +335,7 @@ export default function CustomerEmailsPage() {
     setLoading(true)
     try {
       // Load campaigns first (fast-path for Campaigns tab)
-      const campaignResponse = await fetch('/api/admin/campaigns')
+      const campaignResponse = await fetch('/api/admin/campaigns', { cache: 'no-store' })
       if (campaignResponse.ok) {
         const campaignData = await campaignResponse.json()
         const campaignsWithCustomEmails = campaignData.map((campaign: any) => ({
@@ -775,8 +775,8 @@ export default function CustomerEmailsPage() {
 
         // Wait a moment for database update to complete, then reload
         setTimeout(async () => {
-          await loadData()  // This will reload campaigns AND analytics
-        }, 2000)
+          await loadData()  // This will reload campaigns AND analytics with no-store
+        }, 1500)
         
         // Start polling for tracking updates every 30 seconds
         const trackingInterval = setInterval(async () => {

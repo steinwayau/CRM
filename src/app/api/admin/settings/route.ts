@@ -28,7 +28,13 @@ export async function GET() {
       maxFileSize: '10MB',
       emailNotifications: true,
       autoBackup: true,
-      maintenanceMode: false
+      maintenanceMode: false,
+      footerEnabled: false,
+      footerLogoUrl: '',
+      footerPhoneLabel: 'National Information Line 1300 199 589',
+      footerFacebook: 'https://www.facebook.com/steinwayaustralia',
+      footerInstagram: 'https://www.instagram.com/steinwaygalleriesaustralia/?hl=en',
+      footerYouTube: 'https://www.youtube.com/@steinwaygalleriesaustralia8733/featured'
     }
     
     const finalSettings = { ...defaultSettings, ...settings }

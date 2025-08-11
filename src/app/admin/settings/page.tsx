@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useEffect } from 'react'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -10,11 +11,31 @@ export default function SettingsPage() {
     autoBackup: true,
     maintenanceMode: false,
     maxFileSize: '10MB',
-    sessionTimeout: '30 minutes'
+    sessionTimeout: '30 minutes',
+    footerEnabled: false,
+    footerLogoUrl: '',
+    footerPhoneLabel: 'National Information Line 1300 199 589',
+    footerFacebook: 'https://www.facebook.com/steinwayaustralia',
+    footerInstagram: 'https://www.instagram.com/steinwaygalleriesaustralia/?hl=en',
+    footerYouTube: 'https://www.youtube.com/@steinwaygalleriesaustralia8733/featured'
   })
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/settings', { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.settings) setSettings((prev) => ({ ...prev, ...json.settings }))
+        }
+      } catch (e) {
+        console.error('Failed to load settings', e)
+      }
+    })()
+  }, [])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -121,6 +142,70 @@ export default function SettingsPage() {
                   <option value="20MB">20MB</option>
                   <option value="50MB">50MB</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Branded Footer Settings */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Footer</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900">Enable Branded Footer</h4>
+                    <p className="text-sm text-gray-600">Adds logo, phone label, and social links above unsubscribe</p>
+                  </div>
+                  <button
+                    onClick={() => setSettings({...settings, footerEnabled: !settings.footerEnabled})}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${settings.footerEnabled ? 'bg-purple-600' : 'bg-gray-200'}`}
+                  >
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.footerEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Footer Logo (PNG/SVG recommended)</label>
+                  <div className="flex items-center space-x-3">
+                    <input type="file" accept="image/*" onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const form = new FormData()
+                      form.append('image', file)
+                      const res = await fetch('/api/upload/image', { method: 'POST', body: form })
+                      if (res.ok) {
+                        const json = await res.json()
+                        setSettings({...settings, footerLogoUrl: json.url})
+                      }
+                    }} />
+                    {settings.footerLogoUrl && (
+                      <img src={settings.footerLogoUrl} alt="Footer Logo" className="h-10" />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Label</label>
+                  <input
+                    type="text"
+                    value={settings.footerPhoneLabel}
+                    onChange={(e) => setSettings({...settings, footerPhoneLabel: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Facebook URL</label>
+                    <input type="url" value={settings.footerFacebook} onChange={(e)=>setSettings({...settings, footerFacebook: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Instagram URL</label>
+                    <input type="url" value={settings.footerInstagram} onChange={(e)=>setSettings({...settings, footerInstagram: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">YouTube URL</label>
+                    <input type="url" value={settings.footerYouTube} onChange={(e)=>setSettings({...settings, footerYouTube: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                  </div>
+                </div>
               </div>
             </div>
 

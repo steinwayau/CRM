@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { PrismaClient } from '@prisma/client'
+import { sql } from '@vercel/postgres'
 
 // Initialize Resend and Prisma
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -741,13 +742,27 @@ const SOCIAL_LINKS = {
   youtube: process.env.BRANDED_FOOTER_YOUTUBE || 'https://www.youtube.com/@steinwaygalleriesaustralia8733/featured'
 }
 
-function appendFooter(html: string, recipientEmail: string): string {
+async function getFooterSettings() {
+  try {
+    const res = await sql`SELECT key, value FROM system_settings WHERE key IN ('footerEnabled','footerLogoUrl','footerPhoneLabel','footerFacebook','footerInstagram','footerYouTube')`
+    const out: Record<string,string> = {}
+    res.rows.forEach((r:any)=>{ out[r.key] = r.value })
+    return out
+  } catch { return {} as any }
+}
+
+async function appendFooterAsync(html: string, recipientEmail: string): Promise<string> {
   const base = getBaseUrl()
   const unsub = `${base}/api/email/unsubscribe?e=${encodeURIComponent(recipientEmail)}`
 
-  // Branded signature (optional)
-  const enableBranded = (process.env.ENABLE_BRANDED_FOOTER || 'false').toLowerCase() === 'true'
-  const logoUrl = `${base}/branding/logo.png`
+  // Load settings; env is fallback
+  const s = await getFooterSettings()
+  const enableBranded = (s.footerEnabled ?? (process.env.ENABLE_BRANDED_FOOTER || 'false')).toString().toLowerCase() === 'true'
+  const logoUrl = s.footerLogoUrl || `${base}/branding/logo.png`
+  const phoneLabel = s.footerPhoneLabel || 'National Information Line 1300 199 589'
+  const fb = s.footerFacebook || SOCIAL_LINKS.facebook
+  const ig = s.footerInstagram || SOCIAL_LINKS.instagram
+  const yt = s.footerYouTube || SOCIAL_LINKS.youtube
 
   // Simple circle “icons” (email-safe fallback without external images)
   const circle = (label: string) => 
@@ -766,14 +781,14 @@ function appendFooter(html: string, recipientEmail: string): string {
     </tr>
     <tr>
       <td align="center" style="padding:2px 10px 10px 10px;font-family:Arial, sans-serif;font-size:13px;color:#475569;">
-        National Information Line 1300 199 589
+        ${phoneLabel}
       </td>
     </tr>
     <tr>
       <td align="center" style="padding:4px 10px 8px 10px;">
-        <a href="${SOCIAL_LINKS.facebook}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('F')}</a>
-        <a href="${SOCIAL_LINKS.instagram}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('IG')}</a>
-        <a href="${SOCIAL_LINKS.youtube}" style="text-decoration:none" target="_blank" rel="noopener">${circle('YT')}</a>
+        <a href="${fb}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('F')}</a>
+        <a href="${ig}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">${circle('IG')}</a>
+        <a href="${yt}" style="text-decoration:none" target="_blank" rel="noopener">${circle('YT')}</a>
       </td>
     </tr>
   ` : ''
@@ -848,6 +863,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Persist initial sending state
+    try {
+      await prisma.emailCampaign.update({
+        where: { id: updateCampaignId },
+        data: {
+          status: 'sending',
+          recipientCount: eligibleCustomers.length,
+          sentAt: null
+        }
+      })
+    } catch (prepErr) {
+      console.warn('Failed to set sending state:', prepErr)
+    }
+
     // Check email limits 
     if (eligibleCustomers.length > 1000) {
       return NextResponse.json(
@@ -874,7 +903,7 @@ export async function POST(request: NextRequest) {
     // Process each batch
     for (const batch of batches) {
       try {
-        const batchEmails = batch.map(customer => {
+        const batchEmails = await Promise.all(batch.map(async customer => {
           // INTELLIGENT EMAIL GENERATION: Use client-appropriate HTML
           let emailHtml = htmlContent // Fallback to original if no elements available
           
@@ -919,7 +948,7 @@ export async function POST(request: NextRequest) {
           const trackedHtml = addEmailTracking(personalizedHtml, updateCampaignId, customer.email)
 
           // Append standard footer with unsubscribe
-          const finalHtml = appendFooter(trackedHtml, customer.email)
+          const finalHtml = await appendFooterAsync(trackedHtml, customer.email)
           
           return {
             to: customer.email,
@@ -929,7 +958,7 @@ export async function POST(request: NextRequest) {
             from: 'noreply@steinway.com.au',
             replyTo: process.env.REPLY_TO_EMAIL || 'info@steinway.com.au'
           }
-        })
+        }))
 
         // Send batch using Resend with concurrency cap and backoff
         const RATE = Math.max(1, parseInt(process.env.EMAIL_RATE_PER_SEC || '5'))
@@ -982,15 +1011,24 @@ export async function POST(request: NextRequest) {
 
     // Update campaign sentCount in database
     try {
-      await prisma.emailCampaign.update({
-        where: { id: updateCampaignId },
-        data: { 
-          sentCount: results.successCount,
-          sentAt: new Date(),
-          status: 'sent'
-        }
-      })
-      console.log(`Campaign ${updateCampaignId} sentCount updated: ${results.successCount}`)
+      if (results.successCount > 0) {
+        await prisma.emailCampaign.update({
+          where: { id: updateCampaignId },
+          data: { 
+            sentCount: results.successCount,
+            sentAt: new Date(),
+            status: 'sent'
+          }
+        })
+        console.log(`Campaign ${updateCampaignId} sentCount updated: ${results.successCount}`)
+      } else {
+        // No successes → revert to draft so UI shows Send Now consistently
+        await prisma.emailCampaign.update({
+          where: { id: updateCampaignId },
+          data: { status: 'draft', sentAt: null }
+        })
+        console.log(`Campaign ${updateCampaignId} had no successful sends; reverted to draft`)
+      }
     } catch (dbError) {
       console.warn('Failed to update campaign sentCount:', dbError)
     }
@@ -999,7 +1037,7 @@ export async function POST(request: NextRequest) {
     console.log(`Campaign ${updateCampaignId} sent:`, results)
 
     return NextResponse.json({
-      success: true,
+      success: results.successCount > 0,
       results: results,
       message: `Campaign sent to ${results.successCount} of ${results.totalRecipients} recipients`
     })

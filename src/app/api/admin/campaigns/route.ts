@@ -85,6 +85,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const hard = (searchParams.get('hard') || 'false').toLowerCase() === 'true'
     
     if (!id) {
       return NextResponse.json(
@@ -93,11 +94,16 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Soft delete: mark as deleted but keep record for analytics integrity
-    await prisma.emailCampaign.update({
-      where: { id },
-      data: { status: 'deleted' }
-    })
+    if (hard) {
+      // Hard delete: remove campaign and cascade related analytics (see prisma schema onDelete: Cascade)
+      await prisma.emailCampaign.delete({ where: { id } })
+    } else {
+      // Soft delete: mark as deleted but keep record for analytics integrity
+      await prisma.emailCampaign.update({
+        where: { id },
+        data: { status: 'deleted' }
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -2,8 +2,8 @@
 
 ## **CURRENT STABLE VERSION**
 
-**Git Commit**: `2ad0871` ✅ VERIFIED DEPLOYED  
-**Date**: August 10, 2025  
+**Git Commit**: `6d84199` ✅ VERIFIED DEPLOYED  
+**Date**: August 11, 2025  
 **Status**: 🟢 PRODUCTION RUNNING
 
 ### **✅ CONFIRMED WORKING FEATURES:**
@@ -16,6 +16,7 @@
 **📊 Analytics:**
 - ✅ Overall/detailed analytics APIs live (`/api/email/analytics`, `/api/email/analytics/detailed`) with start/end/q filters
 - ✅ Dashboard renders clients/devices/domains/top URLs and 24h timeline
+- ✅ Campaign tiles and modal reflect tracking data; no caching issues (force-dynamic + no-store)
 
 **🛠 Admin Utilities:**
 - ✅ Analytics reset endpoint (`POST /api/admin/analytics/reset`) supports all-time or start/end range
@@ -24,16 +25,15 @@
 ### **📋 DEPLOYMENT INFO:**
 
 **Production URL**: https://crm.steinway.com.au  
-**Last Deployment**: August 10, 2025  
-**Commit**: 2ad0871 — "Guides: pick single best guide per axis"
+**Last Deployment**: August 11, 2025  
+**Commit**: 6d84199 — "Analytics API: force-dynamic + no-store headers to avoid caching; tiles still read latest data"
 
 ---
 
 ## **⚠️ KNOWN ISSUES TO INVESTIGATE:**
 
-1. Reset button in Analytics UI opens dialog but action may not execute (no visible effect) — verify POST and UI wiring.  
-2. Previous campaigns list added under Analytics; search UX should mirror analytics filters and load automatically.  
-3. Date preset behavior: ranges can look identical when data is only in recent window; consider showing “N events in range” chip.
+1. Reset button analytics refresh UX: ensure tiles and modal always reflect resets instantly.  
+2. Previous campaigns list search UX: mirror analytics filters and auto-load.
 
 ---
 
@@ -41,10 +41,10 @@
 
 Revert to this commit if needed:
 ```bash
-git reset --hard 2ad0871
+git reset --hard 6d84199
 git push origin main --force
 npx vercel --prod
 ```
 
-**Last Updated**: August 10, 2025 by Agent  
+**Last Updated**: August 11, 2025 by Agent  
 **Verification**: ✅ APIs live; dashboard renders; unsubscribe works 

@@ -64,11 +64,55 @@ export async function GET(req: Request) {
     const range = searchParams.get('range') || '30days'
     const { from, to } = parseRange(range)
 
-    // Overall email campaign analytics (Golden State behavior)
+    // 1) Original enquiries-based analytics payload (backwards compatible for /admin/analytics)
+    // Enquiries totals
+    const total = await prisma.enquiry.count()
+    const thisMonthCount = await prisma.enquiry.count({ where: { createdAt: { gte: from, lte: to } } })
+
+    // Growth vs previous period
+    const prevFrom = new Date(from)
+    const periodDays = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) || 30
+    prevFrom.setDate(prevFrom.getDate() - periodDays)
+    const prevCount = await prisma.enquiry.count({ where: { createdAt: { gte: prevFrom, lt: from } } })
+    const growth = prevCount === 0 ? 100 : Math.round(((thisMonthCount - prevCount) / Math.max(1, prevCount)) * 1000) / 10
+
+    // Sources breakdown
+    const rows = await prisma.enquiry.groupBy({ by: ['source'], _count: { _all: true } })
+    const sourcesRaw = rows.map(r => ({ name: (r as any).source || 'Unknown', count: (r as any)._count._all }))
+    const sourcesTotal = sourcesRaw.reduce((s, r) => s + r.count, 0) || 1
+    const sources = sourcesRaw
+      .sort((a,b)=> b.count - a.count)
+      .map(r => ({ ...r, percentage: Math.round((r.count / sourcesTotal) * 100) }))
+
+    // Product interest breakdown (from productInterest string)
+    const piRows = await prisma.enquiry.findMany({ select: { productInterest: true } })
+    const productCounts: Record<string, number> = {}
+    for (const row of piRows) {
+      const interest = ((row as any).productInterest || 'Other').split(',').map((s: string) => s.trim()).filter(Boolean)
+      if (interest.length === 0) interest.push('Other')
+      for (const i of interest) productCounts[i] = (productCounts[i] || 0) + 1
+    }
+    const productsTotal = Object.values(productCounts).reduce((a,b)=>a+b,0) || 1
+    const products = Object.entries(productCounts)
+      .sort((a,b)=> b[1]-a[1])
+      .slice(0,5)
+      .map(([name,count]) => ({ name, count, percentage: Math.round((Number(count)/productsTotal)*100) }))
+
+    // Staff performance: enquiries handled by submittedBy
+    const staffRows = await prisma.enquiry.groupBy({ by: ['submittedBy'], _count: { _all: true } })
+    const staff = staffRows
+      .filter(r => r.submittedBy)
+      .map(r => ({ name: r.submittedBy as string, enquiries: (r as any)._count._all, rating: 4.6 }))
+      .sort((a,b)=> b.enquiries - a.enquiries)
+
+    // Simple conversion rate: percentage of enquiries with status "Sold"
+    const soldCount = await prisma.enquiry.count({ where: { status: 'Sold' } })
+    const conversionRate = total === 0 ? 0 : Math.round((soldCount / total) * 1000) / 10
+
+    // 2) Email-campaign summary for dashboard tiles (kept alongside)
     const sentCampaigns = await prisma.emailCampaign.findMany({ where: { status: 'sent' }, select: { sentCount: true } })
     const totalEmailsSent = sentCampaigns.reduce((sum, c) => sum + (c.sentCount || 0), 0)
 
-    // Unique opens/clicks across all campaigns
     const uniqueOpenEmails = await prisma.emailOpen.findMany({ select: { recipientEmail: true }, distinct: ['recipientEmail'] })
     const uniqueClickEmails = await prisma.emailClick.findMany({ select: { recipientEmail: true }, distinct: ['recipientEmail'] })
     const uniqueOpens = uniqueOpenEmails.length
@@ -79,6 +123,10 @@ export async function GET(req: Request) {
     const overallClickRate = Math.round((uniqueClicks / denom) * 1000) / 10
 
     return NextResponse.json({
+      enquiries: { total, thisMonth: thisMonthCount, growth, conversionRate },
+      sources,
+      products,
+      staff,
       summary: {
         totalEmailsSent,
         overallOpenRate,

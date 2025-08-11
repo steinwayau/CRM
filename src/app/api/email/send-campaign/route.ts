@@ -757,8 +757,10 @@ async function appendFooterAsync(html: string, recipientEmail: string): Promise<
 
   // Load settings; env is fallback
   const s = await getFooterSettings()
-  const enableBranded = (s.footerEnabled ?? (process.env.ENABLE_BRANDED_FOOTER || 'false')).toString().toLowerCase() === 'true'
-  const logoUrl = s.footerLogoUrl || `${base}/branding/logo.png`
+  const enableBrandedFlag = (s.footerEnabled ?? (process.env.ENABLE_BRANDED_FOOTER || 'false')).toString().toLowerCase() === 'true'
+  const logoUrlFromSettings = s.footerLogoUrl || ''
+  const enableBranded = enableBrandedFlag || !!logoUrlFromSettings
+  const logoUrl = logoUrlFromSettings || `${base}/branding/logo.png`
   const phoneLabel = s.footerPhoneLabel || 'National Information Line 1300 199 589'
   const fb = s.footerFacebook || SOCIAL_LINKS.facebook
   const ig = s.footerInstagram || SOCIAL_LINKS.instagram

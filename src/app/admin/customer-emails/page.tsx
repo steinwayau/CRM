@@ -773,11 +773,15 @@ export default function CustomerEmailsPage() {
             : c
         ))
 
-        // Wait a moment for database update to complete, then reload
-        setTimeout(async () => {
-          await loadData()  // This will reload campaigns AND analytics with no-store
-        }, 1500)
-        
+        // Immediately refetch campaigns (fresh) to avoid stale UI
+        try {
+          const latestResp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
+          if (latestResp.ok) {
+            const latest = await latestResp.json()
+            setCampaigns(latest)
+          }
+        } catch (e) { /* ignore */ }
+
         // Start polling for tracking updates every 30 seconds
         const trackingInterval = setInterval(async () => {
           try {

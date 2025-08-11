@@ -1,5 +1,12 @@
 # 🤖 AGENT TRACKING SYSTEM
 
+### Agent — Aug 11 (Revert analytics; keep editor)
+- Action: Reverted analytics to Golden State baseline while retaining template editor improvements from main
+- Deployment: Production alias updated to latest
+- Finding: Tracking data present in `email_tracking` for current campaigns, but dashboard/modal still show 0
+- Likely cause: Mixed data sources in UI (legacy Prisma models vs tracking table)
+- Next steps: Unify UI reads to `/api/email/analytics?campaignId=...`; verify `campaignAnalytics` population and Refresh handler
+
 ### Agent — Canva Positioning Update (Aug 10)
 - Deployed to production (main): single-best-guide snapping, measurement overlays, initial equal-gap, aspect-preserving corner resize, rotation handle with snapping, Cmd/Ctrl disables snap.
 - Next steps left for new agent: resize-edge snapping to neighbor edges/centers; equal-gap polish; Zoom + Fit/Center; Alignment/Distribution panel; rulers + draggable guides; margins/safe area; grouping; layers; constraints.

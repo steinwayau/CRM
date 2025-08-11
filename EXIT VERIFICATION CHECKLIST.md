@@ -1387,3 +1387,31 @@ By this exit verification, I acknowledge that:
   5) Rulers + draggable guides; margins/safe area snapping
   6) Layers and constraints; undo/redo stack
 - Notes: All changes are UI-only in `src/app/admin/customer-emails/template-editor/page.tsx`. Production deploys via GitHub main auto-deploy (verify build on Vercel). Hard-refresh after deploy to clear cached assets.
+
+# EXIT VERIFICATION CHECKLIST
+
+Date: 2025-08-11
+Agent: Current
+
+Summary
+- Editor work retained and stable (see TODO LIST for completed vs pending).
+- Analytics (opens/clicks) on dashboard and campaign modal still not rendering despite tracking events existing.
+
+What changed this session
+- Reverted analytics to Golden State while keeping template editor files.
+- Adjusted per‑campaign analytics to read from `email_tracking` (still needs UI reconciliation in one area).
+
+Outstanding Issues (must hand over)
+- Open/Click rates: Tracking data exists (verified via `/api/debug/campaign-tracking-match`), but UI tiles and campaign modal show 0. Likely mismatch between reader (Prisma models vs tracking table) in one or more code paths.
+- Enquiries analytics card shows 0 because enquiries table has no recent rows; not an error but confusing.
+
+Next Steps for Agent
+1) Unify data source: ensure all places that show opens/clicks call `/api/email/analytics?campaignId=...` (tracking-backed) and not legacy Prisma `EmailOpen`/`EmailClick`.
+2) Verify UI wiring: `customer-emails/page.tsx` uses `campaignAnalytics` map; ensure it’s filled from the tracking-backed endpoint everywhere (including initial load and “Refresh Now”).
+3) Add a small badge on campaign modal showing the raw counts (opens, clicks) pulled from API to confirm values.
+
+Deployment status
+- Domain `crm.steinway.com.au` points to latest deployment (see Vercel alias history).
+
+Rollback plan
+- Golden State commit: 2ad0871 (already used as base for revert).

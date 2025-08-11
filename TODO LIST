@@ -1,37 +1,36 @@
 # TODO LIST — EPG CRM Comprehensive Audit
 
-Last Updated: 2025-08-10
-Owner: Current agent (investigation-only)
-Scope: Read-only audit; no code changes or deployments performed
+Last Updated: 2025-08-11
+Owner: Current agent (handover)
+Scope: Summarize editor progress and remaining tasks; flag current analytics issue for next agent
 
-Canva-style Editor — Remaining Tasks (simple, numbered)
-1) Best-in-class resize snapping: moving edge snaps to neighbor edges/centers; anchor edge fixed; show single guide + pixel label per axis.
-2) Equal-gap polish: dual labels (left/right or top/bottom) with fade; snap when gaps equal within tolerance; suppress at low zoom.
-3) Zoom + Fit/Center controls: 50/75/100/125% with visual-only scaling; editing enabled only at 100%; Fit-to-window and Center canvas.
-4) Alignment & Distribution panel: Align Left/Right/Top/Bottom/Vertical Center/Horizontal Center; Distribute with equal gap (respect locked).
-5) Rulers & draggable guides: top/left rulers with draggable guide lines; snap-to-guide; toggle; density auto at zoom.
-6) Canvas margins/safe-area: configurable margins/bleed; guides appear; snapping respects them.
-7) Properties panel fields: Rotation (done), add Opacity, Z-index, Lock Aspect toggle; live numeric editing with undo/redo.
-8) Grouping and multi-select: marquee/Shift-click; group bounds snapping; align/distribute inside group; lock/hide on group members.
-9) Layers panel: rename, lock, hide, reorder; Bring to Front/Back and Step Forward/Back.
-10) Constraints (pinning): pin to top/left/right/bottom; scale with canvas; fixed size; predictable behavior on canvas resize.
-11) Distance/redlining mode: while dragging or holding Space, show redline measurements to nearest neighbors and canvas edges.
-12) Rotation UX polish: larger handle target, degree ring at hover, configurable snap angles.
-13) High-contrast mode: toggle increases guide/label contrast and thickness for accessibility.
-14) Keyboard shortcuts: Cmd/Ctrl disable snap (done), Arrows/Shift (done), Alt-drag duplicate (done); add: Cmd/Ctrl+G group, Cmd/Ctrl+Shift+G ungroup, Esc cancel transform.
-15) Undo/Redo stack: capture all transforms and property edits; Ctrl/Cmd+Z / Shift+Z.
-16) Performance: spatial index (quadtree/R-tree) for nearest-neighbor queries; cache bounds; rAF-only updates; avoid layout thrash.
-17) Precision/pixel snapping: store sub-pixel state but render snapped to whole pixels to avoid blur; text boxes prefer integer sizes.
-18) Guide engine config: expose constants (SNAP_TOLERANCE, BIG_NUDGE, ROTATE_SNAP_DEGREES, GUIDE_FADE_MS, MAX_NEIGHBORS_FOR_SNAP) with comments.
-19) Resize behavior for text boxes: fixed width, auto-height; snapping/measurement uses visual bounds.
-20) Help/shortcuts modal: quick reference for guides, snapping rules, and shortcuts.
+Canva-style Editor — Status
+- Completed:
+  - Zoom + Fit/Center controls (visual-only scaling wrapper); editing at 100% only
+  - Alignment & Distribution actions; arrow-key nudge and Shift-nudge
+  - Equal-gap indicators with snap tolerance and memory; button coverage improved
+  - Rotation UX: larger handle + degree tooltip; snap angles
+  - Multi-select (Shift-click) groundwork and marquee selection basics; selection visuals
+  - Undo/Redo stack with keyboard shortcuts
+  - Performance: spatial index for neighbor queries; rAF updates
+  - Precision/pixel snapping on render (Math.round)
+  - Exposed guide constants in `src/lib/editor-constants.ts`
+  - Heading resize behavior: font scales when compressing
 
-Other Open Items (non-Canva)
-A1) Resend webhooks TODOs (8 items): status/delivery/bounce/complaint/open/click logging — implement after analytics model finalised.
-A2) Email analytics route TODO: confirm relevance post-latest schema; clean up or complete behaviour accordingly.
-A3) Preview placeholder links: change `href="#"` behaviour in preview-only context to prevent scrolling (minor polish).
-A4) `scripts/test-urls.sh` BASE_URL: update legacy domain reference (doc utility only).
-A5) Error surfacing pass: ensure critical throws in admin flows surface as user-friendly toasts (import/template/campaign).
+- Pending:
+  1) Equal-gap: multi-gap visual (ticks + banner) and stricter snap precedence
+  2) Rulers & draggable guides (top/left), snap-to-guide, toggle
+  3) Canvas margins/safe-area and snapping awareness
+  4) Properties panel fields: Opacity, Z-index, Lock Aspect
+  5) Layers panel: rename, lock, hide, reorder; Bring/Send
+  6) Grouping/ungrouping + align/distribute inside group; lock/hide on group members
+  7) Constraints/pinning options per element
+  8) Distance/redlining mode (hold Space) for neighbor/canvas measures
+  9) High-contrast mode for guides/labels
+  10) Keyboard shortcuts: Group/Ungroup, Esc cancel transform
+  11) Text boxes: fixed width, auto-height; visual bounds in snap
+  12) Help/shortcuts modal
 
 Notes
-- Production deploys auto-trigger from GitHub main; hard-refresh after deploy to clear cached assets. 
+- Editor code retained after analytics revert; no further editor changes pending analytics fix.
+- Current Issue (critical): Dashboard campaign open/click rates not rendering; Analytics page enquiries are 0, but tracking exists in `email_tracking`. Next agent should reconcile data source for opens/clicks across UI. 

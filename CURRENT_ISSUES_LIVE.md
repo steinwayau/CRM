@@ -490,3 +490,21 @@ By this exit verification, I acknowledge that:
   3) Zoom + Fit/Center controls
   4) Alignment/Distribution panel
 - Notes: Production deployments are auto-triggered from GitHub main; verify build status before testing. Hard-refresh the editor to bust cached JS. 
+
+# CURRENT ISSUES LIVE
+
+Last Updated: 2025-08-11
+
+Open Items
+- Campaign analytics (opens/clicks) not rendering on dashboard tiles and campaign modal.
+  - Evidence: `/api/debug/campaign-tracking-match` shows tracking rows for current campaigns (distinct opens/clicks present).
+  - Suspected cause: mixed data sources — UI reading legacy Prisma `EmailOpen`/`EmailClick` in some paths while tracking writes to `email_tracking`.
+  - Attempted: Reverted analytics to Golden State; added tracking-backed per‑campaign analytics endpoint usage. Still one UI path showing 0.
+  - Next agent: unify UI to consume `/api/email/analytics?campaignId=...` for all campaign views; confirm with campaign ID from list.
+
+- Enquiries analytics cards show 0
+  - Likely due to no recent rows in enquiries table; not a service failure.
+
+Recent Changes
+- Golden State analytics restored while keeping template editor improvements.
+- Production alias verified to latest deployment. 

@@ -779,6 +779,8 @@ export default function CustomerEmailsPage() {
           if (latestResp.ok) {
             const latest = await latestResp.json()
             setCampaigns(latest)
+            // Kick analytics reload so tiles update fast
+            await loadCampaignAnalyticsSync(latest)
           }
         } catch (e) { /* ignore */ }
 

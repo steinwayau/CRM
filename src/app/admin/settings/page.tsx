@@ -40,6 +40,29 @@ export default function SettingsPage() {
     })()
   }, [])
 
+  // Auto-save with debounce
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        setIsSaving(true)
+        const resp = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings })
+        })
+        if (resp.ok) {
+          setSaveMessage('Saved')
+          setTimeout(()=>setSaveMessage(''), 1200)
+        }
+      } catch (e) {
+        console.error('Auto-save failed', e)
+      } finally {
+        setIsSaving(false)
+      }
+    }, 600)
+    return () => clearTimeout(t)
+  }, [settings])
+
   const handleSave = async () => {
     setIsSaving(true)
     

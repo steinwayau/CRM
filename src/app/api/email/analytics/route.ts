@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { sql } from '@vercel/postgres'
 
+// Prevent static optimization/caching
+export const dynamic = 'force-dynamic'
+
+const noStore = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+}
+
 const prisma = new PrismaClient()
 
 function parseRange(range?: string) {
@@ -54,7 +63,7 @@ export async function GET(req: Request) {
         clickRate,
         sentCount,
         recipientCount
-      })
+      }, { headers: noStore })
     }
 
     const range = searchParams.get('range') || '30days'
@@ -126,7 +135,7 @@ export async function GET(req: Request) {
       ...enquiriesPayload,
       summary: { totalEmailsSent, overallOpenRate, overallClickRate },
       timestamp: new Date().toISOString()
-    })
+    }, { headers: noStore })
   } catch (e: any) {
     // Absolute fallback: never hard-fail UI
     return NextResponse.json({
@@ -136,6 +145,6 @@ export async function GET(req: Request) {
       staff: [],
       summary: { totalEmailsSent: 0, overallOpenRate: 0, overallClickRate: 0 },
       error: e.message || 'Failed to load analytics'
-    })
+    }, { headers: noStore })
   }
 } 

@@ -8,6 +8,13 @@ interface AnalyticsData {
   sources: Array<{ name: string; count: number; percentage: number }>
   products: Array<{ name: string; count: number; percentage: number }>
   staff: Array<{ name: string; enquiries: number; rating: number }>
+  summary?: {
+    totalEmailsSent: number
+    uniqueOpens?: number
+    uniqueClicks?: number
+    overallOpenRate?: number
+    overallClickRate?: number
+  }
 }
 
 export default function AnalyticsPage() {
@@ -15,6 +22,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailDetails, setEmailDetails] = useState<any | null>(null)
 
   const loadData = async (range: string) => {
     setLoading(true)
@@ -24,9 +32,26 @@ export default function AnalyticsPage() {
       if (!res.ok) throw new Error('Failed to load analytics')
       const json = await res.json()
       setData(json)
+
+      // Map range → start/end for detailed endpoint
+      const now = new Date()
+      let start: Date
+      switch (range) {
+        case '7days': start = new Date(now.getTime() - 7*86400000); break
+        case '90days': start = new Date(now.getTime() - 90*86400000); break
+        case '1year': start = new Date(now.setFullYear(now.getFullYear()-1)); break
+        case '30days':
+        default: start = new Date(Date.now() - 30*86400000); break
+      }
+      const params = new URLSearchParams()
+      params.set('start', start.toISOString())
+      params.set('end', new Date().toISOString())
+      const dres = await fetch(`/api/email/analytics/detailed?${params.toString()}`, { cache: 'no-store' })
+      if (dres.ok) setEmailDetails(await dres.json())
     } catch (e: any) {
       setError(e.message || 'Error loading analytics')
       setData(null)
+      setEmailDetails(null)
     } finally {
       setLoading(false)
     }
@@ -126,6 +151,99 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
+
+        {/* Email Performance (Overall) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <p className="text-sm font-medium text-gray-600">Emails Sent</p>
+            <p className="text-3xl font-bold text-gray-900">{data?.summary?.totalEmailsSent ?? 0}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <p className="text-sm font-medium text-gray-600">Unique Opens</p>
+            <p className="text-3xl font-bold text-gray-900">{data?.summary?.uniqueOpens ?? 0}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <p className="text-sm font-medium text-gray-600">Unique Clicks</p>
+            <p className="text-3xl font-bold text-gray-900">{data?.summary?.uniqueClicks ?? 0}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <p className="text-sm font-medium text-gray-600">Open / Click Rate</p>
+            <p className="text-xl font-bold text-gray-900">
+              {(data?.summary?.overallOpenRate ?? 0).toFixed(1)}% / {(data?.summary?.overallClickRate ?? 0).toFixed(1)}%
+            </p>
+          </div>
+        </div>
+
+        {/* Email Detailed Analytics */}
+        {emailDetails && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Click Breakdown by Type</h3>
+                <p className="text-sm text-gray-600">Video / Button / Website</p>
+              </div>
+              <div className="p-6 space-y-3">
+                {(emailDetails.summary?.clickBreakdown || emailDetails.clickBreakdown || []).map((row: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 capitalize">{row.linkType}</span>
+                    <span className="text-sm text-gray-600">{row.totalClicks ?? row.clicks} clicks · {row.uniqueUsers} users</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Top Domains</h3>
+                <p className="text-sm text-gray-600">Unique recipients by domain</p>
+              </div>
+              <div className="p-6 space-y-3">
+                {(emailDetails.summary?.domains || emailDetails.domains || []).slice(0,10).map((row: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">{row.domain}</span>
+                    <span className="text-sm text-gray-600">{row.uniqueUsers} users</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Clients / Devices</h3>
+                <p className="text-sm text-gray-600">Recent user‑agent sample</p>
+              </div>
+              <div className="p-6 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-2">Clients</p>
+                  {(emailDetails.summary?.clients || emailDetails.clients || []).slice(0,6).map((c: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between"><span>{c.client}</span><span className="text-sm text-gray-600">{c.events}</span></div>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Devices</p>
+                  {(emailDetails.summary?.devices || emailDetails.devices || []).slice(0,6).map((d: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between"><span>{d.device}</span><span className="text-sm text-gray-600">{d.events}</span></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Top URLs</h3>
+                <p className="text-sm text-gray-600">Most clicked links</p>
+              </div>
+              <div className="p-6 space-y-3">
+                {(emailDetails.summary?.topUrls || emailDetails.topUrls || []).map((row: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="truncate max-w-[70%] text-sm text-gray-900" title={row.url}>{row.url}</span>
+                    <span className="text-sm text-gray-600">{row.clicks} clicks</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Enquiry Sources */}

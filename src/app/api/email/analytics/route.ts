@@ -133,7 +133,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ...enquiriesPayload,
-      summary: { totalEmailsSent, overallOpenRate, overallClickRate },
+      summary: { totalEmailsSent, uniqueOpens, uniqueClicks, overallOpenRate, overallClickRate },
       timestamp: new Date().toISOString()
     }, { headers: noStore })
   } catch (e: any) {

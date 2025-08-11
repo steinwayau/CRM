@@ -1194,10 +1194,10 @@ export default function CustomerEmailsPage() {
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
                   const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
-                  const latest = ordered[ordered.length - 1]
-                  const analytics = latest ? campaignAnalytics[latest.id] : undefined
-                  if (analytics) return analytics.openRate.toFixed(1)
-                  return overallAnalytics?.summary?.overallOpenRate?.toFixed(1) || '0'
+                                     const latest = ordered[ordered.length - 1]
+                   const analytics = latest ? campaignAnalytics[latest.id] : undefined
+                   if (analytics && typeof analytics.openRate === 'number') return analytics.openRate.toFixed(1)
+                   return overallAnalytics?.summary?.overallOpenRate?.toFixed?.(1) || '0'
                 })()}%
               </p>
             </div>
@@ -1218,10 +1218,10 @@ export default function CustomerEmailsPage() {
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
                   const ordered = [...campaigns].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
-                  const latest = ordered[ordered.length - 1]
-                  const analytics = latest ? campaignAnalytics[latest.id] : undefined
-                  if (analytics) return analytics.clickRate.toFixed(1)
-                  return overallAnalytics?.summary?.overallClickRate?.toFixed(1) || '0'
+                                     const latest = ordered[ordered.length - 1]
+                   const analytics = latest ? campaignAnalytics[latest.id] : undefined
+                   if (analytics && typeof analytics.clickRate === 'number') return analytics.clickRate.toFixed(1)
+                   return overallAnalytics?.summary?.overallClickRate?.toFixed?.(1) || '0'
                 })()}%
               </p>
             </div>

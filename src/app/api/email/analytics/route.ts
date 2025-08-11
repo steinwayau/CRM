@@ -24,8 +24,9 @@ export async function GET(req: Request) {
       // Per-campaign analytics (Golden-State compatible)
       const campaign = await prisma.emailCampaign.findUnique({ where: { id: campaignId } })
       const sentCount = campaign?.sentCount || 0
+      const recipientCount = campaign?.recipientCount || 0
 
-      // Unique opens by distinct recipientEmail
+      // Unique opens and clicks by distinct recipientEmail
       const uniqueOpenEmails = await prisma.emailOpen.findMany({
         where: { campaignId },
         select: { recipientEmail: true },
@@ -38,8 +39,16 @@ export async function GET(req: Request) {
       })
       const opens = uniqueOpenEmails.length
       const clicks = uniqueClickEmails.length
-      const openRate = sentCount === 0 ? 0 : Math.round((opens / sentCount) * 1000) / 10
-      const clickRate = sentCount === 0 ? 0 : Math.round((clicks / sentCount) * 1000) / 10
+
+      // Robust denominator: prefer sentCount, then recipientCount, then distinct observed recipients
+      const observedRecipients = new Set<string>([
+        ...uniqueOpenEmails.map(r => r.recipientEmail),
+        ...uniqueClickEmails.map(r => r.recipientEmail)
+      ]).size
+      const denom = Math.max(1, sentCount || recipientCount || observedRecipients)
+
+      const openRate = Math.round((opens / denom) * 1000) / 10
+      const clickRate = Math.round((clicks / denom) * 1000) / 10
 
       return NextResponse.json({
         campaignId,
@@ -47,7 +56,8 @@ export async function GET(req: Request) {
         clicks,
         openRate,
         clickRate,
-        sentCount
+        sentCount,
+        recipientCount
       })
     }
 

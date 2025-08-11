@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+import { SNAP_TOLERANCE, ROTATE_SNAP_DEGREES, MAX_NEIGHBORS_FOR_SNAP, GRID_CELL_SIZE } from '@/src/lib/editor-constants'
+import { SpatialIndex } from '@/src/lib/spatial-index'
+
 interface EmailTemplate {
   id: string
   name: string
@@ -73,6 +76,7 @@ export default function TemplateEditorPage() {
   // Visual editor state
   const [editorElements, setEditorElements] = useState<EditorElement[]>([])
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 800 })
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState('#ffffff')
 
@@ -391,18 +395,154 @@ export default function TemplateEditorPage() {
     return Math.round(value / gridSize) * gridSize
   }
 
-  const SNAP_TOLERANCE = 8
-  const ROTATE_SNAP_DEGREES = [0, 15, 30, 45, 60, 90]
-
   const disableSnapRef = useRef(false)
   const [angleHint, setAngleHint] = useState<number | null>(null)
-  const [measureOverlays, setMeasureOverlays] = useState<Array<{ x1: number, y1: number, x2: number, y2: number, label: string }>>([])
+  const [measureOverlays, setMeasureOverlays] = useState<Array<{ x1: number, y1: number, x2: number, y2: number, label: string, color?: string }>>([])
+  const [neighborHighlights, setNeighborHighlights] = useState<Array<{ x: number, y: number, w: number, h: number }>>([])
+  // Remember last used spacing (for Canva-like consistent spacing)
+  const lastGapRef = useRef<{ vertical: number | null; horizontal: number | null }>({ vertical: null, horizontal: null })
   const MAX_NEIGHBORS_FOR_SNAP = 40
+  const [zoom, setZoom] = useState<50 | 75 | 100 | 125>(100)
+  const [fadeTick, setFadeTick] = useState(0) // changes to trigger label fade timing
+  useEffect(() => {
+    if (measureOverlays.length === 0) return
+    const t = setTimeout(() => setFadeTick(v => v + 1), 800) // fade labels after delay
+    return () => clearTimeout(t)
+  }, [measureOverlays])
+
+  // Spatial index for performance (rebuilt whenever elements change)
+  const spatialRef = useRef(new SpatialIndex<EditorElement>(GRID_CELL_SIZE))
+  useEffect(() => {
+    try {
+      spatialRef.current.build(editorElements)
+    } catch {
+      // no-op safeguard
+    }
+  }, [editorElements])
+
+  // Simple undo/redo history for element edits
+  const historyRef = useRef<EditorElement[][]>([])
+  const futureRef = useRef<EditorElement[][]>([])
+  const interactionRef = useRef<{ active: boolean; pushed: boolean }>({ active: false, pushed: false })
+  const pushHistory = () => {
+    // Deep clone minimal: JSON structured form is sufficient here
+    const snapshot: EditorElement[] = JSON.parse(JSON.stringify(editorElements))
+    historyRef.current.push(snapshot)
+    if (historyRef.current.length > 50) historyRef.current.shift()
+    futureRef.current = []
+  }
+  const undo = () => {
+    const prev = historyRef.current.pop()
+    if (!prev) return
+    const current = JSON.parse(JSON.stringify(editorElements))
+    futureRef.current.push(current)
+    setEditorElements(prev)
+  }
+  const redo = () => {
+    const next = futureRef.current.pop()
+    if (!next) return
+    const current = JSON.parse(JSON.stringify(editorElements))
+    historyRef.current.push(current)
+    setEditorElements(next)
+  }
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey
+      // Undo/redo
+      if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault(); undo(); return
+      }
+      if (isMod && ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y')) {
+        e.preventDefault(); redo(); return
+      }
+      // Arrow-key nudge for multi-select (or single)
+      const nudgeKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight']
+      if (nudgeKeys.includes(e.key) && selectedIds.length > 0) {
+        e.preventDefault()
+        const delta = e.shiftKey ? 10 : 1
+        const dx = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0
+        const dy = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0
+        pushHistory()
+        setEditorElements(prev => prev.map(el => {
+          if (!selectedIds.includes(el.id)) return el
+          const nx = Math.max(0, Math.min(canvasSize.width - el.style.width, el.style.position.x + dx))
+          const ny = Math.max(0, Math.min(canvasSize.height - el.style.height, el.style.position.y + dy))
+          return { ...el, style: { ...el.style, position: { x: nx, y: ny } } }
+        }))
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editorElements, selectedIds, canvasSize])
+
+  // Align/Distribute helpers
+  const alignSelected = (mode: 'left'|'centerX'|'right'|'top'|'middle'|'bottom') => {
+    if (selectedIds.length < 2) return
+    pushHistory()
+    const selected = editorElements.filter(el => selectedIds.includes(el.id))
+    const minX = Math.min(...selected.map(e => e.style.position.x))
+    const maxRight = Math.max(...selected.map(e => e.style.position.x + e.style.width))
+    const minY = Math.min(...selected.map(e => e.style.position.y))
+    const maxBottom = Math.max(...selected.map(e => e.style.position.y + e.style.height))
+    const centerX = (minX + maxRight) / 2
+    const centerY = (minY + maxBottom) / 2
+    setEditorElements(prev => prev.map(el => {
+      if (!selectedIds.includes(el.id)) return el
+      let x = el.style.position.x
+      let y = el.style.position.y
+      if (mode === 'left') x = minX
+      if (mode === 'right') x = maxRight - el.style.width
+      if (mode === 'centerX') x = Math.round(centerX - el.style.width / 2)
+      if (mode === 'top') y = minY
+      if (mode === 'bottom') y = maxBottom - el.style.height
+      if (mode === 'middle') y = Math.round(centerY - el.style.height / 2)
+      return { ...el, style: { ...el.style, position: { x, y } } }
+    }))
+  }
+  const distributeSelected = (axis: 'horizontal'|'vertical') => {
+    if (selectedIds.length < 3) return
+    pushHistory()
+    const selected = editorElements.filter(el => selectedIds.includes(el.id))
+    if (axis === 'horizontal') {
+      const sorted = [...selected].sort((a,b)=> a.style.position.x - b.style.position.x)
+      const left = sorted[0].style.position.x
+      const right = sorted[sorted.length-1].style.position.x + sorted[sorted.length-1].style.width
+      const totalWidth = sorted.reduce((s,e)=> s + e.style.width, 0)
+      const gap = Math.round((right - left - totalWidth) / (sorted.length - 1))
+      let cursor = left
+      const pos: Record<string, number> = {}
+      sorted.forEach((e, idx) => {
+        pos[e.id] = cursor
+        cursor += e.style.width + gap
+      })
+      setEditorElements(prev => prev.map(el => selectedIds.includes(el.id) ? { ...el, style: { ...el.style, position: { x: pos[el.id], y: el.style.position.y } } } : el))
+    } else {
+      const sorted = [...selected].sort((a,b)=> a.style.position.y - b.style.position.y)
+      const top = sorted[0].style.position.y
+      const bottom = sorted[sorted.length-1].style.position.y + sorted[sorted.length-1].style.height
+      const totalHeight = sorted.reduce((s,e)=> s + e.style.height, 0)
+      const gap = Math.round((bottom - top - totalHeight) / (sorted.length - 1))
+      let cursor = top
+      const pos: Record<string, number> = {}
+      sorted.forEach((e, idx) => {
+        pos[e.id] = cursor
+        cursor += e.style.height + gap
+      })
+      setEditorElements(prev => prev.map(el => selectedIds.includes(el.id) ? { ...el, style: { ...el.style, position: { x: el.style.position.x, y: pos[el.id] } } } : el))
+    }
+  }
 
   const getAlignmentGuides = (draggedElement: EditorElement, newX: number, newY: number) => {
-    const guides = []
+    const guides = [] as Array<{ type: 'vertical' | 'horizontal'; position: number; label: string }>
     const threshold = SNAP_TOLERANCE // pixels
-    const otherElements = editorElements.filter(el => el.id !== draggedElement.id)
+    // Query nearby elements for performance
+    const neighborhood = spatialRef.current.queryNeighbors({
+      x: newX - 300,
+      y: newY - 300,
+      width: draggedElement.style.width + 600,
+      height: draggedElement.style.height + 600
+    }, MAX_NEIGHBORS_FOR_SNAP)
+    const otherElements = neighborhood.filter(el => el.id !== draggedElement.id)
     
     // Canvas center lines
     const canvasCenterX = canvasSize.width / 2
@@ -476,12 +616,13 @@ export default function TemplateEditorPage() {
   const getVerticalNeighbors = (dragged: EditorElement) => {
     const candidates = editorElements.filter(el => el.id !== dragged.id)
       .filter(el => {
-        // overlap horizontally
+        // overlap horizontally (with small tolerance so equal-gap works like Canva)
         const aLeft = dragged.style.position.x
         const aRight = dragged.style.position.x + dragged.style.width
         const bLeft = el.style.position.x
         const bRight = el.style.position.x + el.style.width
-        return !(aRight < bLeft || aLeft > bRight)
+        const overlap = Math.min(aRight, bRight) - Math.max(aLeft, bLeft)
+        return overlap >= -200 // allow significant misalignment for narrow elements (e.g., buttons)
       })
       .slice(0, MAX_NEIGHBORS_FOR_SNAP)
     const above = candidates
@@ -493,6 +634,37 @@ export default function TemplateEditorPage() {
     return { above, below }
   }
 
+  // Edge candidate producers for resize-edge snapping
+  const getVerticalEdgeCandidates = (x: number, y: number, w: number, h: number, selfId: string) => {
+    const neighbors = spatialRef.current.queryNeighbors({ x: x - 400, y: y - 400, width: w + 800, height: h + 800 }, MAX_NEIGHBORS_FOR_SNAP)
+    const positions: number[] = []
+    for (const el of neighbors) {
+      if (el.id === selfId) continue
+      positions.push(el.style.position.x) // left
+      positions.push(el.style.position.x + el.style.width) // right
+      positions.push(el.style.position.x + Math.round(el.style.width / 2)) // center
+    }
+    // canvas edges and center
+    positions.push(0)
+    positions.push(canvasSize.width)
+    positions.push(Math.round(canvasSize.width / 2))
+    return positions
+  }
+  const getHorizontalEdgeCandidates = (x: number, y: number, w: number, h: number, selfId: string) => {
+    const neighbors = spatialRef.current.queryNeighbors({ x: x - 400, y: y - 400, width: w + 800, height: h + 800 }, MAX_NEIGHBORS_FOR_SNAP)
+    const positions: number[] = []
+    for (const el of neighbors) {
+      if (el.id === selfId) continue
+      positions.push(el.style.position.y) // top
+      positions.push(el.style.position.y + el.style.height) // bottom
+      positions.push(el.style.position.y + Math.round(el.style.height / 2)) // middle
+    }
+    positions.push(0)
+    positions.push(canvasSize.height)
+    positions.push(Math.round(canvasSize.height / 2))
+    return positions
+  }
+
   const snapPosition = (draggedElement: EditorElement, newX: number, newY: number) => {
     // First compute guide-based snapping using raw coordinates
     let snappedX = newX
@@ -500,48 +672,149 @@ export default function TemplateEditorPage() {
     
     const guides = disableSnapRef.current ? [] : getAlignmentGuides(draggedElement, snappedX, snappedY)
     const threshold = SNAP_TOLERANCE
-    const measurements: Array<{ x1:number,y1:number,x2:number,y2:number,label:string }> = []
+    const equalTolerance = 1 // px: strict equality for green + snap
+    const measurements: Array<{ x1:number,y1:number,x2:number,y2:number,label:string,color?:string }> = []
+    const neighborRects: Array<{ x:number,y:number,w:number,h:number }> = []
+    let eqX = false
+    let eqY = false
     
     // Equal-gap snapping (horizontal)
     if (!disableSnapRef.current) {
-      const { left, right } = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const hr1 = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const left1 = hr1.left; const right1 = hr1.right;
+      if (left1 || right1) {
+        const memH = lastGapRef.current.horizontal
+        // Prefer memory-based target if present against the nearest neighbor
+        if (memH != null) {
+          // If left neighbor exists, target x so left gap = memH
+          if (left1 && Math.abs((snappedX - (left1.style.position.x + left1.style.width)) - memH) <= threshold) {
+            snappedX = left1.style.position.x + left1.style.width + memH
+            eqX = true
+          }
+          // If right neighbor exists, target x so right gap = memH
+          if (!eqX && right1 && Math.abs((right1.style.position.x - (snappedX + draggedElement.style.width)) - memH) <= threshold) {
+            snappedX = right1.style.position.x - draggedElement.style.width - memH
+            eqX = true
+          }
+        }
+      }
+      const hr2 = getHorizontalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const left = hr2.left; const right = hr2.right;
       if (left && right) {
         const gapLeft = snappedX - (left.style.position.x + left.style.width)
         const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
+        const equalVisual = Math.abs(gapLeft - gapRight) <= equalTolerance
+        const memH = lastGapRef.current.horizontal
+        const matchLeftMem = memH != null && Math.abs(gapLeft - memH) <= threshold
+        const matchRightMem = memH != null && Math.abs(gapRight - memH) <= threshold
         measurements.push({
-          x1: left.style.position.x + left.style.width, y1: draggedElement.style.position.y - 12,
-          x2: snappedX, y2: draggedElement.style.position.y - 12, label: `${Math.round(gapLeft)}px`
+          x1: left.style.position.x + left.style.width, y1: snappedY - 12,
+          x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: (equalVisual || matchLeftMem) ? '#10b981' : '#3b82f6'
         })
         measurements.push({
-          x1: snappedX + draggedElement.style.width, y1: draggedElement.style.position.y - 12,
-          x2: right.style.position.x, y2: draggedElement.style.position.y - 12, label: `${Math.round(gapRight)}px`
+          x1: snappedX + draggedElement.style.width, y1: snappedY - 12,
+          x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: (equalVisual || matchRightMem) ? '#10b981' : '#3b82f6'
         })
+        neighborRects.push(
+          { x: left.style.position.x, y: left.style.position.y, w: left.style.width, h: left.style.height },
+          { x: right.style.position.x, y: right.style.position.y, w: right.style.width, h: right.style.height }
+        )
         const targetCenterX = (left.style.position.x + left.style.width + right.style.position.x) / 2 - draggedElement.style.width / 2
-        if (Math.abs(gapLeft - gapRight) <= threshold) {
+        if (equalVisual) {
           snappedX = targetCenterX
+          eqX = true
+        }
+      } else if (left || right) {
+        // Single-neighbor memory-based indicator & snap
+        const memH = lastGapRef.current.horizontal
+        if (left) {
+          const gapLeft = snappedX - (left.style.position.x + left.style.width)
+          const matchMem = memH != null && Math.abs(gapLeft - memH) <= threshold
+          measurements.push({
+            x1: left.style.position.x + left.style.width, y1: snappedY - 12,
+            x2: snappedX, y2: snappedY - 12, label: `${Math.round(gapLeft)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: left.style.position.x, y: left.style.position.y, w: left.style.width, h: left.style.height })
+          if (matchMem) { snappedX = left.style.position.x + left.style.width + (memH as number); eqX = true }
+        } else if (right) {
+          const gapRight = right.style.position.x - (snappedX + draggedElement.style.width)
+          const matchMem = memH != null && Math.abs(gapRight - memH) <= threshold
+          measurements.push({
+            x1: snappedX + draggedElement.style.width, y1: snappedY - 12,
+            x2: right.style.position.x, y2: snappedY - 12, label: `${Math.round(gapRight)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: right.style.position.x, y: right.style.position.y, w: right.style.width, h: right.style.height })
+          if (matchMem) { snappedX = right.style.position.x - draggedElement.style.width - (memH as number); eqX = true }
         }
       }
-      // Equal-gap snapping (vertical)
-      const { above, below } = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      // Equal-gap + memory snapping (vertical)
+      const vr1 = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const above1 = vr1.above; const below1 = vr1.below;
+      if (above1 || below1) {
+        const memV = lastGapRef.current.vertical
+        if (memV != null) {
+          if (above1 && Math.abs((snappedY - (above1.style.position.y + above1.style.height)) - memV) <= threshold) {
+            snappedY = above1.style.position.y + above1.style.height + memV
+            eqY = true
+          }
+          if (!eqY && below1 && Math.abs((below1.style.position.y - (snappedY + draggedElement.style.height)) - memV) <= threshold) {
+            snappedY = below1.style.position.y - draggedElement.style.height - memV
+            eqY = true
+          }
+        }
+      }
+      const vr2 = getVerticalNeighbors({ ...draggedElement, style: { ...draggedElement.style, position: { x: snappedX, y: snappedY } } as any })
+      const above = vr2.above; const below = vr2.below;
       if (above && below) {
         const gapTop = snappedY - (above.style.position.y + above.style.height)
         const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
+        const equalVisualV = Math.abs(gapTop - gapBottom) <= equalTolerance
+        const memV = lastGapRef.current.vertical
+        const matchTopMem = memV != null && Math.abs(gapTop - memV) <= threshold
+        const matchBottomMem = memV != null && Math.abs(gapBottom - memV) <= threshold
         measurements.push({
-          x1: draggedElement.style.position.x - 12, y1: above.style.position.y + above.style.height,
-          x2: draggedElement.style.position.x - 12, y2: snappedY, label: `${Math.round(gapTop)}px`
+          x1: snappedX - 12, y1: above.style.position.y + above.style.height,
+          x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: (equalVisualV || matchTopMem) ? '#10b981' : '#3b82f6'
         })
         measurements.push({
-          x1: draggedElement.style.position.x - 12, y1: snappedY + draggedElement.style.height,
-          x2: draggedElement.style.position.x - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`
+          x1: snappedX - 12, y1: snappedY + draggedElement.style.height,
+          x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: (equalVisualV || matchBottomMem) ? '#10b981' : '#3b82f6'
         })
+        neighborRects.push(
+          { x: above.style.position.x, y: above.style.position.y, w: above.style.width, h: above.style.height },
+          { x: below.style.position.x, y: below.style.position.y, w: below.style.width, h: below.style.height }
+        )
         const targetCenterY = (above.style.position.y + above.style.height + below.style.position.y) / 2 - draggedElement.style.height / 2
-        if (Math.abs(gapTop - gapBottom) <= threshold) {
+        if (equalVisualV) {
           snappedY = targetCenterY
+          eqY = true
+        }
+      } else if (above || below) {
+        // Single-neighbor memory-based indicator & snap
+        const memV = lastGapRef.current.vertical
+        if (above) {
+          const gapTop = snappedY - (above.style.position.y + above.style.height)
+          const matchMem = memV != null && Math.abs(gapTop - memV) <= threshold
+          measurements.push({
+            x1: snappedX - 12, y1: above.style.position.y + above.style.height,
+            x2: snappedX - 12, y2: snappedY, label: `${Math.round(gapTop)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: above.style.position.x, y: above.style.position.y, w: above.style.width, h: above.style.height })
+          if (matchMem) { snappedY = above.style.position.y + above.style.height + (memV as number); eqY = true }
+        } else if (below) {
+          const gapBottom = below.style.position.y - (snappedY + draggedElement.style.height)
+          const matchMem = memV != null && Math.abs(gapBottom - memV) <= threshold
+          measurements.push({
+            x1: snappedX - 12, y1: snappedY + draggedElement.style.height,
+            x2: snappedX - 12, y2: below.style.position.y, label: `${Math.round(gapBottom)}px`, color: matchMem ? '#10b981' : '#3b82f6'
+          })
+          neighborRects.push({ x: below.style.position.x, y: below.style.position.y, w: below.style.width, h: below.style.height })
+          if (matchMem) { snappedY = below.style.position.y - draggedElement.style.height - (memV as number); eqY = true }
         }
       }
     }
     
-    // Choose a single best guide per axis
+    // Choose a single best guide per axis (skip when equal-gap already engaged)
     const elementCenterX = snappedX + draggedElement.style.width / 2
     const elementCenterY = snappedY + draggedElement.style.height / 2
     const vCandidates = guides.filter(g => g.type === 'vertical')
@@ -557,39 +830,37 @@ export default function TemplateEditorPage() {
       Math.abs(snappedY + draggedElement.style.height - pos)
     )
     let bestV = vCandidates.sort((a,b)=> distX(a.position) - distX(b.position))[0]
-    if (bestV && distX(bestV.position) < threshold) {
+    if (!eqX && bestV && distX(bestV.position) < threshold) {
       // Snap X to the closest feature on this vertical line
       const dCenter = Math.abs(elementCenterX - bestV.position)
       const dLeft = Math.abs(snappedX - bestV.position)
       const dRight = Math.abs(snappedX + draggedElement.style.width - bestV.position)
       if (dCenter <= dLeft && dCenter <= dRight) {
         snappedX = bestV.position - draggedElement.style.width / 2
-        measurements.push({ x1: bestV.position, y1: snappedY - 16, x2: elementCenterX, y2: snappedY - 16, label: `${Math.round(dCenter)}px` })
       } else if (dLeft <= dRight) {
-        measurements.push({ x1: bestV.position, y1: snappedY - 16, x2: snappedX, y2: snappedY - 16, label: `${Math.round(dLeft)}px` })
         snappedX = bestV.position
       } else {
-        measurements.push({ x1: snappedX + draggedElement.style.width, y1: snappedY - 16, x2: bestV.position, y2: snappedY - 16, label: `${Math.round(dRight)}px` })
         snappedX = bestV.position - draggedElement.style.width
       }
+    } else if (eqX) {
+      bestV = undefined as any
     } else {
       bestV = undefined as any
     }
     let bestH = hCandidates.sort((a,b)=> distY(a.position) - distY(b.position))[0]
-    if (bestH && distY(bestH.position) < threshold) {
+    if (!eqY && bestH && distY(bestH.position) < threshold) {
       const dCenter = Math.abs(elementCenterY - bestH.position)
       const dTop = Math.abs(snappedY - bestH.position)
       const dBottom = Math.abs(snappedY + draggedElement.style.height - bestH.position)
       if (dCenter <= dTop && dCenter <= dBottom) {
         snappedY = bestH.position - draggedElement.style.height / 2
-        measurements.push({ x1: snappedX - 16, y1: bestH.position, x2: snappedX - 16, y2: elementCenterY, label: `${Math.round(dCenter)}px` })
       } else if (dTop <= dBottom) {
-        measurements.push({ x1: snappedX - 16, y1: bestH.position, x2: snappedY, y2: bestH.position, label: `${Math.round(dTop)}px` })
         snappedY = bestH.position
       } else {
-        measurements.push({ x1: snappedX - 16, y1: snappedY + draggedElement.style.height, x2: snappedX - 16, y2: bestH.position, label: `${Math.round(dBottom)}px` })
         snappedY = bestH.position - draggedElement.style.height
       }
+    } else if (eqY) {
+      bestH = undefined as any
     } else {
       bestH = undefined as any
     }
@@ -601,7 +872,7 @@ export default function TemplateEditorPage() {
     if (snappedX <= edgeThreshold) {
       snappedX = 0
       bestV = { type: 'vertical', position: 0, label: 'Left Edge' } as any
-      measurements.push({ x1: 0, y1: snappedY - 12, x2: snappedX, y2: snappedY - 12, label: `${Math.round(snappedX)}px` })
+      measurements.push({ x1: 0, y1: snappedY - 12, x2: snappedX, y2: snappedY - 12, label: `${Math.round(snappedX)}px`, color: '#10b981' })
     }
     // Snap to right edge  
     else if (snappedX + draggedElement.style.width >= canvasSize.width - edgeThreshold) {
@@ -628,12 +899,14 @@ export default function TemplateEditorPage() {
     snappedX = Math.max(0, Math.min(canvasSize.width - draggedElement.style.width, snappedX))
     snappedY = Math.max(0, Math.min(canvasSize.height - draggedElement.style.height, snappedY))
     
-    const finalGuides = [bestV, bestH].filter(Boolean) as any
-    return { x: snappedX, y: snappedY, guides: finalGuides, measurements }
+         // Only keep equal-gap edge labels; remove middle-line numbers from generic snapping
+     const finalGuides = [bestV, bestH].filter(Boolean) as any
+     return { x: snappedX, y: snappedY, guides: finalGuides, measurements, neighborRects }
   }
 
   // Create smooth resize handler
   const createResizeHandler = (elementId: string, handle: string) => (e: React.MouseEvent) => {
+    if (zoom !== 100) return
     e.stopPropagation()
     e.preventDefault()
     const startX = e.clientX
@@ -696,8 +969,61 @@ export default function TemplateEditorPage() {
           }
         }
 
+        // Resize-edge snapping (anchor opposite edge). Skip when meta/ctrl pressed
+        if (!(e.metaKey || e.ctrlKey)) {
+          const candidatesV = getVerticalEdgeCandidates(newStyle.position.x, newStyle.position.y, newStyle.width, newStyle.height, elementId)
+          const candidatesH = getHorizontalEdgeCandidates(newStyle.position.x, newStyle.position.y, newStyle.width, newStyle.height, elementId)
+          let guide: { type: 'vertical' | 'horizontal'; position: number; label: string } | null = null
+
+          // Moving right edge
+          if (handle.includes('e')) {
+            const moving = newStyle.position.x + newStyle.width
+            const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.width = Math.max(10, best - newStyle.position.x)
+              guide = { type: 'vertical', position: best, label: 'Snap Right' }
+            }
+          }
+          // Moving left edge (right edge anchored)
+          if (handle.includes('w')) {
+            const rightEdge = newStyle.position.x + newStyle.width
+            const moving = newStyle.position.x
+            const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.position = { ...newStyle.position, x: best }
+              newStyle.width = Math.max(10, rightEdge - best)
+              guide = { type: 'vertical', position: best, label: 'Snap Left' }
+            }
+          }
+          // Moving bottom edge
+          if (handle.includes('s')) {
+            const moving = newStyle.position.y + newStyle.height
+            const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.height = Math.max(10, best - newStyle.position.y)
+              guide = { type: 'horizontal', position: best, label: 'Snap Bottom' }
+            }
+          }
+          // Moving top edge (bottom anchored)
+          if (handle.includes('n')) {
+            const bottomEdge = newStyle.position.y + newStyle.height
+            const moving = newStyle.position.y
+            const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
+            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
+              newStyle.position = { ...newStyle.position, y: best }
+              newStyle.height = Math.max(10, bottomEdge - best)
+              guide = { type: 'horizontal', position: best, label: 'Snap Top' }
+            }
+          }
+          setShowAlignmentGuides(guide ? [guide] : [])
+        } else {
+          setShowAlignmentGuides([])
+        }
+
         // Size-match snapping: match width/height of nearest elements within 2px
-        const others = editorElements.filter(el => el.id !== elementId).slice(0, MAX_NEIGHBORS_FOR_SNAP)
+        const others = spatialRef.current
+          .queryNeighbors({ x: newStyle.position?.x ?? element.style.position.x, y: newStyle.position?.y ?? element.style.position.y, width: newStyle.width, height: newStyle.height }, MAX_NEIGHBORS_FOR_SNAP)
+          .filter(el => el.id !== elementId)
         for (const other of others) {
           if (Math.abs(other.style.width - newStyle.width) <= 2) {
             newStyle.width = other.style.width
@@ -723,6 +1049,20 @@ export default function TemplateEditorPage() {
           }
         }
         
+        // Heading-specific behavior: scale font size with box, top-anchored like Canva
+        if (startElement && startElement.type === 'heading') {
+          const startFont = startElement.style.fontSize || 32
+          const scaleX = newStyle.width / Math.max(1, startWidth)
+          const scaleY = newStyle.height / Math.max(1, startHeight)
+          const fontScale = Math.min(scaleX, scaleY)
+          const nextFont = Math.max(10, Math.round(startFont * fontScale))
+          newStyle.fontSize = nextFont
+          // Ensure top stays anchored when dragging bottom handle
+          if (handle === 's' || handle === 'se' || handle === 'sw') {
+            newStyle.position = { x: newStyle.position?.x ?? element.style.position.x, y: element.style.position.y }
+          }
+        }
+        
         updateElement(elementId, { style: newStyle })
       })
     }
@@ -734,6 +1074,7 @@ export default function TemplateEditorPage() {
       setIsResizingElement(null)
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      setShowAlignmentGuides([])
     }
     
     document.addEventListener('mousemove', handleMouseMove)
@@ -742,6 +1083,7 @@ export default function TemplateEditorPage() {
 
   // Rotation handler
   const createRotateHandler = (elementId: string) => (e: React.MouseEvent) => {
+    if (zoom !== 100) return
     e.stopPropagation()
     e.preventDefault()
     const element = editorElements.find(el => el.id === elementId)
@@ -769,9 +1111,9 @@ export default function TemplateEditorPage() {
     }
     const onUp = () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
-      setAngleHint(null)
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
+      setAngleHint(null)
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -1035,6 +1377,7 @@ export default function TemplateEditorPage() {
 
   // Visual editor functions
   const addElement = (type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading') => {
+    pushHistory()
     const position = getNextElementPosition(type)
     
     const newElement: EditorElement = {
@@ -1085,6 +1428,12 @@ export default function TemplateEditorPage() {
   }
 
   const updateElement = (id: string, updates: Partial<EditorElement>) => {
+    if (!interactionRef.current.active) {
+      pushHistory()
+    } else if (interactionRef.current.active && !interactionRef.current.pushed) {
+      pushHistory()
+      interactionRef.current.pushed = true
+    }
     setEditorElements(prevElements => prevElements.map(el => 
       el.id === id ? { ...el, ...updates } : el
     ))
@@ -1096,6 +1445,7 @@ export default function TemplateEditorPage() {
   }
 
   const deleteElement = (id: string) => {
+    pushHistory()
     setEditorElements(editorElements.filter(el => el.id !== id))
     setSelectedElement(null)
   }
@@ -1867,6 +2217,8 @@ export default function TemplateEditorPage() {
     )
   }
 
+  const BUILD_VERSION = 'e9d7ffb'
+
   return (
     <div className={`min-h-screen bg-gray-50 ${isResizing ? 'select-none' : ''}`}>
       {/* Header */}
@@ -2113,6 +2465,7 @@ export default function TemplateEditorPage() {
               </div>
               
               <div className="flex flex-wrap items-center gap-3">
+                <div className="text-xs text-gray-500 px-2 py-1 border border-gray-200 rounded bg-white">Editor v{BUILD_VERSION} · EG v1.2</div>
                 {/* Design Warnings */}
                 {designWarnings.length > 0 && (
                   <div className="flex items-center gap-2">
@@ -2192,12 +2545,52 @@ export default function TemplateEditorPage() {
                     <option value="25">25px</option>
                   </select>
                 </div>
+                {/* Zoom controls */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Zoom:</span>
+                  <div className="flex items-center gap-1">
+                    {[50, 75, 100, 125].map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setZoom(v as 50 | 75 | 100 | 125)}
+                        className={`px-2 py-1 text-sm border rounded ${zoom === v ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        {v}%
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                    onClick={() => {
+                      const container = document.getElementById('canvas-scroll')
+                      if (container) {
+                        const padding = 64
+                        const avail = container.clientWidth - padding
+                        const zRaw = Math.round((avail / canvasSize.width) * 100)
+                        const allowed = [50, 75, 100, 125] as const
+                        const closest = allowed.reduce((b, a) => (Math.abs(a - zRaw) < Math.abs(b - zRaw) ? a : b), allowed[0])
+                        setZoom(closest)
+                      }
+                    }}
+                  >
+                    Fit
+                  </button>
+                  <button
+                    className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                    onClick={() => {
+                      const container = document.getElementById('canvas-scroll')
+                      if (container) container.scrollTo({ left: 0, top: 0, behavior: 'smooth' })
+                    }}
+                  >
+                    Center
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Visual Canvas */}
-          <div className="flex-1 bg-gray-100 overflow-auto p-8">
+          <div id="canvas-scroll" className="flex-1 bg-gray-100 overflow-auto p-8">
             {previewMode ? (
               /* Email Client Preview Mode */
               <div className="w-full h-full">
@@ -2236,13 +2629,10 @@ export default function TemplateEditorPage() {
               <div 
                 className="shadow-lg mx-auto relative"
                 style={{ 
-                  width: `${canvasSize.width}px`, 
-                  minHeight: `${canvasSize.height}px`,
+                  width: `${Math.round(canvasSize.width * (zoom/100))}px`, 
+                  minHeight: `${Math.round(canvasSize.height * (zoom/100))}px`,
                   backgroundColor: canvasBackgroundColor,
-                  border: '1px solid #e5e7eb',
-                  backgroundImage: showGrid ? 
-                    `radial-gradient(circle, #e5e7eb 1px, transparent 1px)` : 'none',
-                  backgroundSize: showGrid ? `${gridSize}px ${gridSize}px` : 'auto'
+                  border: '1px solid #e5e7eb'
                 }}
                 onClick={(e) => {
                   // Only clear selection if this was an actual canvas click, not just a mouse release after element interaction
@@ -2259,62 +2649,54 @@ export default function TemplateEditorPage() {
                   }
                 }}
               >
+              {/* Scale wrapper so children keep exact coordinates */}
+              <div
+                className="relative"
+                style={{
+                  width: `${canvasSize.width}px`,
+                  height: `${canvasSize.height}px`,
+                  transform: `scale(${zoom/100})`,
+                  transformOrigin: 'top left'
+                }}
+              >
               {/* Grid overlay */}
               {showGrid && (
                 <div 
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     backgroundImage: `
-                      linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)
+                      linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px)
                     `,
                     backgroundSize: `${gridSize}px ${gridSize}px`
                   }}
                 />
               )}
-
-              {/* Gmail 600px Constraint Overlay */}
-              {showGmailConstraints && canvasSize.width > 600 && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Gmail Safe Zone (600px centered) */}
-                  <div 
-                    className="absolute top-0 bg-blue-100 bg-opacity-30 border-2 border-blue-400 border-dashed"
-                    style={{
-                      left: `${(canvasSize.width - 600) / 2}px`,
-                      width: '600px',
-                      height: `${canvasSize.height}px`
-                    }}
-                  >
-                                         <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                       Gmail Preview Zone (Auto-scales to 600px)
-                     </div>
-                  </div>
-                  
-                  {/* Side margins that will auto-scale in Gmail */}
-                  <div 
-                    className="absolute top-0 left-0 bg-green-100 bg-opacity-30"
-                    style={{
-                      width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${canvasSize.height}px`
-                    }}
-                  >
-                                         <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded rotate-90 origin-bottom-left">
-                       Auto-scales to fit
-                     </div>
-                  </div>
-                  <div 
-                    className="absolute top-0 right-0 bg-green-100 bg-opacity-30"
-                    style={{
-                      width: `${(canvasSize.width - 600) / 2}px`,
-                      height: `${canvasSize.height}px`
-                    }}
-                  >
-                                         <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
-                       Auto-scales to fit
-                     </div>
-                  </div>
+              {/* Gmail preview zone banner */}
+              <div
+                className="absolute left-1/2 -translate-x-1/2 text-xs text-gray-500"
+                style={{ top: '-24px' }}
+              >
+                Gmail Preview Zone (Auto-scales to 600px)
+              </div>
+              <div
+                className="absolute"
+                style={{
+                  left: `${(canvasSize.width - 600) / 2}px`,
+                  width: '600px',
+                  height: `${canvasSize.height}px`
+                }}
+              >
+                <div className="absolute inset-y-0 left-0 w-px bg-blue-300" />
+                <div className="absolute inset-y-0 right-0 w-px bg-blue-300" />
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded border border-blue-300 shadow-sm">
+                  Gmail Preview Zone (Auto-scales to 600px)
                 </div>
-              )}
+                {/* Watermark tag */}
+                <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded -rotate-90 origin-bottom-right">
+                  Auto-scales to fit
+                </div>
+              </div>
               
               {/* Alignment guides */}
               {showAlignmentGuides.map((guide, index) => (
@@ -2355,11 +2737,34 @@ export default function TemplateEditorPage() {
                   </div>
                 </div>
               ))}
+              {/* Distance/redline overlays (fade) */}
+              {measureOverlays.map((m, i) => (
+                <div key={`m-${i}`} className={`absolute pointer-events-none z-40 transition-opacity duration-300 ${fadeTick ? 'opacity-60':'opacity-100'}`}
+                  style={{
+                    left: `${Math.min(m.x1, m.x2)}px`,
+                    top: `${Math.min(m.y1, m.y2)}px`,
+                    width: `${Math.max(1, Math.abs(m.x2 - m.x1))}px`,
+                    height: `${Math.max(1, Math.abs(m.y2 - m.y1))}px`,
+                    borderTop: m.y1 === m.y2 ? `1px dashed ${m.color || '#10b981'}` : undefined,
+                    borderLeft: m.x1 === m.x2 ? `1px dashed ${m.color || '#10b981'}` : undefined,
+                  }}
+                >
+                  <div className="absolute -translate-y-1/2 -translate-x-1/2 text-white text-[10px] px-1.5 py-0.5 rounded"
+                    style={{ left: '50%', top: '50%', background: m.color || '#10b981' }}
+                  >{m.label}</div>
+                </div>
+              ))}
+              {/* Neighbor highlights */}
+              {neighborHighlights.map((r, i) => (
+                <div key={`n-${i}`} className="absolute pointer-events-none z-30"
+                  style={{ left: r.x, top: r.y, width: r.w, height: r.h, border: '1px solid rgba(59,130,246,0.4)', borderRadius: 2 }}
+                />
+              ))}
               {editorElements.map((element) => (
                 <div
                   key={element.id}
                   className={`absolute cursor-move transition-shadow ${
-                    selectedElement === element.id ? 'ring-2 ring-blue-500' : ''
+                    selectedElement === element.id ? 'ring-2 ring-blue-500' : (selectedIds.includes(element.id) ? 'ring-2 ring-blue-300' : '')
                   } ${
                     draggedElement === element.id ? 'shadow-lg opacity-80' : ''
                   }`}
@@ -2373,117 +2778,94 @@ export default function TemplateEditorPage() {
                     transform: element.style.rotation ? `rotate(${element.style.rotation}deg)` : undefined,
                     transformOrigin: 'center center'
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Track element interaction time
-                    lastElementInteractionRef.current = Date.now()
-                    // Only handle click if we haven't dragged
-                    if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                      setSelectedElement(element.id)
-                    }
-                  }}
                   onMouseDown={(e) => {
-                    // Don't start dragging if we're resizing
+                    if (zoom !== 100) return
+                    // Shift-toggle selection, do not start drag
+                    if (e.shiftKey) {
+                      e.stopPropagation()
+                      setSelectedIds(prev => prev.includes(element.id) ? prev.filter(id => id !== element.id) : [...prev, element.id])
+                      setSelectedElement(element.id)
+                      return
+                    }
+                    // Begin drag
                     if (isResizingElement) return
-                    
                     e.preventDefault()
                     e.stopPropagation()
-                    // Track element interaction time
                     lastElementInteractionRef.current = Date.now()
                     setSelectedElement(element.id)
-                    
-                    // Reset drag state
-                    dragStateRef.current = {
-                      isDragging: false,
-                      dragStarted: false,
-                      elementId: element.id
-                    }
-                    
-                    // Clear any existing timeout
-                    if (dragTimeoutRef.current) {
-                      clearTimeout(dragTimeoutRef.current)
-                    }
-                    
+                    setSelectedIds([element.id])
+
+                    if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current)
+
                     const base = editorElements.find(el => el.id === element.id) || element
                     const startX = e.clientX - base.style.position.x
                     const startY = e.clientY - base.style.position.y
                     const startMouseX = e.clientX
                     const startMouseY = e.clientY
-                    
+
                     let animationFrameId: number
-                    
+
                     const handleMouseMove = (e: MouseEvent) => {
                       e.preventDefault()
                       disableSnapRef.current = e.metaKey || e.ctrlKey
-                      
-                      // Calculate how far mouse has moved
+                      if (!interactionRef.current.active) {
+                        interactionRef.current = { active: true, pushed: false }
+                      }
+
                       const deltaX = Math.abs(e.clientX - startMouseX)
                       const deltaY = Math.abs(e.clientY - startMouseY)
-                      
-                      // Only start dragging if mouse has moved more than 3 pixels
                       if (!dragStateRef.current.dragStarted && (deltaX > 3 || deltaY > 3)) {
                         dragStateRef.current.dragStarted = true
                         dragStateRef.current.isDragging = true
                         setIsDragging(true)
                         setDraggedElement(element.id)
                       }
-                      
+
                       if (dragStateRef.current.dragStarted) {
-                        // Use requestAnimationFrame for smoother performance
-                        if (animationFrameId) {
-                          cancelAnimationFrame(animationFrameId)
-                        }
-                        
+                        if (animationFrameId) cancelAnimationFrame(animationFrameId)
                         animationFrameId = requestAnimationFrame(() => {
                           const rawX = e.clientX - startX
                           const rawY = e.clientY - startY
-                          
-                          // Constrain to canvas bounds
                           const current = editorElements.find(el => el.id === element.id) || element
                           const constrainedX = Math.max(0, Math.min(rawX, canvasSize.width - current.style.width))
                           const constrainedY = Math.max(0, Math.min(rawY, canvasSize.height - current.style.height))
-                          
-                          const { x: newX, y: newY, guides, measurements } = snapPosition(current, constrainedX, constrainedY)
-                          
+                          const { x: newX, y: newY, guides, measurements, neighborRects } = snapPosition(current, constrainedX, constrainedY)
                           setShowAlignmentGuides(guides)
                           setMeasureOverlays(measurements)
-                          
-                          updateElement(element.id, {
-                            style: {
-                              ...current.style,
-                              position: { x: newX, y: newY }
-                            }
-                          })
+                          setNeighborHighlights(neighborRects)
+                          updateElement(element.id, { style: { ...current.style, position: { x: newX, y: newY } } })
                         })
                       }
                     }
-                    
+
                     const handleMouseUp = () => {
-                      if (animationFrameId) {
-                        cancelAnimationFrame(animationFrameId)
-                      }
-                      // Track element interaction time
+                      if (animationFrameId) cancelAnimationFrame(animationFrameId)
                       lastElementInteractionRef.current = Date.now()
                       setIsDragging(false)
                       setDraggedElement(null)
                       setShowAlignmentGuides([])
                       setMeasureOverlays([])
+                      setNeighborHighlights([])
                       disableSnapRef.current = false
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
-                      
-                      // Reset drag state after a delay to allow click handler to check it
+                      interactionRef.current = { active: false, pushed: false }
                       dragTimeoutRef.current = setTimeout(() => {
-                        dragStateRef.current = {
-                          isDragging: false,
-                          dragStarted: false,
-                          elementId: null
-                        }
+                        dragStateRef.current = { isDragging: false, dragStarted: false, elementId: null }
                       }, 50)
                     }
-                    
+
                     document.addEventListener('mousemove', handleMouseMove)
                     document.addEventListener('mouseup', handleMouseUp)
+                  }}
+                  onClick={(e) => {
+                    if (zoom !== 100) return
+                    e.stopPropagation()
+                    lastElementInteractionRef.current = Date.now()
+                    if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
+                      setSelectedElement(element.id)
+                      setSelectedIds([element.id])
+                    }
                   }}
                 >
                   {element.type === 'text' && (
@@ -2508,16 +2890,15 @@ export default function TemplateEditorPage() {
                             textAlign: element.style.textAlign,
                             width: '100%',
                             height: '100%',
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
                             resize: 'none',
+                            outline: 'none',
+                            border: 'none',
                             overflow: 'hidden'
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
                         />
                       ) : (
                         <div
+                          className="w-full h-full"
                           style={{
                             fontSize: element.style.fontSize,
                             fontWeight: element.style.fontWeight,
@@ -2528,29 +2909,15 @@ export default function TemplateEditorPage() {
                             backgroundColor: element.style.backgroundColor,
                             padding: element.style.padding,
                             borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
-                            border: '1px solid #e5e7eb',
-                            cursor: 'text'
+                            textAlign: element.style.textAlign
                           }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Start editing immediately on single click, but only if not dragging
-                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              startEditingText(element.id)
-                            }
-                          }}
+                          onDoubleClick={() => startEditingText(element.id)}
                         >
-                          {element.content}
+                          {element.content || 'Double-click to edit text'}
                         </div>
                       )}
                     </>
                   )}
-                  
                   {element.type === 'heading' && (
                     <>
                       {editingTextElement === element.id ? (
@@ -2573,16 +2940,15 @@ export default function TemplateEditorPage() {
                             textAlign: element.style.textAlign,
                             width: '100%',
                             height: '100%',
-                            border: '2px solid #3b82f6',
-                            outline: 'none',
                             resize: 'none',
+                            outline: 'none',
+                            border: 'none',
                             overflow: 'hidden'
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
                         />
                       ) : (
                         <div
+                          className="w-full h-full"
                           style={{
                             fontSize: element.style.fontSize,
                             fontWeight: element.style.fontWeight,
@@ -2593,29 +2959,15 @@ export default function TemplateEditorPage() {
                             backgroundColor: element.style.backgroundColor,
                             padding: element.style.padding,
                             borderRadius: element.style.borderRadius,
-                            textAlign: element.style.textAlign,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: element.style.textAlign === 'center' ? 'center' : element.style.textAlign === 'right' ? 'flex-end' : 'flex-start',
-                            border: '1px solid #e5e7eb',
-                            cursor: 'text'
+                            textAlign: element.style.textAlign
                           }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Start editing immediately on single click, but only if not dragging
-                            if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
-                              startEditingText(element.id)
-                            }
-                          }}
+                          onDoubleClick={() => startEditingText(element.id)}
                         >
-                          {element.content}
+                          {element.content || 'Double-click to edit text'}
                         </div>
                       )}
                     </>
                   )}
-                  
                   {element.type === 'image' && (
                     <img 
                       src={element.content} 
@@ -2628,7 +2980,6 @@ export default function TemplateEditorPage() {
                       }}
                     />
                   )}
-                  
                   {element.type === 'button' && (
                     <>
                       {editingTextElement === element.id ? (
@@ -2676,7 +3027,8 @@ export default function TemplateEditorPage() {
                             fontWeight: element.style.fontWeight || 'medium',
                             fontFamily: element.style.fontFamily,
                             fontStyle: element.style.fontStyle,
-                            textDecoration: element.style.textDecoration
+                            textDecoration: element.style.textDecoration,
+                            pointerEvents: 'none' // allow measurement overlays to show unobstructed on top of buttons
                           }}
                           onDoubleClick={(e) => {
                             e.stopPropagation()
@@ -2688,7 +3040,6 @@ export default function TemplateEditorPage() {
                       )}
                     </>
                   )}
-                  
                   {element.type === 'video' && (
                     <div
                       style={{
@@ -2735,7 +3086,6 @@ export default function TemplateEditorPage() {
                       )}
                     </div>
                   )}
-                  
                   {element.type === 'divider' && (
                     <div
                       style={{
@@ -2746,7 +3096,6 @@ export default function TemplateEditorPage() {
                       }}
                     />
                   )}
-                  
                   {selectedElement === element.id && (
                     <>
                       <button
@@ -2813,23 +3162,41 @@ export default function TemplateEditorPage() {
                       </>
                       {/* Rotation handle */}
                       {selectedElement === element.id && (
-                        <div
-                          className="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border border-gray-300 rounded-full cursor-crosshair flex items-center justify-center"
-                          onMouseDown={createRotateHandler(element.id)}
-                          title="Rotate (snaps to 0/15/30/45/60/90)"
-                        >
-                          <svg className="w-3 h-3 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 10-7 11"/></svg>
-                        </div>
-                      )}
-                      {angleHint !== null && selectedElement === element.id && (
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded shadow">
-                          {angleHint}°
-                        </div>
+                        <>
+                          {/* Larger rotate handle */}
+                          <div
+                            className="absolute -top-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full cursor-crosshair flex items-center justify-center"
+                            onMouseDown={createRotateHandler(element.id)}
+                            title="Rotate (snaps to 0/15/30/45/60/90)"
+                          >
+                            <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 10-7 11"/></svg>
+                          </div>
+                          {/* Degree ring and tooltip when rotating */}
+                          {angleHint !== null && (
+                            <>
+                              <div
+                                className="absolute pointer-events-none"
+                                style={{
+                                  left: -8,
+                                  top: -8,
+                                  width: element.style.width + 16,
+                                  height: element.style.height + 16,
+                                  borderRadius: '9999px',
+                                  border: '1px dashed rgba(59,130,246,0.6)'
+                                }}
+                              />
+                              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded shadow">
+                                {angleHint}°
+                              </div>
+                            </>
+                          )}
+                        </>
                       )}
                     </>
                   )}
                 </div>
               ))}
+              </div>{/* end scale wrapper */}
               
               {editorElements.length === 0 && (
                 <div className="flex items-center justify-center h-full">
@@ -2837,8 +3204,7 @@ export default function TemplateEditorPage() {
                     <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    <p className="text-gray-500 text-lg">Start by adding elements from the sidebar</p>
-                    <p className="text-gray-400 text-sm mt-2">Drag and drop elements to build your email template</p>
+                    <p className="text-gray-600">Start by selecting an element on the left.</p>
                   </div>
                 </div>
               )}

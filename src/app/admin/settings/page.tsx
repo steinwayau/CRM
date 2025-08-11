@@ -25,6 +25,15 @@ export default function SettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  
+  // Track upload states to prevent concurrent modifications
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingIcons, setUploadingIcons] = useState({
+    facebook: false,
+    instagram: false,
+    youtube: false
+  })
 
   useEffect(() => {
     ;(async () => {
@@ -40,30 +49,13 @@ export default function SettingsPage() {
     })()
   }, [])
 
-  // Auto-save with debounce
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      try {
-        setIsSaving(true)
-        const resp = await fetch('/api/admin/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ settings })
-        })
-        if (resp.ok) {
-          setSaveMessage('Saved')
-          setTimeout(()=>setSaveMessage(''), 1200)
-        }
-      } catch (e) {
-        console.error('Auto-save failed', e)
-      } finally {
-        setIsSaving(false)
-      }
-    }, 600)
-    return () => clearTimeout(t)
-  }, [settings])
+  // REMOVED AUTO-SAVE - This was causing race conditions
+  // Settings now only save when explicitly triggered
 
   const handleSave = async () => {
+    // Prevent concurrent saves
+    if (isSaving) return
+    
     setIsSaving(true)
     
     try {
@@ -76,11 +68,23 @@ export default function SettingsPage() {
       })
 
       if (response.ok) {
+        // Reload settings from server to confirm persistence
+        const confirmResponse = await fetch('/api/admin/settings', { cache: 'no-store' })
+        if (confirmResponse.ok) {
+          const data = await confirmResponse.json()
+          if (data?.settings) {
+            setSettings(data.settings)
+          }
+        }
+        
         setSaveMessage('Settings saved successfully!')
+        setHasUnsavedChanges(false)
         setTimeout(() => setSaveMessage(''), 3000)
       }
     } catch (error) {
       console.error('Error saving settings:', error)
+      setSaveMessage('Failed to save settings')
+      setTimeout(() => setSaveMessage(''), 3000)
     } finally {
       setIsSaving(false)
     }
@@ -181,7 +185,10 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-600">Adds logo, phone label, and social links above unsubscribe</p>
                   </div>
                   <button
-                    onClick={() => setSettings({...settings, footerEnabled: !settings.footerEnabled})}
+                    onClick={() => {
+                      setSettings({...settings, footerEnabled: !settings.footerEnabled})
+                      setHasUnsavedChanges(true)
+                    }}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${settings.footerEnabled ? 'bg-purple-600' : 'bg-gray-200'}`}
                   >
                     <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.footerEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -191,17 +198,30 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Footer Logo (PNG/SVG recommended)</label>
                   <div className="flex items-center space-x-3">
-                    <input type="file" accept="image/*" onChange={async (e) => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      const form = new FormData()
-                      form.append('image', file)
-                      const res = await fetch('/api/upload/image', { method: 'POST', body: form })
-                      if (res.ok) {
-                        const json = await res.json()
-                        setSettings({...settings, footerLogoUrl: json.url})
-                      }
-                    }} />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      disabled={uploadingLogo || isSaving}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        
+                        setUploadingLogo(true)
+                        try {
+                          const form = new FormData()
+                          form.append('image', file)
+                          const res = await fetch('/api/upload/image', { method: 'POST', body: form })
+                          if (res.ok) {
+                            const json = await res.json()
+                            setSettings({...settings, footerLogoUrl: json.url})
+                            setHasUnsavedChanges(true)
+                            // Auto-save after successful upload
+                            setTimeout(() => handleSave(), 100)
+                          }
+                        } finally {
+                          setUploadingLogo(false)
+                        }
+                      }} />
                     {settings.footerLogoUrl && (
                       <img src={settings.footerLogoUrl} alt="Footer Logo" className="h-10" />
                     )}
@@ -213,7 +233,10 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={settings.footerPhoneLabel}
-                    onChange={(e) => setSettings({...settings, footerPhoneLabel: e.target.value})}
+                    onChange={(e) => {
+                      setSettings({...settings, footerPhoneLabel: e.target.value})
+                      setHasUnsavedChanges(true)
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
@@ -221,31 +244,91 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Facebook URL</label>
-                    <input type="url" value={settings.footerFacebook} onChange={(e)=>setSettings({...settings, footerFacebook: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <input type="url" value={settings.footerFacebook} onChange={(e)=>{setSettings({...settings, footerFacebook: e.target.value}); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
                     <div className="mt-2 flex items-center gap-3">
-                      <input type="file" accept="image/*" onChange={async (e)=>{
-                        const f = e.target.files?.[0]; if(!f) return; const form = new FormData(); form.append('image', f); const r = await fetch('/api/upload/image',{method:'POST',body:form}); if(r.ok){ const j=await r.json(); setSettings({...settings, facebookIconUrl:j.url}) }
-                      }} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        disabled={uploadingIcons.facebook || isSaving}
+                        onChange={async (e)=>{
+                          const f = e.target.files?.[0]; 
+                          if(!f) return; 
+                          
+                          setUploadingIcons({...uploadingIcons, facebook: true})
+                          try {
+                            const form = new FormData(); 
+                            form.append('image', f); 
+                            const r = await fetch('/api/upload/image',{method:'POST',body:form}); 
+                            if(r.ok){ 
+                              const j=await r.json(); 
+                              setSettings({...settings, facebookIconUrl:j.url})
+                              setHasUnsavedChanges(true)
+                              setTimeout(() => handleSave(), 100)
+                            }
+                          } finally {
+                            setUploadingIcons({...uploadingIcons, facebook: false})
+                          }
+                        }} />
                       {settings.facebookIconUrl && <img src={settings.facebookIconUrl} alt="FB" className="h-6" />}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Instagram URL</label>
-                    <input type="url" value={settings.footerInstagram} onChange={(e)=>setSettings({...settings, footerInstagram: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <input type="url" value={settings.footerInstagram} onChange={(e)=>{setSettings({...settings, footerInstagram: e.target.value}); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
                     <div className="mt-2 flex items-center gap-3">
-                      <input type="file" accept="image/*" onChange={async (e)=>{
-                        const f = e.target.files?.[0]; if(!f) return; const form = new FormData(); form.append('image', f); const r = await fetch('/api/upload/image',{method:'POST',body:form}); if(r.ok){ const j=await r.json(); setSettings({...settings, instagramIconUrl:j.url}) }
-                      }} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        disabled={uploadingIcons.instagram || isSaving}
+                        onChange={async (e)=>{
+                          const f = e.target.files?.[0]; 
+                          if(!f) return; 
+                          
+                          setUploadingIcons({...uploadingIcons, instagram: true})
+                          try {
+                            const form = new FormData(); 
+                            form.append('image', f); 
+                            const r = await fetch('/api/upload/image',{method:'POST',body:form}); 
+                            if(r.ok){ 
+                              const j=await r.json(); 
+                              setSettings({...settings, instagramIconUrl:j.url})
+                              setHasUnsavedChanges(true)
+                              setTimeout(() => handleSave(), 100)
+                            }
+                          } finally {
+                            setUploadingIcons({...uploadingIcons, instagram: false})
+                          }
+                        }} />
                       {settings.instagramIconUrl && <img src={settings.instagramIconUrl} alt="IG" className="h-6" />}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">YouTube URL</label>
-                    <input type="url" value={settings.footerYouTube} onChange={(e)=>setSettings({...settings, footerYouTube: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <input type="url" value={settings.footerYouTube} onChange={(e)=>{setSettings({...settings, footerYouTube: e.target.value}); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
                     <div className="mt-2 flex items-center gap-3">
-                      <input type="file" accept="image/*" onChange={async (e)=>{
-                        const f = e.target.files?.[0]; if(!f) return; const form = new FormData(); form.append('image', f); const r = await fetch('/api/upload/image',{method:'POST',body:form}); if(r.ok){ const j=await r.json(); setSettings({...settings, youtubeIconUrl:j.url}) }
-                      }} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        disabled={uploadingIcons.youtube || isSaving}
+                        onChange={async (e)=>{
+                          const f = e.target.files?.[0]; 
+                          if(!f) return; 
+                          
+                          setUploadingIcons({...uploadingIcons, youtube: true})
+                          try {
+                            const form = new FormData(); 
+                            form.append('image', f); 
+                            const r = await fetch('/api/upload/image',{method:'POST',body:form}); 
+                            if(r.ok){ 
+                              const j=await r.json(); 
+                              setSettings({...settings, youtubeIconUrl:j.url})
+                              setHasUnsavedChanges(true)
+                              setTimeout(() => handleSave(), 100)
+                            }
+                          } finally {
+                            setUploadingIcons({...uploadingIcons, youtube: false})
+                          }
+                        }} />
                       {settings.youtubeIconUrl && <img src={settings.youtubeIconUrl} alt="YT" className="h-6" />}
                     </div>
                   </div>
@@ -318,19 +401,24 @@ export default function SettingsPage() {
 
             {/* Save Button */}
             <div className="border-t pt-6">
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-6 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {isSaving && (
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || (!hasUnsavedChanges && !uploadingLogo && !uploadingIcons.facebook && !uploadingIcons.instagram && !uploadingIcons.youtube)}
+                  className={`px-6 py-3 ${hasUnsavedChanges ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400'} text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors`}
+                >
+                  {isSaving && (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save Settings' : 'No Changes'}</span>
+                </button>
+                {(uploadingLogo || uploadingIcons.facebook || uploadingIcons.instagram || uploadingIcons.youtube) && (
+                  <span className="text-sm text-gray-600">Uploading image...</span>
                 )}
-                <span>{isSaving ? 'Saving...' : 'Save Settings'}</span>
-              </button>
+              </div>
             </div>
           </div>
         </div>

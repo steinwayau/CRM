@@ -1388,30 +1388,69 @@ By this exit verification, I acknowledge that:
   6) Layers and constraints; undo/redo stack
 - Notes: All changes are UI-only in `src/app/admin/customer-emails/template-editor/page.tsx`. Production deploys via GitHub main auto-deploy (verify build on Vercel). Hard-refresh after deploy to clear cached assets.
 
-# EXIT VERIFICATION CHECKLIST
+# EXIT VERIFICATION CHECKLIST (Agent)
 
-Date: 2025-08-11
-Agent: Current
+Date: 2025-08-12
+Environment: Production (crm.steinway.com.au)
 
-Summary
-- Editor work retained and stable (see TODO LIST for completed vs pending).
-- Analytics (opens/clicks) on dashboard and campaign modal still not rendering despite tracking events existing.
+## Summary
+- Two persistent issues remain:
+  1) Email footer persistence/rendering is unreliable in production (likely settings not saved/read consistently).
+  2) Campaign list sometimes shows "Send Now" after send until manual refresh (UI/server timing).
+- Delete stability and Duplicate flow are fixed.
 
-What changed this session
-- Reverted analytics to Golden State while keeping template editor files.
-- Adjusted per‑campaign analytics to read from `email_tracking` (still needs UI reconciliation in one area).
+## What I changed (code)
+- Admin Settings
+  - Added Email Footer section (toggle, logo upload, links, social icon uploads for FB/IG/YT).
+  - Implemented auto-save on change (debounced) with POST /api/admin/settings; kept Save button as backup.
+- Send API (app/api/email/send-campaign/route.ts)
+  - Appends branded footer if any branded asset exists (toggle OR logo OR any icon URL).
+  - Reads system_settings via sql; renders uploaded social icon images when present; falls back to simple letter circles.
+  - Finalizes campaign status to 'sent' when successCount>0.
+- Campaigns UI (src/app/admin/customer-emails/page.tsx)
+  - After send success, immediately refetch /api/admin/campaigns with no-store and reload analytics.
+  - Duplicate now creates via server POST to avoid phantom drafts.
+- Campaigns API
+  - DELETE is idempotent (success if not found). Hard delete still cascades analytics.
 
-Outstanding Issues (must hand over)
-- Open/Click rates: Tracking data exists (verified via `/api/debug/campaign-tracking-match`), but UI tiles and campaign modal show 0. Likely mismatch between reader (Prisma models vs tracking table) in one or more code paths.
-- Enquiries analytics card shows 0 because enquiries table has no recent rows; not an error but confusing.
+## What still fails / user reports
+1) Footer persistence
+- User uploads logo/icons and toggles on footer.
+- Leaving Settings and returning shows toggle off and images cleared.
+- Emails show no branded footer (or only fallback).
+- Hypothesis: POST writes but GET reads from different or stale store (pooling/region or schema mismatch), or upsert failing silently.
 
-Next Steps for Agent
-1) Unify data source: ensure all places that show opens/clicks call `/api/email/analytics?campaignId=...` (tracking-backed) and not legacy Prisma `EmailOpen`/`EmailClick`.
-2) Verify UI wiring: `customer-emails/page.tsx` uses `campaignAnalytics` map; ensure it’s filled from the tracking-backed endpoint everywhere (including initial load and “Refresh Now”).
-3) Add a small badge on campaign modal showing the raw counts (opens, clicks) pulled from API to confirm values.
+2) Send Now reappears
+- Sporadic: After send, UI shows draft/Send Now until manual refresh.
+- Hypothesis: server update latency vs immediate refetch; UI updates before DB reflects 'sent'.
 
-Deployment status
-- Domain `crm.steinway.com.au` points to latest deployment (see Vercel alias history).
+## Reproduction steps (prod)
+1) Footer
+- Visit /admin/settings, enable footer, upload logo (PNG), upload social icons, set links. Navigate away, then back: toggle resets and files missing.
+- Send a test email; footer missing.
 
-Rollback plan
-- Golden State commit: 2ad0871 (already used as base for revert).
+2) Send flow
+- Create a one-recipient campaign and send. Observe list occasionally shows draft/Send Now until browser refresh.
+
+## Do NOT repeat
+- Do not redesign footer HTML/CSS until settings persistence is proven.
+- Do not rely on client-only duplicates (phantom ids) — use server POST.
+
+## Suggested next steps (concrete)
+1) Settings persistence
+- Instrument POST /api/admin/settings to log the exact rows written. Immediately GET and log results; compare.
+- Ensure GET/POST use the same DB connection and schema (consider using Prisma instead of @vercel/postgres sql for both).
+- Verify that upload URLs are absolute and accessible from production.
+
+2) Send flow
+- After send success, poll /api/admin/campaigns for that id until status='sent' (max 3 tries, ~2s total) before settling UI state.
+- Alternatively, modify send API to return the updated campaign row; trust server truth in UI.
+
+## Rollback plan
+- None required; current state is stable for non-footer flows and delete/duplicate.
+
+## Ownership handoff
+- Files to examine quickly:
+  - app/api/admin/settings/route.ts (GET/POST persistence)
+  - app/api/email/send-campaign/route.ts (appendFooterAsync reads)
+  - src/app/admin/customer-emails/page.tsx (post-send refresh logic)

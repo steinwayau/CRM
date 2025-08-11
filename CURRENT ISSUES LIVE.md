@@ -1,4 +1,47 @@
-﻿🚀 CURRENT ISSUES STATUS - EPG CRM SYSTEM
+﻿# CURRENT ISSUES (Updated by Agent)
+
+Date: 2025-08-12
+Environment: Production (crm.steinway.com.au)
+
+## 1) Email Footer not persisting / not rendering
+- Symptom: After uploading logo and social icon images and toggling on the footer, returning to Settings shows toggle off and images cleared; emails show no branded footer or only fallback text.
+- What was tried:
+  - Added Settings UI for footer logo + FB/IG/YT icon uploads and links; added auto-save on change (debounced POST /api/admin/settings); kept manual Save.
+  - Send API now reads system_settings (sql) and renders footer when any branded asset exists (toggle OR logo OR any icon).
+  - Verified production alias is correct; deployed multiple fixes.
+- Current status: Settings appear to not persist reliably (toggle returns to off; uploads not present on reload). Footer therefore sometimes missing.
+- Likely cause: settings persistence path. POST /api/admin/settings writes to system_settings, but on reload GET may not reflect the write (stale read, different DB, or failed upsert). Needs verification of:
+  - Database row values for keys: footerEnabled, footerLogoUrl, facebookIconUrl, instagramIconUrl, youtubeIconUrl, footerPhoneLabel.
+  - That GET /api/admin/settings uses the same database/connection as POST.
+  - That uploads return absolute, publicly retrievable URLs.
+- Do NOT: redesign footer again. Fix persistence first.
+- Suggested next steps:
+  1) Log and inspect the rows in system_settings immediately after POST from prod; compare GET response.
+  2) If GET diverges, ensure both GET/POST use the same pool/connection and schema. Consider prisma instead of @vercel/postgres sql for consistency.
+  3) After persistence is proven, verify send-time read in send-campaign/route.ts (appendFooterAsync) returns expected values.
+
+## 2) "Send Now" appears after sending until manual refresh
+- Symptom: After sending a campaign to 1 recipient, the list sometimes returns to draft/Send Now until the page is hard-refreshed.
+- What was tried:
+  - UI: mark sending → when success, set status=sent locally; then immediately refetch /api/admin/campaigns with cache:'no-store' and refresh analytics.
+  - API: Finalize status to 'sent' when successCount>0; idempotent deletes; duplicate now creates on server.
+- Current status: Intermittent. On user’s machine, list still shows draft/Send Now until a full browser refresh.
+- Likely cause: race between server update and client refetch, or status not written quickly in DB in production (pool/region latency). Also tiles may compute from stale per-campaign analytics.
+- Suggested next steps:
+  1) After send API returns success, poll /api/admin/campaigns until the specific campaign id reflects status='sent' (max 3 attempts over ~2s) before updating the UI.
+  2) Verify prisma update to email_campaigns.status is succeeding in prod (log errors).
+  3) If needed, have the send API return the finalized campaign row so the client can trust the server’s truth.
+
+## 3) Delete stability (now resolved)
+- Fix shipped: DELETE /api/admin/campaigns is idempotent (success if not found). Duplicate now posts to server to create a real DB row (no more phantom draft ids).
+- Guidance: Keep both behaviors.
+
+## Deployment notes
+- Production alias confirmed for each deploy. Avoid double-deploys (GitHub push + manual) at the same time.
+
+---
+
+🚀 CURRENT ISSUES STATUS - EPG CRM SYSTEM
 
 ### **✅ AGENT #42 ELEMENT SELECTION REGRESSION FIX - COMPLETED SUCCESSFULLY**
 

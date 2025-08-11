@@ -1021,9 +1021,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Update campaign sentCount in database
+    let updatedCampaign = null
     try {
       if (results.successCount > 0) {
-        await prisma.emailCampaign.update({
+        updatedCampaign = await prisma.emailCampaign.update({
           where: { id: updateCampaignId },
           data: { 
             sentCount: results.successCount,
@@ -1034,7 +1035,7 @@ export async function POST(request: NextRequest) {
         console.log(`Campaign ${updateCampaignId} sentCount updated: ${results.successCount}`)
       } else {
         // No successes → revert to draft so UI shows Send Now consistently
-        await prisma.emailCampaign.update({
+        updatedCampaign = await prisma.emailCampaign.update({
           where: { id: updateCampaignId },
           data: { status: 'draft', sentAt: null }
         })
@@ -1050,6 +1051,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: results.successCount > 0,
       results: results,
+      campaign: updatedCampaign, // Return the updated campaign for immediate UI update
       message: `Campaign sent to ${results.successCount} of ${results.totalRecipients} recipients`
     })
 

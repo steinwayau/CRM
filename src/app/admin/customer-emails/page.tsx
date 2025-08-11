@@ -758,31 +758,47 @@ export default function CustomerEmailsPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Update campaign with actual results and persist to database
-        await updateCampaigns(campaigns.map(c => 
-          c.id === campaignId 
-            ? { 
-                ...c, 
-                status: 'sent' as const, 
-                sentCount: result.results.successCount,
-                recipientCount: result.results.totalRecipients,
-                sentAt: new Date().toISOString(),
-                openRate: 0,  // Will be updated by tracking
-                clickRate: 0  // Will be updated by tracking
-              }
-            : c
-        ))
+        // Use the server's updated campaign directly for immediate UI update
+        if (result.campaign) {
+          // Update with server's authoritative campaign data
+          await updateCampaigns(campaigns.map(c => 
+            c.id === campaignId 
+              ? {
+                  ...result.campaign,
+                  openRate: 0,  // Will be updated by tracking
+                  clickRate: 0  // Will be updated by tracking
+                }
+              : c
+          ))
+        } else {
+          // Fallback to optimistic update if server doesn't return campaign
+          await updateCampaigns(campaigns.map(c => 
+            c.id === campaignId 
+              ? { 
+                  ...c, 
+                  status: 'sent' as const, 
+                  sentCount: result.results.successCount,
+                  recipientCount: result.results.totalRecipients,
+                  sentAt: new Date().toISOString(),
+                  openRate: 0,  // Will be updated by tracking
+                  clickRate: 0  // Will be updated by tracking
+                }
+              : c
+          ))
+        }
 
-        // Immediately refetch campaigns (fresh) to avoid stale UI
-        try {
-          const latestResp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
-          if (latestResp.ok) {
-            const latest = await latestResp.json()
-            setCampaigns(latest)
-            // Kick analytics reload so tiles update fast
-            await loadCampaignAnalyticsSync(latest)
-          }
-        } catch (e) { /* ignore */ }
+        // Delayed refetch as safety net (2 seconds later) to ensure consistency
+        setTimeout(async () => {
+          try {
+            const latestResp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
+            if (latestResp.ok) {
+              const latest = await latestResp.json()
+              setCampaigns(latest)
+              // Kick analytics reload so tiles update fast
+              await loadCampaignAnalyticsSync(latest)
+            }
+          } catch (e) { /* ignore */ }
+        }, 2000)
 
         // Start polling for tracking updates every 30 seconds
         const trackingInterval = setInterval(async () => {

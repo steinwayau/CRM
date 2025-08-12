@@ -1482,3 +1482,14 @@ Environment: Production (crm.steinway.com.au)
   git push origin main --force
   npx vercel --prod && npx vercel alias set <deployment> crm.steinway.com.au
   ```
+
+---
+
+## Agent Exit – Aug 13, 2025 (Finalized this session)
+
+- Golden State updated to commit `8cd5197` (production alias live).
+- Fixes included in Golden State:
+  - Gmail text rendering preserves paragraphs/line breaks for text blocks (prefers contentHtml; fallback converts newlines to paragraphs/BRs).
+  - Editor context menu now closes on click‑away/Escape/scroll.
+- Do not modify: context menu behavior and paste key handling (Cmd/Ctrl+V works in inputs/textarea).
+- TODO updated: removed completed paste/paragraphs and resize‑snap items; added user's six new issues and kept Undo/Redo open.

@@ -2,24 +2,22 @@
 
 ## CURRENT STABLE VERSION
 
-- Commit: `94bbe2b` (main)
+- Commit: `8cd5197` (main)
 - Deployment: https://crm.steinway.com.au
 - Status: ✅ Production live and verified
-- Date: Updated automatically after deployment
+- Date: Updated after deployment
 
 ### What’s confirmed working in this Golden State
 
-- Email footer
-  - Branded footer toggle persists across sessions
-  - Logo and social icon URLs persist and render in emails
-  - Phone line displayed in bold as requested
+- Gmail text rendering
+  - Paragraphs/line breaks preserved for text blocks (uses contentHtml or newline→paragraph fallback)
+- Context menu
+  - Right‑click Copy/Duplicate/Paste/Delete closes on click‑away/Escape/scroll
+- Template editor essentials
+  - Corner-resize snapping improved and stable
+  - Cmd/Ctrl+V paste works in properties and inline editors
 - Email sending
-  - Footer builder reads icon URLs via Prisma from system settings
-- Admin Settings
-  - Reliable saves (Prisma transaction), dynamic route (no stale cache)
-  - Debounced, functional state saves to prevent stale writes after uploads
-- Campaign management
-  - Delete actions refresh both current and previous lists and close the modal
+  - Gmail client uses Gmail‑specific generator; others use standard generator
 
 ### Rollback
 
@@ -27,7 +25,7 @@ If needed, revert to this exact state:
 
 ```bash
 # From repo root
-git checkout 94bbe2b
+git checkout 8cd5197
 npx vercel --prod
 ```
 

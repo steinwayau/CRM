@@ -26,6 +26,7 @@ interface EditorElement {
   id: string
   type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading'
   content: string
+  contentHtml?: string
   headingLevel?: 1 | 2 | 3 | 4 | 5 | 6
   videoData?: {
     platform: 'youtube' | 'vimeo' | 'facebook' | 'custom'
@@ -1841,7 +1842,7 @@ export default function TemplateEditorPage() {
               ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
               line-height: 1.4;
               margin: 0;
-            ">${content}</div>`
+            ">${element.contentHtml || content}</div>`
             break
             
           case 'heading':
@@ -1857,7 +1858,7 @@ export default function TemplateEditorPage() {
               ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
               ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
               line-height: 1.2;
-            ">${content}</${headingTag}>`
+            ">${element.contentHtml || content}</${headingTag}>`
             break
             
           case 'image':
@@ -2372,6 +2373,70 @@ export default function TemplateEditorPage() {
   }
 
   const BUILD_VERSION = 'e9d7ffb'
+
+  // Utility: sanitize minimal HTML from clipboard (strong/em/u/a/ul/ol/li/br)
+  const sanitizeMinimalHtml = (html: string): string => {
+    try {
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(html, 'text/html')
+      const allowed = new Set(['STRONG','B','EM','I','U','A','UL','OL','LI','BR'])
+      const walk = (node: Node) => {
+        const el = node as HTMLElement
+        for (const child of Array.from(node.childNodes)) walk(child)
+        if (node.nodeType === Node.ELEMENT_NODE && !allowed.has(el.tagName)) {
+          // Replace disallowed element with its text content
+          const span = doc.createTextNode(el.textContent || '')
+          el.replaceWith(span)
+        } else if (el.tagName === 'A') {
+          // keep href only
+          const href = el.getAttribute('href') || '#'
+          el.getAttributeNames().forEach(n => { if (n !== 'href') el.removeAttribute(n) })
+          el.setAttribute('href', href)
+        }
+      }
+      walk(doc.body)
+      return doc.body.innerHTML
+    } catch {
+      return ''
+    }
+  }
+
+  // Shared paste handler: returns {plain, html}
+  const handleSharedPaste = async (e: React.ClipboardEvent): Promise<{ plain: string; html: string }> => {
+    e.preventDefault()
+    const dt = e.clipboardData
+    const html = dt.getData('text/html') || ''
+    const text = dt.getData('text/plain') || ''
+    let minimal = ''
+    if (html) {
+      minimal = sanitizeMinimalHtml(html)
+    }
+    return { plain: text, html: minimal }
+  }
+
+  // Measure auto-height using hidden ruler
+  const measureAutoHeight = (content: string, styleRef: Partial<EditorElement['style']>): number => {
+    if (typeof document === 'undefined') return styleRef.height || 120
+    const ruler = document.createElement('div')
+    ruler.style.position = 'absolute'
+    ruler.style.visibility = 'hidden'
+    ruler.style.pointerEvents = 'none'
+    ruler.style.whiteSpace = 'pre-wrap'
+    ruler.style.wordBreak = 'break-word'
+    ruler.style.boxSizing = 'border-box'
+    ruler.style.width = `${styleRef.width || 300}px`
+    if (styleRef.fontSize) ruler.style.fontSize = `${styleRef.fontSize}px`
+    if (styleRef.fontWeight) ruler.style.fontWeight = styleRef.fontWeight
+    if (styleRef.fontFamily) ruler.style.fontFamily = styleRef.fontFamily
+    if (styleRef.fontStyle) ruler.style.fontStyle = styleRef.fontStyle
+    if (styleRef.textDecoration) ruler.style.textDecoration = styleRef.textDecoration
+    if (styleRef.padding) ruler.style.padding = `${styleRef.padding}px`
+    ruler.textContent = content
+    document.body.appendChild(ruler)
+    const h = Math.ceil(ruler.getBoundingClientRect().height)
+    document.body.removeChild(ruler)
+    return Math.max(40, h)
+  }
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isResizing ? 'select-none' : ''}`}>
@@ -3513,6 +3578,11 @@ export default function TemplateEditorPage() {
                         <textarea
                           value={element.content}
                           onChange={(e) => updateElement(element.id, { content: e.target.value })}
+                          onPaste={async (e) => {
+                            const { plain, html } = await handleSharedPaste(e)
+                            const newH = measureAutoHeight(plain, element.style)
+                            updateElement(element.id, { content: plain, contentHtml: html || undefined, style: { ...element.style, height: newH } })
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           rows={3}
                         />

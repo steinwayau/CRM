@@ -744,11 +744,29 @@ const SOCIAL_LINKS = {
 
 async function getFooterSettings() {
   try {
-    const res = await sql`SELECT key, value FROM system_settings WHERE key IN ('footerEnabled','footerLogoUrl','footerPhoneLabel','footerFacebook','footerInstagram','footerYouTube')`
-    const out: Record<string,string> = {}
-    res.rows.forEach((r:any)=>{ out[r.key] = r.value })
+    // Use Prisma so we read the same DB used by the Settings API
+    const keys = [
+      'footerEnabled',
+      'footerLogoUrl',
+      'footerPhoneLabel',
+      'footerFacebook',
+      'footerInstagram',
+      'footerYouTube',
+      // Icon URLs (previously missing → caused text circles instead of images)
+      'facebookIconUrl',
+      'instagramIconUrl',
+      'youtubeIconUrl'
+    ]
+    const rows = await prisma.systemSetting.findMany({
+      where: { key: { in: keys } },
+      select: { key: true, value: true }
+    })
+    const out: Record<string, string> = {}
+    rows.forEach((r) => { out[r.key] = r.value })
     return out
-  } catch { return {} as any }
+  } catch {
+    return {} as any
+  }
 }
 
 async function appendFooterAsync(html: string, recipientEmail: string): Promise<string> {

@@ -424,6 +424,70 @@ export default function TemplateEditorPage() {
   const historyRef = useRef<EditorElement[][]>([])
   const futureRef = useRef<EditorElement[][]>([])
   const interactionRef = useRef<{ active: boolean; pushed: boolean }>({ active: false, pushed: false })
+  const clipboardRef = useRef<EditorElement[] | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 })
+
+  const closeContextMenu = () => setContextMenu({ open: false, x: 0, y: 0 })
+
+  const generateId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const sanitizeForCopy = (elements: EditorElement[]) => {
+    // Deep clone and drop IDs so we can assign new ones on paste/duplicate
+    return elements.map(el => {
+      const clone = JSON.parse(JSON.stringify(el)) as EditorElement
+      ;(clone as any).id = undefined
+      return clone
+    })
+  }
+  const copySelected = async () => {
+    const selected = editorElements.filter(el => selectedIds.includes(el.id))
+    if (selected.length === 0) return
+    const payload = sanitizeForCopy(selected)
+    clipboardRef.current = payload
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload))
+    } catch {
+      // clipboard API might be blocked; in-memory ref still works
+    }
+  }
+  const pasteFromClipboard = async () => {
+    let payload: EditorElement[] | null = clipboardRef.current
+    try {
+      const txt = await navigator.clipboard.readText()
+      if (txt && txt.startsWith('[')) payload = JSON.parse(txt)
+    } catch { /* ignore */ }
+    if (!payload || !Array.isArray(payload)) return
+    pushHistory()
+    const offset = 10
+    const now = Date.now()
+    const clones = payload.map((src, idx) => {
+      const base = src as any
+      const id = generateId()
+      const x = Math.max(0, (base.style?.position?.x ?? 0) + offset)
+      const y = Math.max(0, (base.style?.position?.y ?? 0) + offset)
+      return {
+        ...src,
+        id,
+        style: {
+          ...src.style,
+          position: { x, y }
+        }
+      }
+    })
+    setEditorElements(prev => [...prev, ...clones])
+    setSelectedIds(clones.map(c => c.id))
+  }
+  const duplicateSelected = async () => {
+    const selected = editorElements.filter(el => selectedIds.includes(el.id))
+    if (selected.length === 0) return
+    clipboardRef.current = sanitizeForCopy(selected)
+    await pasteFromClipboard()
+  }
+  const deleteSelected = () => {
+    if (selectedIds.length === 0) return
+    pushHistory()
+    setEditorElements(prev => prev.filter(el => !selectedIds.includes(el.id)))
+    setSelectedIds([])
+  }
   const pushHistory = () => {
     // Deep clone minimal: JSON structured form is sufficient here
     const snapshot: EditorElement[] = JSON.parse(JSON.stringify(editorElements))
@@ -448,12 +512,25 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey
+      // If editing text content, let native shortcuts work
+      if (editingTextElement) return
       // Undo/redo
       if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault(); undo(); return
       }
       if (isMod && ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y')) {
         e.preventDefault(); redo(); return
+      }
+      // Duplicate (Cmd/Ctrl+D)
+      if (isMod && e.key.toLowerCase() === 'd') {
+        e.preventDefault(); duplicateSelected(); return
+      }
+      // Copy/Paste (Cmd/Ctrl+C / Cmd/Ctrl+V)
+      if (isMod && e.key.toLowerCase() === 'c') {
+        e.preventDefault(); copySelected(); return
+      }
+      if (isMod && e.key.toLowerCase() === 'v') {
+        e.preventDefault(); pasteFromClipboard(); return
       }
       // Arrow-key nudge for multi-select (or single)
       const nudgeKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight']
@@ -2867,6 +2944,15 @@ export default function TemplateEditorPage() {
                       setSelectedIds([element.id])
                     }
                   }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    // If element not in current selection, select it for menu actions
+                    if (!selectedIds.includes(element.id)) {
+                      setSelectedElement(element.id)
+                      setSelectedIds([element.id])
+                    }
+                    setContextMenu({ open: true, x: e.clientX, y: e.clientY })
+                  }}
                 >
                   {element.type === 'text' && (
                     <>
@@ -3962,6 +4048,20 @@ export default function TemplateEditorPage() {
         accept="image/*"
         className="hidden"
       />
+      {/* Context Menu */}
+      {contextMenu.open && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-md shadow-lg text-sm"
+          style={{ top: contextMenu.y + 2, left: contextMenu.x + 2, minWidth: 160 }}
+          onMouseLeave={closeContextMenu}
+        >
+          <button className="w-full text-left px-3 py-2 hover:bg-gray-50" onClick={() => { copySelected(); closeContextMenu() }}>Copy</button>
+          <button className="w-full text-left px-3 py-2 hover:bg-gray-50" onClick={async () => { await duplicateSelected(); closeContextMenu() }}>Duplicate</button>
+          <button className="w-full text-left px-3 py-2 hover:bg-gray-50" onClick={async () => { await pasteFromClipboard(); closeContextMenu() }}>Paste</button>
+          <div className="h-px bg-gray-200" />
+          <button className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50" onClick={() => { deleteSelected(); closeContextMenu() }}>Delete</button>
+        </div>
+      )}
     </div>
   )
 } 

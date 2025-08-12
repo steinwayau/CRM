@@ -2427,7 +2427,16 @@ export default function TemplateEditorPage() {
     try {
       const parser = new DOMParser()
       const doc = parser.parseFromString(html, 'text/html')
-      const allowed = new Set(['STRONG','B','EM','I','U','A','UL','OL','LI','BR'])
+      // Allow paragraphs in addition to inline tags and lists
+      const allowed = new Set(['P','STRONG','B','EM','I','U','A','UL','OL','LI','BR'])
+
+      // Normalize common structures from Google Docs: convert divs to paragraphs
+      Array.from(doc.body.querySelectorAll('div')).forEach((d) => {
+        const p = doc.createElement('p')
+        p.innerHTML = d.innerHTML
+        d.replaceWith(p)
+      })
+
       const walk = (node: Node) => {
         const el = node as HTMLElement
         for (const child of Array.from(node.childNodes)) walk(child)
@@ -2485,6 +2494,29 @@ export default function TemplateEditorPage() {
     document.body.removeChild(ruler)
     return Math.max(40, h)
   }
+
+  // Close context menu on click-away, Escape, or scroll
+  useEffect(() => {
+    if (!contextMenu.open) return
+    const onClickAway = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('#editor-context-menu')) closeContextMenu()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeContextMenu()
+    }
+    const onScroll = () => closeContextMenu()
+    document.addEventListener('mousedown', onClickAway)
+    document.addEventListener('contextmenu', onClickAway)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', onClickAway)
+      document.removeEventListener('contextmenu', onClickAway)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+    }
+  }, [contextMenu.open])
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isResizing ? 'select-none' : ''}`}>
@@ -3192,7 +3224,11 @@ export default function TemplateEditorPage() {
                           }}
                           onDoubleClick={() => startEditingText(element.id)}
                         >
-                          {element.content || 'Double-click to edit text'}
+                          {element.contentHtml ? (
+                            <div dangerouslySetInnerHTML={{ __html: element.contentHtml }} />
+                          ) : (
+                            <div style={{ whiteSpace: 'pre-wrap' }}>{element.content || 'Double-click to edit text'}</div>
+                          )}
                         </div>
                       )}
                     </>
@@ -3242,7 +3278,11 @@ export default function TemplateEditorPage() {
                           }}
                           onDoubleClick={() => startEditingText(element.id)}
                         >
-                          {element.content || 'Double-click to edit text'}
+                          {element.contentHtml ? (
+                            <div dangerouslySetInnerHTML={{ __html: element.contentHtml }} />
+                          ) : (
+                            <div style={{ whiteSpace: 'pre-wrap' }}>{element.content || 'Double-click to edit text'}</div>
+                          )}
                         </div>
                       )}
                     </>

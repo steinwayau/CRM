@@ -164,7 +164,33 @@ function generateGmailSpecificHtml(
 ): string {
   // GMAIL OPTIMIZATION: 600px width for better mobile compatibility
   const emailWidth = 600  // Standard email width for Gmail mobile/desktop
-  
+
+  // Helpers to keep content safe and preserve paragraphs
+  const escapeHtml = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const textToParagraphHtml = (text: string) => {
+    const blocks = text.split(/\n\s*\n/) // double-newline => new paragraph
+    return blocks
+      .map((p) => `<p style="margin:0 0 10px 0;">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+      .join('')
+  }
+
+  const sanitizeMinimalHtmlServer = (html: string) => {
+    // Defensive: strip scripts/styles and inline event handlers
+    let safe = html
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+      .replace(/ on[a-z]+="[^"]*"/gi, '')
+      .replace(/ on[a-z]+='[^']*'/gi, '')
+    return safe
+  }
+
   let html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -239,6 +265,11 @@ function generateGmailSpecificHtml(
       // Render Gmail-optimized content
       switch (type) {
         case 'text':
+          // Prefer sanitized HTML from editor when available; otherwise convert plain text to paragraphs/BRs
+          const htmlBody = (element as any).contentHtml && typeof (element as any).contentHtml === 'string'
+            ? sanitizeMinimalHtmlServer((element as any).contentHtml)
+            : textToParagraphHtml(content || '')
+          
           html += `<div style="
             font-family: Arial, sans-serif;
             font-size: ${Math.max(14, style.fontSize || 16)}px;
@@ -248,7 +279,7 @@ function generateGmailSpecificHtml(
             ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor}; padding: 10px;` : ''}
             ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
             margin: 0;
-          ">${content}</div>`
+          ">${htmlBody}</div>`
           break
           
         case 'heading':

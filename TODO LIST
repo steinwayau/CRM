@@ -2,7 +2,6 @@
 
 Last Updated: 2025-08-12
 
-1) Text paste behavior: toggle between keeping formatting and plain text
-2) Copy/Paste/Duplicate with z‑index preservation and offset; context menu + shortcuts
-3) Undo/Redo support (robust history, keyboard shortcuts)
-4) Canva‑style corner drag: snap element edges precisely to canvas top/left/right/bottom when resizing from corners 
+1) Text paste behavior: paste from Google Docs/Word into text/heading and keep formatting
+2) Undo/Redo support (robust history, keyboard shortcuts)
+3) Canva‑style corner drag: snap element edges to canvas top/left/right/bottom when resizing from corners 

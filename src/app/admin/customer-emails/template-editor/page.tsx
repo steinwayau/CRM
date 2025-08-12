@@ -515,6 +515,10 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey
+      // Allow native typing/paste inside inputs/textarea/contenteditable
+      const ae = (document.activeElement as HTMLElement | null)
+      const isTyping = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)
+      if (isTyping) return
       // If editing text content, let native shortcuts work
       if (editingTextElement) return
       // Undo/redo

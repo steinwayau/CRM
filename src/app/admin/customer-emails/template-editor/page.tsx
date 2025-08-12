@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-import { SNAP_TOLERANCE, ROTATE_SNAP_DEGREES, MAX_NEIGHBORS_FOR_SNAP, GRID_CELL_SIZE } from '@/src/lib/editor-constants'
+import { SNAP_TOLERANCE, ROTATE_SNAP_DEGREES, MAX_NEIGHBORS_FOR_SNAP, GRID_CELL_SIZE, RESIZE_SNAP_TOLERANCE, RESIZE_EDGE_SNAP_TOLERANCE, RESIZE_SNAP_RELEASE_FACTOR, SIZE_MATCH_TOLERANCE } from '@/src/lib/editor-constants'
 import { SpatialIndex } from '@/src/lib/spatial-index'
 
 interface EmailTemplate {
@@ -404,6 +404,8 @@ export default function TemplateEditorPage() {
   const MAX_NEIGHBORS_FOR_SNAP = 40
   const [zoom, setZoom] = useState<50 | 75 | 100 | 125>(100)
   const [fadeTick, setFadeTick] = useState(0) // changes to trigger label fade timing
+  // Resize snap-lock refs (authoritative feel)
+  const resizeLockRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null })
   useEffect(() => {
     if (measureOverlays.length === 0) return
     const t = setTimeout(() => setFadeTick(v => v + 1), 800) // fade labels after delay
@@ -1052,44 +1054,113 @@ export default function TemplateEditorPage() {
           const candidatesH = getHorizontalEdgeCandidates(newStyle.position.x, newStyle.position.y, newStyle.width, newStyle.height, elementId)
           let guide: { type: 'vertical' | 'horizontal'; position: number; label: string } | null = null
 
+          // Helper to decide tolerance per axis (edge priority slightly higher)
+          const tolV = RESIZE_SNAP_TOLERANCE
+          const tolH = RESIZE_SNAP_TOLERANCE
+          const edgeTolV = RESIZE_EDGE_SNAP_TOLERANCE
+          const edgeTolH = RESIZE_EDGE_SNAP_TOLERANCE
+
           // Moving right edge
           if (handle.includes('e')) {
             const moving = newStyle.position.x + newStyle.width
-            const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
-            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
-              newStyle.width = Math.max(10, best - newStyle.position.x)
-              guide = { type: 'vertical', position: best, label: 'Snap Right' }
+            // Prefer canvas edges if close
+            const edgeTargets = [0, canvasSize.width, Math.round(canvasSize.width / 2)]
+            const nearestEdge = edgeTargets.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), edgeTargets[0])
+            if (Math.abs(nearestEdge - moving) <= edgeTolV) {
+              newStyle.width = Math.max(10, nearestEdge - newStyle.position.x)
+              guide = { type: 'vertical', position: nearestEdge, label: 'Snap Right (Edge)' }
+              resizeLockRef.current.x = nearestEdge
+            } else {
+              const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
+              if (Math.abs(best - moving) <= tolV) {
+                newStyle.width = Math.max(10, best - newStyle.position.x)
+                guide = { type: 'vertical', position: best, label: 'Snap Right' }
+                resizeLockRef.current.x = best
+              } else if (resizeLockRef.current.x !== null && Math.abs((newStyle.position.x + newStyle.width) - resizeLockRef.current.x) <= tolV * RESIZE_SNAP_RELEASE_FACTOR) {
+                // Maintain lock until user pulls away
+                newStyle.width = Math.max(10, (resizeLockRef.current.x as number) - newStyle.position.x)
+                guide = { type: 'vertical', position: resizeLockRef.current.x as number, label: 'Snap Right' }
+              } else {
+                // Release lock
+                resizeLockRef.current.x = null
+              }
             }
           }
           // Moving left edge (right edge anchored)
           if (handle.includes('w')) {
             const rightEdge = newStyle.position.x + newStyle.width
             const moving = newStyle.position.x
-            const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
-            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
-              newStyle.position = { ...newStyle.position, x: best }
-              newStyle.width = Math.max(10, rightEdge - best)
-              guide = { type: 'vertical', position: best, label: 'Snap Left' }
+            const edgeTargets = [0, canvasSize.width, Math.round(canvasSize.width / 2)]
+            const nearestEdge = edgeTargets.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), edgeTargets[0])
+            if (Math.abs(nearestEdge - moving) <= edgeTolV) {
+              newStyle.position = { ...newStyle.position, x: nearestEdge }
+              newStyle.width = Math.max(10, rightEdge - nearestEdge)
+              guide = { type: 'vertical', position: nearestEdge, label: 'Snap Left (Edge)' }
+              resizeLockRef.current.x = nearestEdge
+            } else {
+              const best = candidatesV.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesV[0])
+              if (Math.abs(best - moving) <= tolV) {
+                newStyle.position = { ...newStyle.position, x: best }
+                newStyle.width = Math.max(10, rightEdge - best)
+                guide = { type: 'vertical', position: best, label: 'Snap Left' }
+                resizeLockRef.current.x = best
+              } else if (resizeLockRef.current.x !== null && Math.abs(newStyle.position.x - resizeLockRef.current.x) <= tolV * RESIZE_SNAP_RELEASE_FACTOR) {
+                newStyle.position = { ...newStyle.position, x: resizeLockRef.current.x as number }
+                newStyle.width = Math.max(10, rightEdge - (resizeLockRef.current.x as number))
+                guide = { type: 'vertical', position: resizeLockRef.current.x as number, label: 'Snap Left' }
+              } else {
+                resizeLockRef.current.x = null
+              }
             }
           }
           // Moving bottom edge
           if (handle.includes('s')) {
             const moving = newStyle.position.y + newStyle.height
-            const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
-            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
-              newStyle.height = Math.max(10, best - newStyle.position.y)
-              guide = { type: 'horizontal', position: best, label: 'Snap Bottom' }
+            const edgeTargets = [0, canvasSize.height, Math.round(canvasSize.height / 2)]
+            const nearestEdge = edgeTargets.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), edgeTargets[0])
+            if (Math.abs(nearestEdge - moving) <= edgeTolH) {
+              newStyle.height = Math.max(10, nearestEdge - newStyle.position.y)
+              guide = { type: 'horizontal', position: nearestEdge, label: 'Snap Bottom (Edge)' }
+              resizeLockRef.current.y = nearestEdge
+            } else {
+              const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
+              if (Math.abs(best - moving) <= tolH) {
+                newStyle.height = Math.max(10, best - newStyle.position.y)
+                guide = { type: 'horizontal', position: best, label: 'Snap Bottom' }
+                resizeLockRef.current.y = best
+              } else if (resizeLockRef.current.y !== null && Math.abs((newStyle.position.y + newStyle.height) - resizeLockRef.current.y) <= tolH * RESIZE_SNAP_RELEASE_FACTOR) {
+                newStyle.height = Math.max(10, (resizeLockRef.current.y as number) - newStyle.position.y)
+                guide = { type: 'horizontal', position: resizeLockRef.current.y as number, label: 'Snap Bottom' }
+              } else {
+                resizeLockRef.current.y = null
+              }
             }
           }
           // Moving top edge (bottom anchored)
           if (handle.includes('n')) {
             const bottomEdge = newStyle.position.y + newStyle.height
             const moving = newStyle.position.y
-            const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
-            if (Math.abs(best - moving) <= SNAP_TOLERANCE) {
-              newStyle.position = { ...newStyle.position, y: best }
-              newStyle.height = Math.max(10, bottomEdge - best)
-              guide = { type: 'horizontal', position: best, label: 'Snap Top' }
+            const edgeTargets = [0, canvasSize.height, Math.round(canvasSize.height / 2)]
+            const nearestEdge = edgeTargets.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), edgeTargets[0])
+            if (Math.abs(nearestEdge - moving) <= edgeTolH) {
+              newStyle.position = { ...newStyle.position, y: nearestEdge }
+              newStyle.height = Math.max(10, bottomEdge - nearestEdge)
+              guide = { type: 'horizontal', position: nearestEdge, label: 'Snap Top (Edge)' }
+              resizeLockRef.current.y = nearestEdge
+            } else {
+              const best = candidatesH.reduce((b, p) => (Math.abs(p - moving) < Math.abs(b - moving) ? p : b), candidatesH[0])
+              if (Math.abs(best - moving) <= tolH) {
+                newStyle.position = { ...newStyle.position, y: best }
+                newStyle.height = Math.max(10, bottomEdge - best)
+                guide = { type: 'horizontal', position: best, label: 'Snap Top' }
+                resizeLockRef.current.y = best
+              } else if (resizeLockRef.current.y !== null && Math.abs(newStyle.position.y - resizeLockRef.current.y) <= tolH * RESIZE_SNAP_RELEASE_FACTOR) {
+                newStyle.position = { ...newStyle.position, y: resizeLockRef.current.y as number }
+                newStyle.height = Math.max(10, bottomEdge - (resizeLockRef.current.y as number))
+                guide = { type: 'horizontal', position: resizeLockRef.current.y as number, label: 'Snap Top' }
+              } else {
+                resizeLockRef.current.y = null
+              }
             }
           }
           setShowAlignmentGuides(guide ? [guide] : [])
@@ -1097,19 +1168,19 @@ export default function TemplateEditorPage() {
           setShowAlignmentGuides([])
         }
 
-        // Size-match snapping: match width/height of nearest elements within 2px
+        // Size-match snapping: match width/height of nearest elements within tolerance
         const others = spatialRef.current
           .queryNeighbors({ x: newStyle.position?.x ?? element.style.position.x, y: newStyle.position?.y ?? element.style.position.y, width: newStyle.width, height: newStyle.height }, MAX_NEIGHBORS_FOR_SNAP)
           .filter(el => el.id !== elementId)
         for (const other of others) {
-          if (Math.abs(other.style.width - newStyle.width) <= 2) {
+          if (Math.abs(other.style.width - newStyle.width) <= SIZE_MATCH_TOLERANCE) {
             newStyle.width = other.style.width
             setShowAlignmentGuides(g => [...g, { type:'vertical', position: element.style.position.x + other.style.width, label:'Match width' }])
             break
           }
         }
         for (const other of others) {
-          if (Math.abs(other.style.height - newStyle.height) <= 2) {
+          if (Math.abs(other.style.height - newStyle.height) <= SIZE_MATCH_TOLERANCE) {
             newStyle.height = other.style.height
             setShowAlignmentGuides(g => [...g, { type:'horizontal', position: element.style.position.y + other.style.height, label:'Match height' }])
             break
@@ -1354,11 +1425,17 @@ export default function TemplateEditorPage() {
         break
     }
 
-    // Apply snapping to grid
-    newWidth = snapToGridValue(newWidth)
-    newHeight = snapToGridValue(newHeight)
-    newX = snapToGridValue(newX)
-    newY = snapToGridValue(newY)
+    // Apply snapping to grid (preserve authoritative snap on locked axes)
+    const lockX = resizeLockRef.current.x
+    const lockY = resizeLockRef.current.y
+    if (lockX === null) {
+      newWidth = snapToGridValue(newWidth)
+      newX = snapToGridValue(newX)
+    }
+    if (lockY === null) {
+      newHeight = snapToGridValue(newHeight)
+      newY = snapToGridValue(newY)
+    }
 
     // Keep within canvas bounds
     newX = Math.max(0, Math.min(canvasSize.width - newWidth, newX))

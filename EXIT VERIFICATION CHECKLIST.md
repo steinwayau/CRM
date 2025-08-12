@@ -1454,3 +1454,31 @@ Environment: Production (crm.steinway.com.au)
   - app/api/admin/settings/route.ts (GET/POST persistence)
   - app/api/email/send-campaign/route.ts (appendFooterAsync reads)
   - src/app/admin/customer-emails/page.tsx (post-send refresh logic)
+
+---
+
+## Agent Exit — Aug 12, 2025 (Paste formatting + auto‑expand)
+
+- Task: Allow staff to paste from Google Docs/Word into template editor text/heading and keep basic formatting; auto‑expand the text box; Cmd/Ctrl+V should work in both the canvas editor and the right‑panel Content box.
+- What I implemented (did not meet user requirements):
+  - Added sanitized paste handler and optional `contentHtml` field for text/heading/button.
+  - Wired paste handling in canvas textarea and right‑panel Content textarea.
+  - Attempted auto‑resize by measuring content height and updating `style.height` on paste/save.
+  - Email generation preferred `contentHtml` for text/heading.
+- Outcome in production:
+  - Keyboard paste (Cmd/Ctrl+V) still not captured reliably in both editors; user had to right‑click → Paste.
+  - Auto‑expand sizing not reliable; text boxes continued to clip longer content.
+- Do not repeat:
+  - Do not modify `updateElement()` merge semantics used by image resize/drag.
+  - Do not change drag/resize/selection code while addressing paste.
+- Recommended next steps:
+  1) One shared paste handler used by BOTH inputs; explicitly preventDefault and insert sanitized text; test on macOS Chrome and Safari.
+  2) Use a dedicated hidden measurement element (same width/fonts/padding) to compute required height and update only `style.height` per change.
+  3) Store both plain text and minimal safe HTML. Render plain text with line breaks inside canvas; use HTML only for email output to avoid canvas XSS/complexity.
+  4) Add light telemetry/console logging gated by env flag to confirm which editor handled paste (canvas vs properties) and that preventDefault executed.
+- Final action: Reverted repository and production to Golden State commit `56be24e` as requested.
+  ```bash
+  git reset --hard 56be24e
+  git push origin main --force
+  npx vercel --prod && npx vercel alias set <deployment> crm.steinway.com.au
+  ```

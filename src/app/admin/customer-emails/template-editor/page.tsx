@@ -259,58 +259,6 @@ export default function TemplateEditorPage() {
     }
   }
 
-  // Allow pasting rich text but sanitize to email-safe tags
-  const sanitizePastedHtml = (html: string): string => {
-    try {
-      const doc = new DOMParser().parseFromString(html, 'text/html')
-      const ALLOWED = new Set(['STRONG','B','EM','I','U','A','BR','P','UL','OL','LI'])
-      const walk = (node: Node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement
-          if (!ALLOWED.has(el.tagName)) {
-            // unwrap unknown tags but keep children
-            const parent = el.parentNode
-            while (el.firstChild) parent?.insertBefore(el.firstChild, el)
-            parent?.removeChild(el)
-            return
-          }
-          // strip inline styles/attributes except href on links
-          for (const attr of Array.from(el.attributes)) {
-            if (!(el.tagName === 'A' && attr.name.toLowerCase() === 'href')) {
-              el.removeAttribute(attr.name)
-            }
-          }
-        }
-        for (const child of Array.from(node.childNodes)) walk(child)
-      }
-      walk(doc.body)
-      // Normalize paragraphs and line breaks
-      return doc.body.innerHTML
-        .replace(/\n/g, '')
-    } catch {
-      return html
-    }
-  }
-
-  const handlePasteSanitized = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const html = e.clipboardData.getData('text/html')
-    if (html) {
-      e.preventDefault()
-      const safe = sanitizePastedHtml(html)
-      // Insert at cursor position in tempTextContent
-      const target = e.target as HTMLTextAreaElement
-      const start = target.selectionStart || 0
-      const end = target.selectionEnd || 0
-      const next = tempTextContent.slice(0, start) + safe + tempTextContent.slice(end)
-      setTempTextContent(next)
-      // move caret to end of inserted content
-      requestAnimationFrame(() => {
-        const pos = start + safe.length
-        target.setSelectionRange(pos, pos)
-      })
-    }
-  }
-
   // Quick alignment actions
   const centerHorizontally = (elementId: string) => {
     const element = editorElements.find(el => el.id === elementId)
@@ -3009,22 +2957,11 @@ export default function TemplateEditorPage() {
                   {element.type === 'text' && (
                     <>
                       {editingTextElement === element.id ? (
-                        <div
-                          ref={textEditRef as any}
-                          contentEditable
-                          suppressContentEditableWarning
-                          dangerouslySetInnerHTML={{ __html: tempTextContent }}
-                          onInput={(e) => {
-                            const html = (e.currentTarget as HTMLDivElement).innerHTML
-                            setTempTextContent(html)
-                            requestAnimationFrame(() => {
-                              const el = e.currentTarget as HTMLDivElement
-                              const newH = Math.max(40, el.scrollHeight)
-                              updateElement(element.id, { style: { ...element.style, height: newH } })
-                            })
-                          }}
+                        <textarea
+                          ref={textEditRef}
+                          value={tempTextContent}
+                          onChange={(e) => setTempTextContent(e.target.value)}
                           onKeyDown={handleTextEditKeyDown}
-                          onPaste={(e) => handlePasteSanitized(e as unknown as React.ClipboardEvent<HTMLTextAreaElement>)}
                           onBlur={finishEditingText}
                           style={{
                             fontSize: element.style.fontSize,
@@ -3070,22 +3007,11 @@ export default function TemplateEditorPage() {
                   {element.type === 'heading' && (
                     <>
                       {editingTextElement === element.id ? (
-                        <div
-                          ref={textEditRef as any}
-                          contentEditable
-                          suppressContentEditableWarning
-                          dangerouslySetInnerHTML={{ __html: tempTextContent }}
-                          onInput={(e) => {
-                            const html = (e.currentTarget as HTMLDivElement).innerHTML
-                            setTempTextContent(html)
-                            requestAnimationFrame(() => {
-                              const el = e.currentTarget as HTMLDivElement
-                              const newH = Math.max(40, el.scrollHeight)
-                              updateElement(element.id, { style: { ...element.style, height: newH } })
-                            })
-                          }}
+                        <textarea
+                          ref={textEditRef}
+                          value={tempTextContent}
+                          onChange={(e) => setTempTextContent(e.target.value)}
                           onKeyDown={handleTextEditKeyDown}
-                          onPaste={(e) => handlePasteSanitized(e as unknown as React.ClipboardEvent<HTMLTextAreaElement>)}
                           onBlur={finishEditingText}
                           style={{
                             fontSize: element.style.fontSize,
@@ -3143,22 +3069,11 @@ export default function TemplateEditorPage() {
                   {element.type === 'button' && (
                     <>
                       {editingTextElement === element.id ? (
-                        <div
-                          ref={textEditRef as any}
-                          contentEditable
-                          suppressContentEditableWarning
-                          dangerouslySetInnerHTML={{ __html: tempTextContent }}
-                          onInput={(e) => {
-                            const html = (e.currentTarget as HTMLDivElement).innerHTML
-                            setTempTextContent(html)
-                            requestAnimationFrame(() => {
-                              const el = e.currentTarget as HTMLDivElement
-                              const newH = Math.max(32, el.scrollHeight)
-                              updateElement(element.id, { content: html, style: { ...element.style, height: newH } })
-                            })
-                          }}
+                        <textarea
+                          ref={textEditRef}
+                          value={tempTextContent}
+                          onChange={(e) => setTempTextContent(e.target.value)}
                           onKeyDown={handleTextEditKeyDown}
-                          onPaste={(e) => handlePasteSanitized(e as unknown as React.ClipboardEvent<HTMLTextAreaElement>)}
                           onBlur={finishEditingText}
                           style={{
                             backgroundColor: element.style.backgroundColor,

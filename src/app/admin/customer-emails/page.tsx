@@ -2989,7 +2989,7 @@ export default function CustomerEmailsPage() {
                                   method: 'DELETE'
                                 })
                                 if (response.ok) {
-                                  await loadData()
+                                  await Promise.all([loadData(), loadPreviousCampaigns()])
                                   setShowCampaignView(false)
                                 } else {
                                   alert('Failed to delete campaign')

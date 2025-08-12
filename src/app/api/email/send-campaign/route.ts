@@ -803,7 +803,7 @@ async function appendFooterAsync(html: string, recipientEmail: string): Promise<
       </td>
     </tr>
     <tr>
-      <td align="center" style="padding:2px 10px 10px 10px;font-family:Arial, sans-serif;font-size:13px;color:#475569;">
+      <td align="center" style="padding:2px 10px 10px 10px;font-family:Arial, sans-serif;font-size:13px;color:#475569;font-weight:bold;">
         ${phoneLabel}
       </td>
     </tr>

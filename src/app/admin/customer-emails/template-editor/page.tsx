@@ -4052,8 +4052,21 @@ export default function TemplateEditorPage() {
       {contextMenu.open && (
         <div
           className="fixed z-50 bg-white border border-gray-200 rounded-md shadow-lg text-sm"
-          style={{ top: contextMenu.y + 2, left: contextMenu.x + 2, minWidth: 160 }}
-          onMouseLeave={closeContextMenu}
+          id="editor-context-menu"
+          style={{
+            // Flip above/left if too close to viewport edges
+            top: (() => {
+              const h = 140; // approx menu height
+              const vpH = typeof window !== 'undefined' ? window.innerHeight : 0
+              return vpH && contextMenu.y + h > vpH ? Math.max(0, contextMenu.y - h - 8) : contextMenu.y + 2
+            })(),
+            left: (() => {
+              const w = 180; // approx menu width
+              const vpW = typeof window !== 'undefined' ? window.innerWidth : 0
+              return vpW && contextMenu.x + w > vpW ? Math.max(0, contextMenu.x - w - 8) : contextMenu.x + 2
+            })(),
+            minWidth: 160
+          }}
         >
           <button className="w-full text-left px-3 py-2 hover:bg-gray-50" onClick={() => { copySelected(); closeContextMenu() }}>Copy</button>
           <button className="w-full text-left px-3 py-2 hover:bg-gray-50" onClick={async () => { await duplicateSelected(); closeContextMenu() }}>Duplicate</button>

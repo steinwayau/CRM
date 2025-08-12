@@ -2258,8 +2258,7 @@ export default function TemplateEditorPage() {
         }
       }
 
-      // Redirect back to templates page
-      router.push('/admin/customer-emails?tab=templates')
+      // Stay on editor after save (no redirect)
     } catch (error) {
       console.error('Error saving template:', error)
     } finally {

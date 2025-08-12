@@ -175,7 +175,8 @@ function generateGmailSpecificHtml(
       .replace(/'/g, '&#39;')
 
   const textToParagraphHtml = (text: string) => {
-    const blocks = text.split(/\n\s*\n/) // double-newline => new paragraph
+    const normalized = text.replace(/\r\n/g, '\n')
+    const blocks = normalized.split(/\n\s*\n+/) // one or more blank lines => new paragraph
     return blocks
       .map((p) => `<p style="margin:0 0 10px 0;">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
       .join('')

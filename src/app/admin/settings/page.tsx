@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useEffect } from 'react'
+import { useRef } from 'react'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -26,6 +27,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const settingsRef = useRef(settings)
+  useEffect(() => { settingsRef.current = settings }, [settings])
+  const saveDebounceRef = useRef<NodeJS.Timeout | null>(null)
   
   // Track upload states to prevent concurrent modifications
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -59,12 +63,13 @@ export default function SettingsPage() {
     setIsSaving(true)
     
     try {
+      const snapshot = settingsRef.current
       const response = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ settings }),
+        body: JSON.stringify({ settings: snapshot }),
       })
 
       if (response.ok) {
@@ -88,6 +93,14 @@ export default function SettingsPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const scheduleAutoSave = () => {
+    setHasUnsavedChanges(true)
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current)
+    saveDebounceRef.current = setTimeout(() => {
+      handleSave()
+    }, 400)
   }
 
   return (
@@ -132,7 +145,7 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={settings.siteName}
-                    onChange={(e) => setSettings({...settings, siteName: e.target.value})}
+                    onChange={(e) => setSettings(prev => ({...prev, siteName: e.target.value}))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
@@ -142,7 +155,7 @@ export default function SettingsPage() {
                   </label>
                   <select
                     value={settings.sessionTimeout}
-                    onChange={(e) => setSettings({...settings, sessionTimeout: e.target.value})}
+                    onChange={(e) => setSettings(prev => ({...prev, sessionTimeout: e.target.value}))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value="15 minutes">15 minutes</option>
@@ -164,7 +177,7 @@ export default function SettingsPage() {
                 </label>
                 <select
                   value={settings.maxFileSize}
-                  onChange={(e) => setSettings({...settings, maxFileSize: e.target.value})}
+                  onChange={(e) => setSettings(prev => ({...prev, maxFileSize: e.target.value}))}
                   className="w-full md:w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="5MB">5MB</option>
@@ -186,7 +199,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => {
-                      setSettings({...settings, footerEnabled: !settings.footerEnabled})
+                      setSettings(prev => ({...prev, footerEnabled: !prev.footerEnabled}))
                       setHasUnsavedChanges(true)
                     }}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${settings.footerEnabled ? 'bg-purple-600' : 'bg-gray-200'}`}
@@ -213,10 +226,9 @@ export default function SettingsPage() {
                           const res = await fetch('/api/upload/image', { method: 'POST', body: form })
                           if (res.ok) {
                             const json = await res.json()
-                            setSettings({...settings, footerLogoUrl: json.url})
+                            setSettings(prev => ({...prev, footerLogoUrl: json.url}))
                             setHasUnsavedChanges(true)
-                            // Auto-save after successful upload
-                            setTimeout(() => handleSave(), 100)
+                            scheduleAutoSave()
                           }
                         } finally {
                           setUploadingLogo(false)
@@ -234,7 +246,7 @@ export default function SettingsPage() {
                     type="text"
                     value={settings.footerPhoneLabel}
                     onChange={(e) => {
-                      setSettings({...settings, footerPhoneLabel: e.target.value})
+                      setSettings(prev => ({...prev, footerPhoneLabel: e.target.value}))
                       setHasUnsavedChanges(true)
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -244,7 +256,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Facebook URL</label>
-                    <input type="url" value={settings.footerFacebook} onChange={(e)=>{setSettings({...settings, footerFacebook: e.target.value}); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <input type="url" value={settings.footerFacebook} onChange={(e)=>{setSettings(prev => ({...prev, footerFacebook: e.target.value})); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
                     <div className="mt-2 flex items-center gap-3">
                       <input 
                         type="file" 
@@ -261,9 +273,9 @@ export default function SettingsPage() {
                             const r = await fetch('/api/upload/image',{method:'POST',body:form}); 
                             if(r.ok){ 
                               const j=await r.json(); 
-                              setSettings({...settings, facebookIconUrl:j.url})
+                              setSettings(prev => ({...prev, facebookIconUrl:j.url}))
                               setHasUnsavedChanges(true)
-                              setTimeout(() => handleSave(), 100)
+                              scheduleAutoSave()
                             }
                           } finally {
                             setUploadingIcons({...uploadingIcons, facebook: false})
@@ -274,7 +286,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Instagram URL</label>
-                    <input type="url" value={settings.footerInstagram} onChange={(e)=>{setSettings({...settings, footerInstagram: e.target.value}); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <input type="url" value={settings.footerInstagram} onChange={(e)=>{setSettings(prev => ({...prev, footerInstagram: e.target.value})); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
                     <div className="mt-2 flex items-center gap-3">
                       <input 
                         type="file" 
@@ -291,9 +303,9 @@ export default function SettingsPage() {
                             const r = await fetch('/api/upload/image',{method:'POST',body:form}); 
                             if(r.ok){ 
                               const j=await r.json(); 
-                              setSettings({...settings, instagramIconUrl:j.url})
+                              setSettings(prev => ({...prev, instagramIconUrl:j.url}))
                               setHasUnsavedChanges(true)
-                              setTimeout(() => handleSave(), 100)
+                              scheduleAutoSave()
                             }
                           } finally {
                             setUploadingIcons({...uploadingIcons, instagram: false})
@@ -304,7 +316,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">YouTube URL</label>
-                    <input type="url" value={settings.footerYouTube} onChange={(e)=>{setSettings({...settings, footerYouTube: e.target.value}); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <input type="url" value={settings.footerYouTube} onChange={(e)=>{setSettings(prev => ({...prev, footerYouTube: e.target.value})); setHasUnsavedChanges(true)}} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
                     <div className="mt-2 flex items-center gap-3">
                       <input 
                         type="file" 
@@ -321,9 +333,9 @@ export default function SettingsPage() {
                             const r = await fetch('/api/upload/image',{method:'POST',body:form}); 
                             if(r.ok){ 
                               const j=await r.json(); 
-                              setSettings({...settings, youtubeIconUrl:j.url})
+                              setSettings(prev => ({...prev, youtubeIconUrl:j.url}))
                               setHasUnsavedChanges(true)
-                              setTimeout(() => handleSave(), 100)
+                              scheduleAutoSave()
                             }
                           } finally {
                             setUploadingIcons({...uploadingIcons, youtube: false})
@@ -346,7 +358,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-600">Send email notifications for new enquiries</p>
                   </div>
                   <button
-                    onClick={() => setSettings({...settings, emailNotifications: !settings.emailNotifications})}
+                    onClick={() => setSettings(prev => ({...prev, emailNotifications: !prev.emailNotifications}))}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                       settings.emailNotifications ? 'bg-purple-600' : 'bg-gray-200'
                     }`}
@@ -365,7 +377,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-600">Automatically backup database daily</p>
                   </div>
                   <button
-                    onClick={() => setSettings({...settings, autoBackup: !settings.autoBackup})}
+                    onClick={() => setSettings(prev => ({...prev, autoBackup: !prev.autoBackup}))}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                       settings.autoBackup ? 'bg-purple-600' : 'bg-gray-200'
                     }`}
@@ -384,7 +396,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-600">Put system in maintenance mode</p>
                   </div>
                   <button
-                    onClick={() => setSettings({...settings, maintenanceMode: !settings.maintenanceMode})}
+                    onClick={() => setSettings(prev => ({...prev, maintenanceMode: !prev.maintenanceMode}))}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                       settings.maintenanceMode ? 'bg-red-600' : 'bg-gray-200'
                     }`}

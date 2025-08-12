@@ -260,6 +260,7 @@ export default function TemplateEditorPage() {
   const startEditingText = (elementId: string) => {
     const element = editorElements.find(el => el.id === elementId)
     if (element && (element.type === 'text' || element.type === 'heading' || element.type === 'button')) {
+      setContextMenu({ open: false, x: 0, y: 0 })
       setEditingTextElement(elementId)
       setTempTextContent(element.content)
       // Focus the textarea immediately and select all text for instant typing
@@ -3045,9 +3046,10 @@ export default function TemplateEditorPage() {
                     transformOrigin: 'center center'
                   }}
                   onMouseDown={(e) => {
-                    if (zoom !== 100) return
-                    // Shift-toggle selection, do not start drag
-                    if (e.shiftKey) {
+                      if (zoom !== 100) return
+                      if (editingTextElement) { e.stopPropagation(); return }
+                      // Shift-toggle selection, do not start drag
+                      if (e.shiftKey) {
                       e.stopPropagation()
                       setSelectedIds(prev => prev.includes(element.id) ? prev.filter(id => id !== element.id) : [...prev, element.id])
                       setSelectedElement(element.id)
@@ -3125,17 +3127,19 @@ export default function TemplateEditorPage() {
                     document.addEventListener('mouseup', handleMouseUp)
                   }}
                   onClick={(e) => {
-                    if (zoom !== 100) return
-                    e.stopPropagation()
-                    lastElementInteractionRef.current = Date.now()
+                      if (zoom !== 100) return
+                      e.stopPropagation()
+                      if (editingTextElement) return
+                      lastElementInteractionRef.current = Date.now()
                     if (!dragStateRef.current.isDragging && !dragStateRef.current.dragStarted) {
                       setSelectedElement(element.id)
                       setSelectedIds([element.id])
                     }
                   }}
                   onContextMenu={(e) => {
-                    e.preventDefault()
-                    // If element not in current selection, select it for menu actions
+                      if (editingTextElement) { e.preventDefault(); return }
+                      e.preventDefault()
+                      // If element not in current selection, select it for menu actions
                     if (!selectedIds.includes(element.id)) {
                       setSelectedElement(element.id)
                       setSelectedIds([element.id])

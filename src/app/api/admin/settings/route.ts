@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { PrismaClient } from '@prisma/client'
+
+export const dynamic = 'force-dynamic'
+
+const prisma = new PrismaClient()
 
 // GET - Retrieve system settings
-// Force new deployment to apply build fixes
 export async function GET() {
   try {
-    const result = await sql`
-      SELECT key, value, type FROM system_settings
-    `
-    
+    const rows = await prisma.systemSetting.findMany({
+      select: { key: true, value: true, type: true }
+    })
+
     const settings: Record<string, any> = {}
-    result.rows.forEach((row: any) => {
-      const { key, value, type } = row
+    rows.forEach(({ key, value, type }) => {
       if (type === 'boolean') {
         settings[key] = value === 'true'
       } else if (type === 'number') {
@@ -20,7 +22,7 @@ export async function GET() {
         settings[key] = value
       }
     })
-    
+
     // Set defaults if not found
     const defaultSettings = {
       siteName: 'EPG CRM System',
@@ -39,15 +41,15 @@ export async function GET() {
       instagramIconUrl: '',
       youtubeIconUrl: ''
     }
-    
+
     const finalSettings = { ...defaultSettings, ...settings }
-    
+
     return NextResponse.json({
       success: true,
       settings: finalSettings
     })
   } catch (error) {
-    console.error('Database error:', error)
+    console.error('Database error (GET /settings):', error)
     return NextResponse.json(
       { error: 'Failed to fetch settings from database' },
       { status: 500 }
@@ -67,27 +69,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Save each setting
-    for (const [key, value] of Object.entries(settings)) {
-      const type = typeof value
-      const stringValue = String(value)
-      
-      // Upsert setting
-      await sql`
-        INSERT INTO system_settings (key, value, type, created_at, updated_at)
-        VALUES (${key}, ${stringValue}, ${type}, NOW(), NOW())
-        ON CONFLICT (key) 
-        DO UPDATE SET value = ${stringValue}, type = ${type}, updated_at = NOW()
-      `
-    }
+    const entries = Object.entries(settings) as Array<[string, unknown]>
+
+    await prisma.$transaction(
+      entries.map(([key, value]) => {
+        const typeOf = typeof value
+        const stringValue = String(value)
+        return prisma.systemSetting.upsert({
+          where: { key },
+          update: { value: stringValue, type: typeOf },
+          create: { key, value: stringValue, type: typeOf }
+        })
+      })
+    )
+
+    // Read back saved settings to confirm and return as source of truth
+    const savedRows = await prisma.systemSetting.findMany({
+      select: { key: true, value: true, type: true }
+    })
+
+    const saved: Record<string, any> = {}
+    savedRows.forEach(({ key, value, type }) => {
+      if (type === 'boolean') {
+        saved[key] = value === 'true'
+      } else if (type === 'number') {
+        saved[key] = parseInt(value, 10)
+      } else {
+        saved[key] = value
+      }
+    })
 
     return NextResponse.json({
       success: true,
-      message: 'Settings saved successfully'
+      message: 'Settings saved successfully',
+      settings: saved
     })
-
   } catch (error) {
-    console.error('Database error:', error)
+    console.error('Database error (POST /settings):', error)
     return NextResponse.json(
       { error: 'Failed to save settings to database' },
       { status: 500 }

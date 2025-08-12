@@ -154,6 +154,44 @@ export default function TemplateEditorPage() {
   // Ref for the text editing textarea
   const textEditRef = useRef<HTMLTextAreaElement>(null)
 
+  // Inline paste handler for editing textarea (surgical: only when editing)
+  useEffect(() => {
+    if (!editingTextElement || !textEditRef.current) return
+    const el = editorElements.find(el => el.id === editingTextElement)
+    const onPaste = async (ev: ClipboardEvent) => {
+      // Ensure we only handle paste inside the inline editor focus
+      if (document.activeElement !== textEditRef.current) return
+      ev.preventDefault()
+      const dt = ev.clipboardData
+      if (!dt) return
+      const html = dt.getData('text/html') || ''
+      const text = dt.getData('text/plain') || ''
+      const minimal = html ? sanitizeMinimalHtml(html) : ''
+      // Update temp content immediately so user sees pasted text in editor
+      setTempTextContent(text)
+      if (el) {
+        const newH = measureAutoHeight(text, el.style)
+        updateElement(editingTextElement, {
+          contentHtml: minimal || undefined,
+          style: { ...el.style, height: newH }
+        })
+      }
+    }
+    textEditRef.current.addEventListener('paste', onPaste as any)
+    return () => {
+      textEditRef.current && textEditRef.current.removeEventListener('paste', onPaste as any)
+    }
+  }, [editingTextElement, editorElements])
+
+  // Auto-expand height while typing inline
+  useEffect(() => {
+    if (!editingTextElement) return
+    const el = editorElements.find(el => el.id === editingTextElement)
+    if (!el) return
+    const newH = measureAutoHeight(tempTextContent, el.style)
+    updateElement(editingTextElement, { style: { ...el.style, height: newH } })
+  }, [tempTextContent])
+
   // Close color picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -238,8 +276,13 @@ export default function TemplateEditorPage() {
 
   const finishEditingText = () => {
     if (editingTextElement) {
-      // Only update content - all style properties including textAlign should already be persisted
-      updateElement(editingTextElement, { content: tempTextContent })
+      const el = editorElements.find(el => el.id === editingTextElement)
+      if (el) {
+        const newH = measureAutoHeight(tempTextContent, el.style)
+        updateElement(editingTextElement, { content: tempTextContent, style: { ...el.style, height: newH } })
+      } else {
+        updateElement(editingTextElement, { content: tempTextContent })
+      }
       setEditingTextElement(null)
       setTempTextContent('')
     }

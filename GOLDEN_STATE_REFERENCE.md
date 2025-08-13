@@ -2,7 +2,7 @@
 
 ## CURRENT STABLE VERSION
 
-- Commit: `e7fa0dc` (main)
+- Commit: `8be163f` (main)
 - Deployment: https://crm.steinway.com.au
 - Status: ✅ Production live and verified
 - Date: Updated after deployment

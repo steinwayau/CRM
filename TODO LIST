@@ -1,11 +1,11 @@
 # TODO — Template Editor (Active Items Only)
 
-Last Updated: 2025-08-14 (Golden State `8be163f`)
+Last Updated: 2025-08-14 (Golden State `6bd77ee`)
 
 2) Undo/Redo support (robust history, keyboard shortcuts)
 
 New items:
-1. Display Name for sender: show “Steinway Galleries Australia” instead of noreply@steinway.com.au; add optional field in template editor to override sender display name per campaign.
+[Removed – Completed] Sender display name: shows “Steinway Galleries Australia” by default; optional per-campaign override supported.
 2. Text formatting parity: Outlook and Apple Mail rendering does not match the editor/Gmail; investigate and normalize typography/line-height/paragraph spacing.
 3. Customer emails performance: speed up initial load and avoid full reloads when switching between editor and campaigns; target sub-3s loads with incremental data fetch and state reuse.
 4. When clicking any of the social media icons that are at the bottom of the footer they do not appear in any of the analytics. Anything that is clickable on the email even things like the social media icons which are hardcoded need to display in our analytics.

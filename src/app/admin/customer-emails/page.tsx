@@ -21,6 +21,7 @@ interface Customer {
   status?: string
   doNotEmail: boolean
   createdAt: string
+  fromName?: string
 }
 
 interface EmailTemplate {
@@ -80,6 +81,7 @@ interface Campaign {
   scheduledAt?: string
   sentAt?: string
   createdAt: string
+  fromName?: string
 }
 
 export default function CustomerEmailsPage() {
@@ -115,7 +117,8 @@ export default function CustomerEmailsPage() {
     subject: '',
     recipientType: 'all', // 'all', 'filtered', 'selected', 'custom'
     customEmails: '', // For custom email list
-    scheduledAt: ''
+    scheduledAt: '',
+    fromName: 'Steinway Galleries Australia'
   })
   
   // Campaign filters (same as enquiry data filters)
@@ -148,7 +151,8 @@ export default function CustomerEmailsPage() {
     subject: '',
     recipientType: 'all',
     customEmails: '',
-    scheduledAt: ''
+    scheduledAt: '',
+    fromName: 'Steinway Galleries Australia'
   })
   const [campaignAnalytics, setCampaignAnalytics] = useState<{[key: string]: {opens: number, clicks: number, openRate: number, clickRate: number}}>({})
   const [overallAnalytics, setOverallAnalytics] = useState<any>(null)
@@ -677,6 +681,7 @@ export default function CustomerEmailsPage() {
           customEmails: campaignForm.customEmails, // FIXED: Include custom emails
           status: campaignForm.scheduledAt ? 'scheduled' : 'draft',
           scheduledAt: campaignForm.scheduledAt || undefined,
+          fromName: campaignForm.fromName || 'Steinway Galleries Australia'
         })
       })
 
@@ -703,7 +708,8 @@ export default function CustomerEmailsPage() {
         subject: '',
         recipientType: 'all',
         customEmails: '',
-        scheduledAt: ''
+        scheduledAt: '',
+        fromName: 'Steinway Galleries Australia'
       })
     } catch (error) {
       console.error('Error creating campaign:', error)
@@ -770,7 +776,8 @@ export default function CustomerEmailsPage() {
           filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined,
           // NEW: Template elements and canvas settings for Gmail-compatible HTML generation
           templateElements: templateElements,
-          canvasSettings: canvasSettings
+          canvasSettings: canvasSettings,
+          fromName: campaign.fromName || 'Steinway Galleries Australia'
         })
       })
 
@@ -922,7 +929,8 @@ export default function CustomerEmailsPage() {
       subject: viewingCampaign?.subject || '',
       recipientType: viewingCampaign?.recipientType || 'all',
       customEmails: viewingCampaign?.customEmails || '',
-      scheduledAt: viewingCampaign?.scheduledAt || ''
+      scheduledAt: viewingCampaign?.scheduledAt || '',
+      fromName: 'Steinway Galleries Australia'
     })
   }
 
@@ -979,7 +987,8 @@ export default function CustomerEmailsPage() {
           recipientType: editCampaignForm.recipientType,
           customerIds: customerIds.length > 0 ? customerIds : undefined,
           customEmails: editCampaignForm.recipientType === 'custom' ? editCampaignForm.customEmails : undefined,
-          filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined
+          filters: Object.values(recipientFilters).some(v => v !== 'All') ? recipientFilters : undefined,
+          fromName: editCampaignForm.fromName || 'Steinway Galleries Australia'
         })
       })
 
@@ -1450,6 +1459,17 @@ export default function CustomerEmailsPage() {
                   value={campaignForm.scheduledAt}
                   onChange={(e) => setCampaignForm({...campaignForm, scheduledAt: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">From Name (optional)</label>
+                <input
+                  type="text"
+                  value={campaignForm.fromName}
+                  onChange={(e) => setCampaignForm({...campaignForm, fromName: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Steinway Galleries Australia"
                 />
               </div>
             </div>
@@ -2811,6 +2831,7 @@ export default function CustomerEmailsPage() {
                                     subject: editCampaignForm.subject,
                                     recipientType: editCampaignForm.recipientType,
                                     textContent: editCampaignForm.recipientType === 'custom' ? editCampaignForm.customEmails : '',
+                                    fromName: editCampaignForm.fromName || 'Steinway Galleries Australia'
                                   })
                                 })
 
@@ -3100,7 +3121,8 @@ export default function CustomerEmailsPage() {
                               recipientType: viewingCampaign.recipientType || 'custom',
                               // carry over custom email list when applicable
                               customEmails: viewingCampaign.recipientType === 'custom' ? (viewingCampaign.customEmails || viewingCampaign.textContent || '') : undefined,
-                              status: 'draft'
+                              status: 'draft',
+                              fromName: viewingCampaign.fromName || 'Steinway Galleries Australia'
                             })
                           })
                           if (resp.ok) {

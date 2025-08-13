@@ -77,6 +77,8 @@ interface CampaignRequest {
     nationality?: string
     source?: string
   }
+  // NEW: Optional display name for sender
+  fromName?: string
 }
 
 // SAFE VIDEO THUMBNAIL GENERATOR WITH COMPREHENSIVE FALLBACK
@@ -897,9 +899,15 @@ export async function POST(request: NextRequest) {
       customerIds, 
       filters,
       templateElements,
-      canvasSettings 
+      canvasSettings,
+      fromName
     } = await request.json()
-    
+
+    // Determine sender display name (safe default)
+    const senderDisplayName = (fromName && typeof fromName === 'string' && fromName.trim().length > 0)
+      ? fromName.trim()
+      : (process.env.DEFAULT_FROM_NAME || 'Steinway Galleries Australia')
+
     // Validate required fields
     if (!name || !templateId || !subject || !htmlContent) {
       return NextResponse.json(
@@ -1016,7 +1024,7 @@ export async function POST(request: NextRequest) {
             subject: subject,
             html: finalHtml,
             text: personalizedText,
-            from: 'noreply@steinway.com.au',
+            from: `${senderDisplayName} <noreply@steinway.com.au>`,
             replyTo: process.env.REPLY_TO_EMAIL || 'info@steinway.com.au'
           }
         }))
@@ -1234,7 +1242,7 @@ export async function GET() {
   try {
     // Test Resend configuration
     const testResult = await resend.emails.send({
-      from: 'noreply@steinway.com.au',
+      from: `${process.env.DEFAULT_FROM_NAME || 'Steinway Galleries Australia'} <noreply@steinway.com.au>`,
       to: 'test@example.com',
       subject: 'Test Email Configuration',
       html: '<p>This is a test email to verify Resend configuration.</p>',

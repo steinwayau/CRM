@@ -295,12 +295,23 @@ export default function TemplateEditorPage() {
   }
 
   const handleTextEditKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      finishEditingText()
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       e.preventDefault()
       cancelEditingText()
+      return
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Insert a newline and auto-grow instead of finishing edit
+      e.preventDefault()
+      const next = `${tempTextContent}\n`
+      setTempTextContent(next)
+      if (editingTextElement) {
+        const el = editorElements.find(el => el.id === editingTextElement)
+        if (el) {
+          const newH = measureAutoHeight(next, el.style)
+          updateElement(editingTextElement, { style: { ...el.style, height: newH } })
+        }
+      }
     }
   }
 
@@ -3202,7 +3213,7 @@ export default function TemplateEditorPage() {
                         <textarea
                           ref={textEditRef}
                           value={tempTextContent}
-                          onChange={(e) => setTempTextContent(e.target.value)}
+                          onChange={(e) => { setTempTextContent(e.target.value); if (editingTextElement) { const el = editorElements.find(el => el.id === editingTextElement); if (el) { const newH = measureAutoHeight(e.target.value, el.style); updateElement(editingTextElement, { style: { ...el.style, height: newH } }); } } }}
                           onKeyDown={handleTextEditKeyDown}
                           onBlur={finishEditingText}
                           style={{
@@ -3256,7 +3267,7 @@ export default function TemplateEditorPage() {
                         <textarea
                           ref={textEditRef}
                           value={tempTextContent}
-                          onChange={(e) => setTempTextContent(e.target.value)}
+                          onChange={(e) => { setTempTextContent(e.target.value); if (editingTextElement) { const el = editorElements.find(el => el.id === editingTextElement); if (el) { const newH = measureAutoHeight(e.target.value, el.style); updateElement(editingTextElement, { style: { ...el.style, height: newH } }); } } }}
                           onKeyDown={handleTextEditKeyDown}
                           onBlur={finishEditingText}
                           style={{
@@ -3322,7 +3333,7 @@ export default function TemplateEditorPage() {
                         <textarea
                           ref={textEditRef}
                           value={tempTextContent}
-                          onChange={(e) => setTempTextContent(e.target.value)}
+                          onChange={(e) => { setTempTextContent(e.target.value); if (editingTextElement) { const el = editorElements.find(el => el.id === editingTextElement); if (el) { const newH = measureAutoHeight(e.target.value, el.style); updateElement(editingTextElement, { style: { ...el.style, height: newH } }); } } }}
                           onKeyDown={handleTextEditKeyDown}
                           onBlur={finishEditingText}
                           style={{

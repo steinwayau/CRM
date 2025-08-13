@@ -515,6 +515,25 @@ export default function CustomerEmailsPage() {
     }
   }
 
+  // Remove a campaign locally (both from recent and previous lists) without reloading the entire dashboard
+  const removeCampaignLocally = (id: string) => {
+    setCampaigns(prev => prev.filter(c => c.id !== id))
+    setPreviousCampaigns(prev => prev.filter((c: any) => c.id !== id))
+  }
+
+  // Light refresh of campaigns only (avoids full dashboard reload)
+  const refreshCampaignsLight = async () => {
+    try {
+      const resp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
+      if (resp.ok) {
+        const list = await resp.json()
+        setCampaigns(list)
+      }
+    } catch (e) {
+      console.log('Light campaigns refresh failed (non-blocking):', e)
+    }
+  }
+
   // Migration function to move localStorage campaigns to database
   const migrateCampaigns = async () => {
     try {
@@ -2091,7 +2110,8 @@ export default function CustomerEmailsPage() {
                       if (!confirm('Permanently delete this campaign? This cannot be undone.')) return
                       const resp = await fetch(`/api/admin/campaigns?id=${c.id}`, { method: 'DELETE' })
                       if (resp.ok) {
-                        await loadPreviousCampaigns()
+                        removeCampaignLocally(c.id)
+                        await refreshCampaignsLight()
                       } else {
                         alert('Failed to delete campaign')
                       }
@@ -2989,8 +3009,11 @@ export default function CustomerEmailsPage() {
                                   method: 'DELETE'
                                 })
                                 if (response.ok) {
-                                  await Promise.all([loadData(), loadPreviousCampaigns()])
+                                  // Remove immediately from UI without reloading whole dashboard
+                                  removeCampaignLocally(viewingCampaign.id)
                                   setShowCampaignView(false)
+                                  // Light campaigns refresh to stay in sync with server
+                                  await refreshCampaignsLight()
                                 } else {
                                   alert('Failed to delete campaign')
                                 }
@@ -3013,8 +3036,10 @@ export default function CustomerEmailsPage() {
                                   method: 'DELETE'
                                 })
                                 if (response.ok) {
-                                  await loadPreviousCampaigns()
+                                  // Remove immediately from both lists locally
+                                  removeCampaignLocally(viewingCampaign.id)
                                   setShowCampaignView(false)
+                                  await refreshCampaignsLight()
                                 } else {
                                   alert('Failed to delete campaign')
                                 }

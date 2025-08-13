@@ -301,10 +301,22 @@ export default function TemplateEditorPage() {
       return
     }
     if (e.key === 'Enter' && !e.shiftKey) {
-      // Insert a newline and auto-grow instead of finishing edit
+      // Insert newline at caret position and auto-grow
       e.preventDefault()
-      const next = `${tempTextContent}\n`
+      const target = e.target as HTMLTextAreaElement
+      const start = (target && typeof target.selectionStart === 'number') ? target.selectionStart : tempTextContent.length
+      const end = (target && typeof target.selectionEnd === 'number') ? target.selectionEnd : start
+      const before = tempTextContent.slice(0, start)
+      const after = tempTextContent.slice(end)
+      const next = before + '\n' + after
       setTempTextContent(next)
+      // Restore caret just after inserted newline
+      setTimeout(() => {
+        if (textEditRef.current) {
+          const pos = start + 1
+          textEditRef.current.setSelectionRange(pos, pos)
+        }
+      }, 0)
       if (editingTextElement) {
         const el = editorElements.find(el => el.id === editingTextElement)
         if (el) {

@@ -2720,7 +2720,7 @@ export default function TemplateEditorPage() {
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500">Height:</span>
                     <select 
-                      value={canvasSize.height}
+                      value={["600","800","1000","1200","1500","2000"].includes(String(canvasSize.height)) ? String(canvasSize.height) : 'custom'}
                       onChange={(e) => {
                         const v = e.target.value
                         if (v === 'custom') {
@@ -2738,6 +2738,9 @@ export default function TemplateEditorPage() {
                       }}
                       className="px-2 py-1 border border-gray-300 rounded text-sm"
                     >
+                      {![600,800,1000,1200,1500,2000].includes(canvasSize.height) && (
+                        <option value="custom">Custom ({canvasSize.height}px)</option>
+                      )}
                       <option value="600">600px (Short)</option>
                       <option value="800">800px (Medium)</option>
                       <option value="1000">1000px (Long)</option>

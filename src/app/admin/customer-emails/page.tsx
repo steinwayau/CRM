@@ -3073,6 +3073,8 @@ export default function CustomerEmailsPage() {
                               templateId: viewingCampaign.templateId,
                               templateName: viewingCampaign.templateName,
                               recipientType: viewingCampaign.recipientType || 'custom',
+                              // carry over custom email list when applicable
+                              customEmails: viewingCampaign.recipientType === 'custom' ? (viewingCampaign.customEmails || viewingCampaign.textContent || '') : undefined,
                               status: 'draft'
                             })
                           })

@@ -2721,7 +2721,21 @@ export default function TemplateEditorPage() {
                     <span className="text-xs text-gray-500">Height:</span>
                     <select 
                       value={canvasSize.height}
-                      onChange={(e) => setCanvasSize({...canvasSize, height: parseInt(e.target.value)})}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (v === 'custom') {
+                          const input = window.prompt('Enter custom canvas height in pixels (e.g., 2400):', String(canvasSize.height))
+                          if (!input) return
+                          const n = parseInt(input, 10)
+                          if (Number.isFinite(n) && n >= 400 && n <= 10000) {
+                            setCanvasSize({ ...canvasSize, height: n })
+                          } else {
+                            alert('Please enter a valid number between 400 and 10000.')
+                          }
+                          return
+                        }
+                        setCanvasSize({ ...canvasSize, height: parseInt(v, 10) })
+                      }}
                       className="px-2 py-1 border border-gray-300 rounded text-sm"
                     >
                       <option value="600">600px (Short)</option>
@@ -2730,6 +2744,7 @@ export default function TemplateEditorPage() {
                       <option value="1200">1200px (Very Long)</option>
                       <option value="1500">1500px (Extra Long)</option>
                       <option value="2000">2000px (Newsletter)</option>
+                      <option value="custom">Custom…</option>
                     </select>
                   </div>
                 </div>

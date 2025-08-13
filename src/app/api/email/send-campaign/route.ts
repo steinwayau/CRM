@@ -524,26 +524,41 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
       // Render element content based on type
       switch (type) {
         case 'text':
-          html += `<div style="
-            ${style.fontSize ? `font-size: ${Math.max(14, style.fontSize)}px;` : 'font-size: 16px;'}
-            ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
-            ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
-            ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
-            ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
-            ${style.color ? `color: ${style.color};` : 'color: #333333;'}
-            ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
-            ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
-            ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-            line-height: 1.4;
-            margin: 0;
-          ">${content}</div>`
-          break
+          {
+            const hasHtml = (element as any).contentHtml && typeof (element as any).contentHtml === 'string'
+            const escapeHtml = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+            const textToParagraphHtml = (text: string) => {
+              const normalized = (text || '').replace(/\r\n/g, '\n')
+              const blocks = normalized.split(/\n\s*\n+/)
+              return blocks.map(p => `<p style="margin:0 0 10px 0;">${escapeHtml(p).replace(/\n/g,'<br/>')}</p>`).join('')
+            }
+            const sanitizeMinimalHtmlServer = (html: string) => html
+              .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+              .replace(/ on[a-z]+="[^"]*"/gi, '')
+              .replace(/ on[a-z]+='[^']*'/gi, '')
+            const htmlBody = hasHtml ? sanitizeMinimalHtmlServer((element as any).contentHtml) : textToParagraphHtml(content || '')
+            html += `<div style="
+              ${style.fontSize ? `font-size: ${Math.max(14, style.fontSize)}px;` : 'font-size: 16px;'}
+              ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+              ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
+              ${style.fontStyle ? `font-style: ${style.fontStyle};` : ''}
+              ${style.textDecoration ? `text-decoration: ${style.textDecoration};` : ''}
+              ${style.color ? `color: ${style.color};` : 'color: #333333;'}
+              ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
+              ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
+              ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
+              line-height: 1.4; mso-line-height-rule: exactly;
+              margin: 0;
+            ">${htmlBody}</div>`
+            break
+          }
           
         case 'heading':
           const headingTag = `h${element.headingLevel || 1}`
           const headingSize = element.headingLevel === 1 ? '28px' : element.headingLevel === 2 ? '24px' : '20px'
           html += `<${headingTag} style="
-            margin: 0;
+            margin: 0 0 10px 0;
             ${style.fontSize ? `font-size: ${Math.max(18, style.fontSize)}px;` : `font-size: ${headingSize};`}
             ${style.fontWeight ? `font-weight: ${style.fontWeight};` : 'font-weight: bold;'}
             ${style.fontFamily ? `font-family: ${style.fontFamily}, Arial, sans-serif;` : 'font-family: Arial, sans-serif;'}
@@ -551,8 +566,7 @@ function generateStandardEmailHtml(templateName: string, elements: any[], canvas
             ${style.backgroundColor && style.backgroundColor !== 'transparent' ? `background-color: ${style.backgroundColor};` : ''}
             ${style.padding ? `padding: ${style.padding}px;` : 'padding: 10px;'}
             ${style.borderRadius ? `border-radius: ${style.borderRadius}px;` : ''}
-            line-height: 1.2;
-            white-space: nowrap;
+            line-height: 1.2; mso-line-height-rule: exactly;
           ">${content}</${headingTag}>`
           break
           

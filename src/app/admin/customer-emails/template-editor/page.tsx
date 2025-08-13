@@ -1269,18 +1269,18 @@ export default function TemplateEditorPage() {
           }
         }
         
-        // Heading-specific behavior: scale font size with box, top-anchored like Canva
-        if (startElement && startElement.type === 'heading') {
+        // Heading-specific behavior: scale font size only on corner resizes
+        if (startElement && startElement.type === 'heading' && isCorner) {
           const startFont = startElement.style.fontSize || 32
           const scaleX = newStyle.width / Math.max(1, startWidth)
           const scaleY = newStyle.height / Math.max(1, startHeight)
           const fontScale = Math.min(scaleX, scaleY)
           const nextFont = Math.max(10, Math.round(startFont * fontScale))
           newStyle.fontSize = nextFont
-          // Ensure top stays anchored when dragging bottom handle
-          if (handle === 's' || handle === 'se' || handle === 'sw') {
-            newStyle.position = { x: newStyle.position?.x ?? element.style.position.x, y: element.style.position.y }
-          }
+        }
+        // Ensure top stays anchored when dragging bottom handle (corner or edge)
+        if (startElement && startElement.type === 'heading' && (handle === 's' || handle === 'se' || handle === 'sw')) {
+          newStyle.position = { x: newStyle.position?.x ?? element.style.position.x, y: element.style.position.y }
         }
         
         updateElement(elementId, { style: newStyle })

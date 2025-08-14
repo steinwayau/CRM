@@ -341,7 +341,6 @@ export default function CustomerEmailsPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Load campaigns first (fast-path for Campaigns tab)
       const campaignResponse = await fetch('/api/admin/campaigns', { cache: 'no-store' })
       if (campaignResponse.ok) {
         const campaignData = await campaignResponse.json()
@@ -350,91 +349,33 @@ export default function CustomerEmailsPage() {
           customEmails: campaign.textContent || ''
         }))
         setCampaigns(campaignsWithCustomEmails)
-
-        // Start analytics immediately for better perceived performance
-        if (campaignsWithCustomEmails.length > 0) {
-          await loadCampaignAnalyticsSync(campaignsWithCustomEmails)
-        } else {
-          setCampaignAnalytics({})
-          await loadOverallAnalytics()
-          setAnalyticsLoading(false)
-        }
-
-        // End initial page loading once campaigns + analytics are ready
-        setLoading(false)
+        cacheRef.current.campaigns = campaignsWithCustomEmails
       } else {
-        console.error('Failed to load campaigns')
         setCampaigns([])
-        setCampaignAnalytics({})
-        await loadOverallAnalytics()
-        setLoading(false)
       }
-
-      // Fetch customers & templates in background (for other tabs)
-      ;(async () => {
-        try {
-          const [enquiriesRes, templatesRes] = await Promise.all([
-            fetch('/api/enquiries').catch(() => null),
-            fetch('/api/admin/templates').catch(() => null)
-          ])
-          if (enquiriesRes && enquiriesRes.ok) {
-            const data = await enquiriesRes.json()
-            const transformedCustomers: Customer[] = data.map((enquiry: any) => ({
-              id: enquiry.id,
-              firstName: enquiry.firstName || '',
-              lastName: enquiry.lastName || '',
-              email: enquiry.email || '',
-              phone: enquiry.phone || '',
-              state: enquiry.state || '',
-              suburb: enquiry.suburb || '',
-              nationality: enquiry.nationality || '',
-              productInterest: enquiry.pianoModel ? [enquiry.pianoModel] : [],
-              source: enquiry.enquirySource || '',
-              eventSource: enquiry.eventSource || '',
-              customerRating: enquiry.customerRating || '',
-              status: enquiry.status || 'New',
-              doNotEmail: enquiry.doNotEmail || false,
-              createdAt: enquiry.createdAt || new Date().toISOString()
-            }))
-            setCustomers(transformedCustomers)
-          }
-          if (templatesRes && templatesRes.ok) {
-            const dbTemplates = await templatesRes.json()
-            setTemplates(dbTemplates)
-          }
-        } catch (bgErr) {
-          console.log('Background loads failed (non-blocking):', bgErr)
-        }
-      })()
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading campaigns:', error)
+      setCampaigns([])
+    } finally {
       setLoading(false)
     }
   }
 
-  // Auto-refresh analytics every 30 seconds for real-time updates
+  // Auto-refresh analytics every 30 seconds only when Analytics tab is active
   useEffect(() => {
-    console.log('🔄 useEffect triggered - campaigns length:', campaigns.length)
-    if (campaigns.length > 0) {
-      // Force immediate analytics load
-      const loadAnalyticsImmediate = async () => {
-        console.log('🚀 Loading analytics immediately due to campaigns change')
+    if (activeTab === 'analytics') {
+      const run = async () => {
         setAnalyticsLoading(true)
         await loadCampaignAnalyticsSync(campaigns)
+        await loadOverallAnalytics()
         setAnalyticsLoading(false)
       }
-      
-      loadAnalyticsImmediate()
-      
-      // Set up interval for auto-refresh
-      const interval = setInterval(() => {
-        console.log('Auto-refreshing campaign analytics...')
-        loadCampaignAnalyticsSync(campaigns)
-      }, 30000) // 30 seconds
-      
+      run()
+      const interval = setInterval(run, 30000)
       return () => clearInterval(interval)
     }
-  }, [campaigns])
+  }, [activeTab, campaigns])
+
   const [templateForm, setTemplateForm] = useState({
     name: '',
     subject: '',
@@ -2266,6 +2207,46 @@ export default function CustomerEmailsPage() {
     if (activeTab !== 'analytics') return
     loadPreviousCampaigns()
   }, [prevStatus])
+
+  // Lazy-load lists when tabs open
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab === 'customers' && customers.length === 0) {
+          const enquiriesRes = await fetch('/api/enquiries')
+          if (enquiriesRes.ok) {
+            const data = await enquiriesRes.json()
+            const transformedCustomers: Customer[] = data.map((enquiry: any) => ({
+              id: enquiry.id,
+              firstName: enquiry.firstName || '',
+              lastName: enquiry.lastName || '',
+              email: enquiry.email || '',
+              phone: enquiry.phone || '',
+              state: enquiry.state || '',
+              suburb: enquiry.suburb || '',
+              nationality: enquiry.nationality || '',
+              productInterest: enquiry.pianoModel ? [enquiry.pianoModel] : [],
+              source: enquiry.enquirySource || '',
+              eventSource: enquiry.eventSource || '',
+              customerRating: enquiry.customerRating || '',
+              status: enquiry.status || 'New',
+              doNotEmail: enquiry.doNotEmail || false,
+              createdAt: enquiry.createdAt || new Date().toISOString()
+            }))
+            setCustomers(transformedCustomers)
+          }
+        }
+        if (activeTab === 'templates' && templates.length === 0) {
+          const templatesRes = await fetch('/api/admin/templates')
+          const dbTemplates = templatesRes.ok ? await templatesRes.json() : []
+          setTemplates(dbTemplates)
+          cacheRef.current.templates = dbTemplates
+        }
+      } catch (err) {
+        console.log('Lazy load failed (non-blocking):', err)
+      }
+    })()
+  }, [activeTab])
 
   if (loading) {
     return (

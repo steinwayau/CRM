@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
     const recipientEmail = searchParams.get('e') // Direct email instead of ID lookup
     const targetUrl = searchParams.get('url')
     const linkType = searchParams.get('type') || 'link'
-    const label = searchParams.get('label') || null
     
     // Determine redirect URL
     const redirectUrl = targetUrl ? decodeURIComponent(targetUrl) : 'https://crm.steinway.com.au'
@@ -31,7 +30,6 @@ export async function GET(request: NextRequest) {
               event_type,
               target_url,
               link_type,
-              label,
               user_agent, 
               ip_address
             ) VALUES (
@@ -40,7 +38,6 @@ export async function GET(request: NextRequest) {
               'click',
               ${decodeURIComponent(targetUrl)},
               ${linkType},
-              ${label},
               ${request.headers.get('user-agent') || ''},
               ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''}
             )

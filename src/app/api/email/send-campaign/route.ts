@@ -857,13 +857,13 @@ async function appendFooterAsync(html: string, recipientEmail: string): Promise<
     </tr>
     <tr>
       <td align="center" style="padding:4px 10px 8px 10px;">
-        <a href="${fb}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
+                 <a href="${fb}" data-social-label="facebook" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
           ${fbIcon ? `<img src="${fbIcon}" alt="Facebook" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('F')}
         </a>
-        <a href="${ig}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
+        <a href="${ig}" data-social-label="instagram" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
           ${igIcon ? `<img src="${igIcon}" alt="Instagram" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('IG')}
         </a>
-        <a href="${yt}" style="text-decoration:none" target="_blank" rel="noopener">
+        <a href="${yt}" data-social-label="youtube" style="text-decoration:none" target="_blank" rel="noopener">
           ${ytIcon ? `<img src="${ytIcon}" alt="YouTube" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('YT')}
         </a>
       </td>
@@ -1031,7 +1031,10 @@ export async function POST(request: NextRequest) {
           const trackedHtml = addEmailTracking(personalizedHtml, updateCampaignId, customer.email)
 
           // Append standard footer with unsubscribe
-          const finalHtml = await appendFooterAsync(trackedHtml, customer.email)
+          const withFooter = await appendFooterAsync(trackedHtml, customer.email)
+
+          // Second pass (schema-safe): track social icons only (facebook/instagram/youtube)
+          const finalHtml = addSocialTrackingPostFooter(withFooter, updateCampaignId, customer.email)
           
           return {
             to: customer.email,
@@ -1240,6 +1243,26 @@ function addEmailTracking(htmlContent: string, campaignId: string, recipientEmai
   }
   
   return trackedHtml
+}
+
+// Schema-safe, minimal second pass: wrap only footer social links (if present)
+function addSocialTrackingPostFooter(html: string, campaignId: string, recipientEmail: string): string {
+  const baseUrl = getBaseUrl()
+  const encodedEmail = encodeURIComponent(recipientEmail)
+  const wrap = (sourceHtml: string, domainPattern: RegExp, type: string) =>
+    sourceHtml.replace(
+      new RegExp(`href=["']((?!${baseUrl.replace(/https?:\\\//g, '(?:https?:\\/\\/)')}.+?/api/email/tracking/)[^"']*?(?:${domainPattern.source})[^"']*)["']`, 'gi'),
+      (_m, url) => {
+        const encodedUrl = encodeURIComponent(url)
+        const tracked = `${baseUrl}/api/email/tracking/click?c=${campaignId}&e=${encodedEmail}&url=${encodedUrl}&type=${type}`
+        return `href="${tracked}"`
+      }
+    )
+  let out = html
+  out = wrap(out, /facebook\.com/i, 'social-facebook')
+  out = wrap(out, /instagram\.com/i, 'social-instagram')
+  out = wrap(out, /(?:youtube\.com|youtu\.be)/i, 'social-youtube')
+  return out
 }
 
 // Helper function to personalize email content

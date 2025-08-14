@@ -2548,7 +2548,15 @@ export default function TemplateEditorPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.push('/admin/customer-emails?tab=templates')}
+                onClick={() => {
+                  try {
+                    const url = new URL(window.location.origin + '/admin/customer-emails?tab=templates')
+                    window.history.replaceState(null, '', url.pathname + url.search)
+                  } catch {
+                    // Fallback to router if needed
+                    router.push('/admin/customer-emails?tab=templates')
+                  }
+                }}
                 className="flex items-center text-gray-600 hover:text-gray-900"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

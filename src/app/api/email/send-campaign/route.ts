@@ -810,7 +810,7 @@ async function getFooterSettings() {
       select: { key: true, value: true }
     })
     const out: Record<string, string> = {}
-    rows.forEach((r) => { out[r.key] = r.value })
+    rows.forEach((r: { key: string; value: string }) => { out[r.key] = r.value })
     return out
   } catch {
     return {} as any
@@ -857,13 +857,13 @@ async function appendFooterAsync(html: string, recipientEmail: string): Promise<
     </tr>
     <tr>
       <td align="center" style="padding:4px 10px 8px 10px;">
-        <a href="${fb}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
+                 <a href="${fb}" data-social-label="facebook" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
           ${fbIcon ? `<img src="${fbIcon}" alt="Facebook" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('F')}
         </a>
-        <a href="${ig}" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
+        <a href="${ig}" data-social-label="instagram" style="text-decoration:none;margin-right:8px" target="_blank" rel="noopener">
           ${igIcon ? `<img src="${igIcon}" alt="Instagram" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('IG')}
         </a>
-        <a href="${yt}" style="text-decoration:none" target="_blank" rel="noopener">
+        <a href="${yt}" data-social-label="youtube" style="text-decoration:none" target="_blank" rel="noopener">
           ${ytIcon ? `<img src="${ytIcon}" alt="YouTube" width="28" height="28" style="display:inline-block;border:0;outline:none;vertical-align:middle;border-radius:14px;" />` : circle('YT')}
         </a>
       </td>
@@ -1213,20 +1213,27 @@ function addEmailTracking(htmlContent: string, campaignId: string, recipientEmai
       
       // Detect link type based on URL and context
       let linkType = 'link' // default
-      const surroundingHtml = htmlContent.substring(Math.max(0, offset - 200), offset + 200)
+      let label = ''
+      const surroundingHtml = htmlContent.substring(Math.max(0, offset - 300), offset + 300)
       
-      // Check URL first for specific patterns
-      if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.includes('video')) {
+      // Social icon detection via surrounding markup or known domains
+      if (surroundingHtml.includes('data-social-label="facebook"') || url.includes('facebook.com')) {
+        linkType = 'social'; label = 'facebook'
+      } else if (surroundingHtml.includes('data-social-label="instagram"') || url.includes('instagram.com')) {
+        linkType = 'social'; label = 'instagram'
+      } else if (surroundingHtml.includes('data-social-label="youtube"') || url.includes('youtube.com') || url.includes('youtu.be')) {
+        linkType = 'social'; label = 'youtube'
+      } else if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.includes('video')) {
         linkType = 'video'
-      } else if (url.includes('.com.au') || url.includes('steinway.com') || url.includes('website') || url.includes('home')) {
-        linkType = 'website'
       } else if (surroundingHtml.includes('<table') && surroundingHtml.includes('padding') && surroundingHtml.includes('border-radius')) {
         linkType = 'button'
+      } else if (url.includes('.com.au') || url.includes('steinway.com') || url.includes('website') || url.includes('home')) {
+        linkType = 'website'
       }
       
-      // Create enhanced tracked link - NEW: Direct email parameter
+      // Create enhanced tracked link - include type and optional label
       const encodedUrl = encodeURIComponent(url)
-      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&e=${encodedEmail}&url=${encodedUrl}&type=${linkType}`
+      const trackedUrl = `${baseUrl}/api/email/tracking/click?c=${campaignId}&e=${encodedEmail}&url=${encodedUrl}&type=${linkType}${label ? `&label=${label}` : ''}`
       return `href="${trackedUrl}"`
     }
   )

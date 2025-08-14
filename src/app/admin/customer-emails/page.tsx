@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useRealTimeAnalytics, AnalyticsUpdate } from '@/lib/useRealTimeAnalytics'
@@ -173,6 +173,9 @@ export default function CustomerEmailsPage() {
   const [resetTo, setResetTo] = useState('')
   const [viewContext, setViewContext] = useState<'campaigns'|'previous'>('campaigns')
   const [prevStatus, setPrevStatus] = useState<'all'|'draft'|'scheduled'|'sending'|'sent'|'paused'|'archived'|'deleted'>('all')
+
+  // Simple in-memory cache to speed up tab switches (session-lifetime)
+  const cacheRef = useRef<{ campaigns?: Campaign[]; templates?: EmailTemplate[]; cachedAt?: number }>({})
 
   const computeDateRange = () => {
     const now = new Date()
@@ -446,6 +449,11 @@ export default function CustomerEmailsPage() {
   // Sample data - replace with actual API calls
   useEffect(() => {
     // Load customers, templates, and campaigns
+    // Hydrate from cache first to avoid empty UI on tab switch
+    if (cacheRef.current.campaigns || cacheRef.current.templates) {
+      if (cacheRef.current.campaigns) setCampaigns(cacheRef.current.campaigns)
+      if (cacheRef.current.templates) setTemplates(cacheRef.current.templates as any)
+    }
     loadData()
   }, [])
 
@@ -455,10 +463,10 @@ export default function CustomerEmailsPage() {
     if (tabParam && ['campaigns', 'customers', 'templates', 'analytics'].includes(tabParam)) {
       setActiveTab(tabParam)
     } else if (!tabParam) {
-      // 🎯 If no tab parameter, set URL to show campaigns as default
+      // 🎯 If no tab parameter, set URL to show campaigns as default without re-render loop
       const url = new URL(window.location.href)
       url.searchParams.set('tab', 'campaigns')
-      router.push(url.pathname + url.search, { scroll: false })
+      window.history.replaceState(null, '', url.pathname + url.search)
     }
   }, [searchParams, router])
 
@@ -475,15 +483,17 @@ export default function CustomerEmailsPage() {
   // 🎯 Handle tab changes with URL synchronization
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab)
-    // Update URL to maintain state on refresh
+    // Update URL without triggering router-driven re-renders
     const url = new URL(window.location.href)
     url.searchParams.set('tab', newTab)
-    router.push(url.pathname + url.search, { scroll: false })
+    window.history.replaceState(null, '', url.pathname + url.search)
   }
 
   // Helper function to update campaigns (now using database)
   const updateCampaigns = async (newCampaigns: Campaign[]) => {
     setCampaigns(newCampaigns)
+    // Update cache for faster subsequent views
+    cacheRef.current.campaigns = newCampaigns
     
     // ANALYTICS FIX: Also persist campaign updates to database
     // This ensures sent campaigns with sentCount are saved permanently
@@ -617,10 +627,9 @@ export default function CustomerEmailsPage() {
         
         // Reload templates from database
         const templateResponse = await fetch('/api/admin/templates')
-        if (templateResponse.ok) {
-          const dbTemplates = await templateResponse.json()
-          setTemplates(dbTemplates)
-        }
+        const templatesData = templateResponse.ok ? await templateResponse.json() : []
+        setTemplates(templatesData)
+        cacheRef.current.templates = templatesData
       }
     } catch (error) {
       console.error('Template migration error:', error)

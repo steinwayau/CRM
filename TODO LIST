@@ -1,6 +1,5 @@
 # TODO — Template Editor (Active Items Only)
 
-Last Updated: 2025-08-14 (Golden State `fb14a2c`)
+Last Updated: 2025-08-15 (Golden State `ae7f9fd`)
 
-1) Action History panel (top-right dropdown). Shows a time-stamped list of actions with type + short description; clicking an item rewinds the editor to that exact state.
-2) Undo/Redo support (robust history, keyboard shortcuts)
+1) Track clicks on hardcoded footer social icons (Facebook/Instagram/YouTube) in emails so they appear in analytics like other links and videos. Must be safe and cause zero regressions.

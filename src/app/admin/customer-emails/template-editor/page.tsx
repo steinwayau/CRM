@@ -660,7 +660,8 @@ export default function TemplateEditorPage() {
   // Align/Distribute helpers
   const alignSelected = (mode: 'left'|'centerX'|'right'|'top'|'middle'|'bottom') => {
     if (selectedIds.length < 2) return
-    pushHistory('format', `Aligned ${selectedIds.length} elements (${mode})`)
+    const label = mode === 'centerX' ? 'center' : mode === 'middle' ? 'middle' : mode
+    pushHistory('format', `Aligned ${selectedIds.length} element(s) ${label}`)
     const selected = editorElements.filter(el => selectedIds.includes(el.id))
     const minX = Math.min(...selected.map(e => e.style.position.x))
     const maxRight = Math.max(...selected.map(e => e.style.position.x + e.style.width))
@@ -683,7 +684,7 @@ export default function TemplateEditorPage() {
   }
   const distributeSelected = (axis: 'horizontal'|'vertical') => {
     if (selectedIds.length < 3) return
-    pushHistory('format', `Distributed ${selectedIds.length} elements (${axis})`)
+    pushHistory('format', `Distributed ${selectedIds.length} element(s) ${axis}`)
     const selected = editorElements.filter(el => selectedIds.includes(el.id))
     if (axis === 'horizontal') {
       const sorted = [...selected].sort((a,b)=> a.style.position.x - b.style.position.x)
@@ -1096,7 +1097,8 @@ export default function TemplateEditorPage() {
     setIsResizingElement({ elementId, handle })
     // Start a resize transaction: record once at start, not per frame
     interactionRef.current = { active: true, pushed: false }
-    currentActionRef.current = { type: 'resize', description: 'Resized element' }
+    const target = editorElements.find(el => el.id === elementId)
+    currentActionRef.current = { type: 'resize', description: `Resized ${target?.type || 'element'}` }
     
     let animationFrameId: number
     
@@ -1348,7 +1350,7 @@ export default function TemplateEditorPage() {
       x: element.style.position.x + element.style.width / 2,
       y: element.style.position.y + element.style.height / 2
     }
-    currentActionRef.current = { type: 'rotate', description: 'Rotated element' }
+    currentActionRef.current = { type: 'rotate', description: `Rotated ${element.type}` }
     let animationFrameId: number
     const onMove = (me: MouseEvent) => {
       me.preventDefault()
@@ -1695,9 +1697,45 @@ export default function TemplateEditorPage() {
   }
 
   const updateElement = (id: string, updates: Partial<EditorElement>) => {
+    const target = editorElements.find(el => el.id === id)
     const meta = currentActionRef.current
-    const metaType = meta?.type || 'update'
-    const metaDesc = meta?.description || 'Update'
+
+    // Generate smarter default description when none provided
+    let metaType = meta?.type
+    let metaDesc = meta?.description
+    if (!metaType || !metaDesc) {
+      // Try to infer from updates
+      if (updates.style && typeof updates.style === 'object') {
+        if (Object.prototype.hasOwnProperty.call(updates.style, 'textAlign')) {
+          metaType = 'format'
+          metaDesc = `Changed alignment to ${updates.style.textAlign}`
+        } else if (Object.prototype.hasOwnProperty.call(updates.style, 'color')) {
+          metaType = 'format'
+          metaDesc = 'Changed text color'
+        } else if (Object.prototype.hasOwnProperty.call(updates.style, 'backgroundColor')) {
+          metaType = 'format'
+          metaDesc = 'Changed background color'
+        } else if (Object.prototype.hasOwnProperty.call(updates.style, 'fontSize')) {
+          metaType = 'format'
+          metaDesc = `Changed font size to ${updates.style.fontSize}`
+        } else if (Object.prototype.hasOwnProperty.call(updates.style, 'width') || Object.prototype.hasOwnProperty.call(updates.style, 'height')) {
+          metaType = 'resize'
+          metaDesc = `Resized ${target?.type || 'element'}`
+        } else if (updates.style.position) {
+          metaType = 'move'
+          metaDesc = `Moved ${target?.type || 'element'} to (${updates.style.position.x}, ${updates.style.position.y})`
+        } else if (Object.prototype.hasOwnProperty.call(updates.style, 'rotation')) {
+          metaType = 'rotate'
+          metaDesc = `Rotated ${target?.type || 'element'}`
+        }
+      }
+      if (!metaType && Object.prototype.hasOwnProperty.call(updates, 'content')) {
+        metaType = 'update'
+        metaDesc = 'Edited text'
+      }
+      metaType = metaType || 'update'
+      metaDesc = metaDesc || 'Update'
+    }
 
     // Do not record history for auto-height adjustments during typing
     const isAutoHeight = editingTextElement === id && updates.style && Object.prototype.hasOwnProperty.call(updates.style, 'height') && !Object.prototype.hasOwnProperty.call(updates, 'content')
@@ -1721,7 +1759,9 @@ export default function TemplateEditorPage() {
   }
 
   const deleteElement = (id: string) => {
-    pushHistory('delete', 'Deleted element')
+    const el = editorElements.find(e => e.id === id)
+    const label = el ? `Deleted ${el.type}` : 'Deleted element'
+    pushHistory('delete', label)
     setEditorElements(editorElements.filter(el => el.id !== id))
     setSelectedElement(null)
   }
@@ -3264,8 +3304,10 @@ export default function TemplateEditorPage() {
                           const { x: newX, y: newY, guides, measurements, neighborRects } = snapPosition(current, constrainedX, constrainedY)
                           setShowAlignmentGuides(guides)
                           setMeasureOverlays(measurements)
-                          setNeighborHighlights(neighborRects)
-                          updateElement(element.id, { style: { ...current.style, position: { x: newX, y: newY } } })
+                                                     setNeighborHighlights(neighborRects)
+                           // Human-friendly move label per frame; recorded once per gesture by interactionRef
+                           currentActionRef.current = { type: 'move', description: `Moved ${current.type} to (${newX}, ${newY})` }
+                           updateElement(element.id, { style: { ...current.style, position: { x: newX, y: newY } } })
                         })
                       }
                     }
@@ -3282,6 +3324,7 @@ export default function TemplateEditorPage() {
                       document.removeEventListener('mousemove', handleMouseMove)
                       document.removeEventListener('mouseup', handleMouseUp)
                       interactionRef.current = { active: false, pushed: false }
+                      currentActionRef.current = null
                       dragTimeoutRef.current = setTimeout(() => {
                         dragStateRef.current = { isDragging: false, dragStarted: false, elementId: null }
                       }, 50)

@@ -1493,3 +1493,29 @@ Environment: Production (crm.steinway.com.au)
   - Editor context menu now closes on click‑away/Escape/scroll.
 - Do not modify: context menu behavior and paste key handling (Cmd/Ctrl+V works in inputs/textarea).
 - TODO updated: removed completed paste/paragraphs and resize‑snap items; added user's six new issues and kept Undo/Redo open.
+
+---
+
+## Agent Exit Verification — August 14, 2025
+
+- Task: Add Action History panel to template editor (top‑right), non‑breaking, surgical.
+- Outcome: ❌ Failed to deliver a visible, working panel for the user. Button appeared but panel was not reliably visible in production layout.
+- Risk: UI instability/frustration. No data loss. Email/campaign systems unaffected.
+- Action Taken: Reverted repository and production to Golden State `10a47df`.
+
+### Evidence
+- Git: `git reset --hard 10a47df` → force-push to `main`
+- Deployment: Production redeployed (see Vercel deployment logs; alias points to latest after revert).
+
+### What was changed (then reverted)
+- Editor UI only: added History button/panel, metadata recording hooks. No server/API changes.
+
+### Root cause (concise)
+- Panel anchoring and layering weren't fixed to the correct toolbar container; on production the panel ended up hidden or clipped, appearing to "do nothing".
+
+### Guidance for Next Agent
+1) Prove the panel first: insert a fixed, z-indexed container within the toolbar node; show a clear empty state.
+2) Only after visibility works, add history metadata recording (non-invasive) and keep Undo/Redo untouched initially.
+3) Confirm placement on real production build locally (no dev-only assumptions).
+
+— End of entry

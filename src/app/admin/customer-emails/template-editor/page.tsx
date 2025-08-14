@@ -497,6 +497,19 @@ export default function TemplateEditorPage() {
   const clipboardRef = useRef<EditorElement[] | null>(null)
   const [contextMenu, setContextMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 })
 
+  // Action History (entries for panel)
+  interface HistoryEntry {
+    id: string
+    timestamp: string
+    type: string
+    description: string
+    snapshot: EditorElement[]
+  }
+  const historyEntriesRef = useRef<HistoryEntry[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyVersion, setHistoryVersion] = useState(0) // trigger re-render when entries change
+  const currentActionRef = useRef<{ type: string; description: string } | null>(null)
+
   const closeContextMenu = () => setContextMenu({ open: false, x: 0, y: 0 })
 
   const generateId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -526,7 +539,7 @@ export default function TemplateEditorPage() {
       if (txt && txt.startsWith('[')) payload = JSON.parse(txt)
     } catch { /* ignore */ }
     if (!payload || !Array.isArray(payload)) return
-    pushHistory()
+    pushHistory('insert', `Pasted ${payload.length} element(s)`) // record before applying changes
     const offset = 10
     const now = Date.now()
     const clones = payload.map((src, idx) => {
@@ -554,16 +567,27 @@ export default function TemplateEditorPage() {
   }
   const deleteSelected = () => {
     if (selectedIds.length === 0) return
-    pushHistory()
+    pushHistory('delete', `Deleted ${selectedIds.length} element(s)`) // record
     setEditorElements(prev => prev.filter(el => !selectedIds.includes(el.id)))
     setSelectedIds([])
   }
-  const pushHistory = () => {
+  const pushHistory = (type?: string, description?: string) => {
     // Deep clone minimal: JSON structured form is sufficient here
     const snapshot: EditorElement[] = JSON.parse(JSON.stringify(editorElements))
     historyRef.current.push(snapshot)
     if (historyRef.current.length > 50) historyRef.current.shift()
     futureRef.current = []
+
+    const entry: HistoryEntry = {
+      id: generateId(),
+      timestamp: new Date().toISOString(),
+      type: type || 'update',
+      description: description || 'Update',
+      snapshot
+    }
+    historyEntriesRef.current.unshift(entry)
+    if (historyEntriesRef.current.length > 200) historyEntriesRef.current.pop()
+    setHistoryVersion(v => v + 1)
   }
   const undo = () => {
     const prev = historyRef.current.pop()
@@ -613,7 +637,7 @@ export default function TemplateEditorPage() {
         const delta = e.shiftKey ? 10 : 1
         const dx = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0
         const dy = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0
-        pushHistory()
+        pushHistory('move', `Nudged ${selectedIds.length} element(s) by ${delta}px`) // record
         setEditorElements(prev => prev.map(el => {
           if (!selectedIds.includes(el.id)) return el
           const nx = Math.max(0, Math.min(canvasSize.width - el.style.width, el.style.position.x + dx))
@@ -629,7 +653,7 @@ export default function TemplateEditorPage() {
   // Align/Distribute helpers
   const alignSelected = (mode: 'left'|'centerX'|'right'|'top'|'middle'|'bottom') => {
     if (selectedIds.length < 2) return
-    pushHistory()
+    pushHistory('format', `Aligned ${selectedIds.length} elements (${mode})`)
     const selected = editorElements.filter(el => selectedIds.includes(el.id))
     const minX = Math.min(...selected.map(e => e.style.position.x))
     const maxRight = Math.max(...selected.map(e => e.style.position.x + e.style.width))
@@ -652,7 +676,7 @@ export default function TemplateEditorPage() {
   }
   const distributeSelected = (axis: 'horizontal'|'vertical') => {
     if (selectedIds.length < 3) return
-    pushHistory()
+    pushHistory('format', `Distributed ${selectedIds.length} elements (${axis})`)
     const selected = editorElements.filter(el => selectedIds.includes(el.id))
     if (axis === 'horizontal') {
       const sorted = [...selected].sort((a,b)=> a.style.position.x - b.style.position.x)
@@ -1063,6 +1087,7 @@ export default function TemplateEditorPage() {
     const startX = e.clientX
     const startY = e.clientY
     setIsResizingElement({ elementId, handle })
+    currentActionRef.current = { type: 'resize', description: 'Resized element' }
     
     let animationFrameId: number
     
@@ -1295,6 +1320,7 @@ export default function TemplateEditorPage() {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
       setShowAlignmentGuides([])
+      currentActionRef.current = null
     }
     
     document.addEventListener('mousemove', handleMouseMove)
@@ -1312,6 +1338,7 @@ export default function TemplateEditorPage() {
       x: element.style.position.x + element.style.width / 2,
       y: element.style.position.y + element.style.height / 2
     }
+    currentActionRef.current = { type: 'rotate', description: 'Rotated element' }
     let animationFrameId: number
     const onMove = (me: MouseEvent) => {
       me.preventDefault()
@@ -1334,6 +1361,7 @@ export default function TemplateEditorPage() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       setAngleHint(null)
+      currentActionRef.current = null
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -1603,7 +1631,7 @@ export default function TemplateEditorPage() {
 
   // Visual editor functions
   const addElement = (type: 'text' | 'image' | 'video' | 'button' | 'divider' | 'heading') => {
-    pushHistory()
+    pushHistory('insert', `Inserted ${type}`)
     const position = getNextElementPosition(type)
     
     const newElement: EditorElement = {
@@ -1654,10 +1682,13 @@ export default function TemplateEditorPage() {
   }
 
   const updateElement = (id: string, updates: Partial<EditorElement>) => {
+    const meta = currentActionRef.current
+    const metaType = meta?.type || 'update'
+    const metaDesc = meta?.description || 'Update'
     if (!interactionRef.current.active) {
-      pushHistory()
+      pushHistory(metaType, metaDesc)
     } else if (interactionRef.current.active && !interactionRef.current.pushed) {
-      pushHistory()
+      pushHistory(metaType, metaDesc)
       interactionRef.current.pushed = true
     }
     setEditorElements(prevElements => prevElements.map(el => 
@@ -1671,7 +1702,7 @@ export default function TemplateEditorPage() {
   }
 
   const deleteElement = (id: string) => {
-    pushHistory()
+    pushHistory('delete', 'Deleted element')
     setEditorElements(editorElements.filter(el => el.id !== id))
     setSelectedElement(null)
   }
@@ -2545,7 +2576,7 @@ export default function TemplateEditorPage() {
       {/* Header */}
       <div className="bg-white border-b shadow-sm">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between relative">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => router.push('/admin/customer-emails?tab=templates')}
@@ -2566,6 +2597,48 @@ export default function TemplateEditorPage() {
             </div>
             
             <div className="flex items-center space-x-3">
+              <div className="relative">
+                <button
+                  onClick={() => setHistoryOpen(o => !o)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  History
+                </button>
+                {historyOpen && (
+                  <div className="absolute right-0 mt-2 w-96 max-h-96 overflow-auto bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                    <div className="p-3 border-b text-sm font-medium text-gray-700">Action History</div>
+                    <ul className="divide-y divide-gray-100">
+                      {historyEntriesRef.current.length === 0 && (
+                        <li className="p-3 text-sm text-gray-500">No actions yet</li>
+                      )}
+                      {historyEntriesRef.current.map((entry) => (
+                        <li key={entry.id}>
+                          <button
+                            className="w-full text-left p-3 hover:bg-gray-50"
+                            onClick={() => {
+                              // Revert to this snapshot and clear redo stack
+                              const current = JSON.parse(JSON.stringify(editorElements))
+                              historyRef.current.push(current)
+                              futureRef.current = []
+                              setEditorElements(JSON.parse(JSON.stringify(entry.snapshot)))
+                              setSelectedElement(null)
+                              setSelectedIds([])
+                              setEditingTextElement(null)
+                              setHistoryOpen(false)
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-500">{new Date(entry.timestamp).toLocaleString()}</span>
+                              <span className="ml-2 inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{entry.type}</span>
+                            </div>
+                            <div className="mt-1 text-sm text-gray-700 truncate">{entry.description}</div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleSave}
                 disabled={!templateForm.name || !templateForm.subject || editorElements.length === 0 || saving}

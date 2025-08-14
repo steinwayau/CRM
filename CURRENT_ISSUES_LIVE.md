@@ -508,3 +508,28 @@ Open Items
 Recent Changes
 - Golden State analytics restored while keeping template editor improvements.
 - Production alias verified to latest deployment. 
+
+# 🚨 EMERGENCY REVERT — August 14, 2025
+
+- Status: Reverted to Golden State reference `10a47df` (Customer Emails performance/tab defer) and redeployed to production.
+- Reason: Template editor History feature attempt caused UI instability and a non-functional History button/panel for the user.
+
+## What was attempted (History feature)
+- Added a visual "History" button and panel intended to appear in the editor’s top‑right.
+- Wired metadata recordings (insert/delete/update/move/format) and periodic snapshots to support time‑travel.
+- Panel visibility/placement conflicted with existing layout; user observed a History button that did nothing and no visible panel.
+
+## Why it failed for the user
+- Panel anchoring and layering were unreliable in the live layout; on production the panel did not appear as expected after clicking.
+- Button placement did not meet the user’s top‑right requirement initially; later tweaks did not resolve the core UX issue quickly.
+
+## Action taken
+- Full revert to Golden State commit: `10a47df` (main branch). Production redeployed.
+
+## Guidance for next agent (do NOT repeat)
+1. Do not alter core editor behavior first. Start with a read‑only overlay that proves visibility/positioning works across the real toolbar container.
+2. Use a dedicated, fixed container with explicit z‑index and verify within the actual toolbar node (no absolute off unanchored parents). Test on production build locally.
+3. Only after panel reliably opens/ closes should you record history metadata. Keep Undo/Redo untouched at first.
+4. Add a clearly visible empty state ("No actions yet") so the user can see the panel is functioning even before edits.
+
+Last updated: Aug 14, 2025 

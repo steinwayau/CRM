@@ -263,6 +263,7 @@ export default function TemplateEditorPage() {
       setContextMenu({ open: false, x: 0, y: 0 })
       setEditingTextElement(elementId)
       setTempTextContent(element.content)
+      suppressHistoryRef.current = true // suppress auto-height noise while typing
       // Focus the textarea immediately and select all text for instant typing
       setTimeout(() => {
         if (textEditRef.current) {
@@ -278,12 +279,16 @@ export default function TemplateEditorPage() {
   const finishEditingText = () => {
     if (editingTextElement) {
       const el = editorElements.find(el => el.id === editingTextElement)
+      // Re-enable history and create a single clean entry for text edit
+      suppressHistoryRef.current = false
+      currentActionRef.current = { type: 'update', description: 'Edited text' }
       if (el) {
         const newH = measureAutoHeight(tempTextContent, el.style)
         updateElement(editingTextElement, { content: tempTextContent, style: { ...el.style, height: newH } })
       } else {
         updateElement(editingTextElement, { content: tempTextContent })
       }
+      currentActionRef.current = null
       setEditingTextElement(null)
       setTempTextContent('')
     }
@@ -509,6 +514,7 @@ export default function TemplateEditorPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyVersion, setHistoryVersion] = useState(0) // trigger re-render when entries change
   const currentActionRef = useRef<{ type: string; description: string } | null>(null)
+  const suppressHistoryRef = useRef(false)
 
   const closeContextMenu = () => setContextMenu({ open: false, x: 0, y: 0 })
 
@@ -572,6 +578,7 @@ export default function TemplateEditorPage() {
     setSelectedIds([])
   }
   const pushHistory = (type?: string, description?: string) => {
+    if (suppressHistoryRef.current) return
     // Deep clone minimal: JSON structured form is sufficient here
     const snapshot: EditorElement[] = JSON.parse(JSON.stringify(editorElements))
     historyRef.current.push(snapshot)
@@ -1087,6 +1094,8 @@ export default function TemplateEditorPage() {
     const startX = e.clientX
     const startY = e.clientY
     setIsResizingElement({ elementId, handle })
+    // Start a resize transaction: record once at start, not per frame
+    interactionRef.current = { active: true, pushed: false }
     currentActionRef.current = { type: 'resize', description: 'Resized element' }
     
     let animationFrameId: number
@@ -1321,6 +1330,7 @@ export default function TemplateEditorPage() {
       document.removeEventListener('mouseup', handleMouseUp)
       setShowAlignmentGuides([])
       currentActionRef.current = null
+      interactionRef.current = { active: false, pushed: false }
     }
     
     document.addEventListener('mousemove', handleMouseMove)
@@ -1343,6 +1353,8 @@ export default function TemplateEditorPage() {
     const onMove = (me: MouseEvent) => {
       me.preventDefault()
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
+      // Ensure rotate uses a single history entry per gesture
+      if (!interactionRef.current.active) interactionRef.current = { active: true, pushed: false }
       animationFrameId = requestAnimationFrame(() => {
         const angleRad = Math.atan2(me.clientY - rectCenter.y, me.clientX - rectCenter.x)
         let angleDeg = Math.round((angleRad * 180) / Math.PI)
@@ -1362,6 +1374,7 @@ export default function TemplateEditorPage() {
       document.removeEventListener('mouseup', onUp)
       setAngleHint(null)
       currentActionRef.current = null
+      interactionRef.current = { active: false, pushed: false }
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -1685,12 +1698,18 @@ export default function TemplateEditorPage() {
     const meta = currentActionRef.current
     const metaType = meta?.type || 'update'
     const metaDesc = meta?.description || 'Update'
-    if (!interactionRef.current.active) {
-      pushHistory(metaType, metaDesc)
-    } else if (interactionRef.current.active && !interactionRef.current.pushed) {
-      pushHistory(metaType, metaDesc)
-      interactionRef.current.pushed = true
+
+    // Do not record history for auto-height adjustments during typing
+    const isAutoHeight = editingTextElement === id && updates.style && Object.prototype.hasOwnProperty.call(updates.style, 'height') && !Object.prototype.hasOwnProperty.call(updates, 'content')
+    if (!isAutoHeight) {
+      if (!interactionRef.current.active) {
+        pushHistory(metaType, metaDesc)
+      } else if (interactionRef.current.active && !interactionRef.current.pushed) {
+        pushHistory(metaType, metaDesc)
+        interactionRef.current.pushed = true
+      }
     }
+
     setEditorElements(prevElements => prevElements.map(el => 
       el.id === id ? { ...el, ...updates } : el
     ))

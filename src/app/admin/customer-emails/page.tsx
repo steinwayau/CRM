@@ -505,13 +505,37 @@ export default function CustomerEmailsPage() {
     setPreviousCampaigns(prev => prev.filter((c: any) => c.id !== id))
   }
 
+  // Safe merge: do not downgrade a campaign that is already marked as sent with sentCount > 0
+  const mergeCampaignListsNoDowngrade = (current: Campaign[], incoming: Campaign[]): Campaign[] => {
+    const byId: Record<string, Campaign> = {}
+    current.forEach(c => { byId[c.id] = c })
+    incoming.forEach(next => {
+      const prev = byId[next.id]
+      if (!prev) {
+        byId[next.id] = next
+        return
+      }
+      // If previous is sent with positive sentCount, never downgrade to draft/sending/paused
+      const prevIsSent = prev.status === 'sent' && (prev.sentCount || 0) > 0
+      const nextIsSent = next.status === 'sent' && (next.sentCount || 0) > 0
+      if (prevIsSent && !nextIsSent) {
+        // Keep previous authoritative sent state
+        byId[next.id] = { ...next, status: 'sent', sentCount: prev.sentCount, sentAt: prev.sentAt || next.sentAt }
+      } else {
+        byId[next.id] = next
+      }
+    })
+    // Preserve ordering by most recent createdAt (like original load)
+    return Object.values(byId).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  }
+
   // Light refresh of campaigns only (avoids full dashboard reload)
   const refreshCampaignsLight = async () => {
     try {
       const resp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
       if (resp.ok) {
         const list = await resp.json()
-        setCampaigns(list)
+        setCampaigns(prev => mergeCampaignListsNoDowngrade(prev, list))
       }
     } catch (e) {
       console.log('Light campaigns refresh failed (non-blocking):', e)
@@ -798,7 +822,7 @@ export default function CustomerEmailsPage() {
             const latestResp = await fetch('/api/admin/campaigns', { cache: 'no-store' })
             if (latestResp.ok) {
               const latest = await latestResp.json()
-              setCampaigns(latest)
+              setCampaigns(prev => mergeCampaignListsNoDowngrade(prev, latest))
               // Kick analytics reload so tiles update fast
               await loadCampaignAnalyticsSync(latest)
             }

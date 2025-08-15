@@ -252,18 +252,26 @@ After deployment, manually test these key areas:
 3. Check Vercel dashboard for build errors
 4. Clear browser cache if seeing 404 errors
 
-## Local Development (Safe, mirrors production)
+## Local Development (Auditor Setup)
 
-These steps let auditors run the CRM locally without touching production:
+Follow these steps to run the CRM locally without touching production:
+
+0) Update to latest main
+```
+git fetch origin main && git pull origin main
+```
 
 1) Start local Postgres (Docker Compose)
 ```
 docker compose up -d
 ```
 
-2) Create local env file
+2) Create `.env.local` in the project root with the following content:
 ```
-cp .env.example .env.local
+DATABASE_URL=postgresql://epg:epg@localhost:5432/epgcrm?schema=public
+POSTGRES_PRISMA_URL=postgresql://epg:epg@localhost:5432/epgcrm?schema=public
+POSTGRES_URL_NON_POOLING=postgresql://epg:epg@localhost:5432/epgcrm?schema=public
+POSTGRES_URL=postgresql://epg:epg@localhost:5432/epgcrm?schema=public
 ```
 
 3) Generate Prisma client and apply dev migrations (local only)
@@ -277,7 +285,7 @@ npx prisma migrate dev --name init
 npm run dev
 ```
 
-Notes:
-- This uses Postgres locally (same as production) to avoid SQLite/behaviour drift.
-- No production credentials are needed; values in `.env.example` are local-only.
-- You can still use @vercel/postgres in code; envs point to the same local DB so the dev server doesn’t hang.
+Troubleshooting
+- If port 5432 is in use, edit `docker-compose.yml` to use a different host port (e.g., `"5433:5432"`) and update the URLs above to use that port.
+- If migrations complain about an existing database, you can reset locally (safe for local env): `npx prisma migrate reset`.
+- This setup mirrors production (Postgres) and avoids dev-server hangs without risky refactors.

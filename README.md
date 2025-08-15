@@ -251,3 +251,33 @@ After deployment, manually test these key areas:
 2. Run the test again
 3. Check Vercel dashboard for build errors
 4. Clear browser cache if seeing 404 errors
+
+## Local Development (Safe, mirrors production)
+
+These steps let auditors run the CRM locally without touching production:
+
+1) Start local Postgres (Docker Compose)
+```
+docker compose up -d
+```
+
+2) Create local env file
+```
+cp .env.example .env.local
+```
+
+3) Generate Prisma client and apply dev migrations (local only)
+```
+npx prisma generate
+npx prisma migrate dev --name init
+```
+
+4) Run the app
+```
+npm run dev
+```
+
+Notes:
+- This uses Postgres locally (same as production) to avoid SQLite/behaviour drift.
+- No production credentials are needed; values in `.env.example` are local-only.
+- You can still use @vercel/postgres in code; envs point to the same local DB so the dev server doesn’t hang.

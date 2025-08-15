@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15
+    container_name: epgcrm-db
+    environment:
+      POSTGRES_USER: epg
+      POSTGRES_PASSWORD: epg
+      POSTGRES_DB: epgcrm
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epg"]
+      interval: 5s
+      timeout: 5s
+      retries: 5 

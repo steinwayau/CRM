@@ -243,6 +243,20 @@ export default function CustomerEmailsPage() {
     }
   }
 
+  // Prefetch templates on demand so the New Campaign modal is never empty on first open
+  const ensureTemplatesLoaded = async () => {
+    try {
+      if (templates.length === 0) {
+        const templatesRes = await fetch('/api/admin/templates', { cache: 'no-store' })
+        const dbTemplates = templatesRes.ok ? await templatesRes.json() : []
+        setTemplates(dbTemplates)
+        cacheRef.current.templates = dbTemplates
+      }
+    } catch (e) {
+      console.error('Failed to prefetch templates:', e)
+    }
+  }
+
   // 🚫 REMOVED: loadDetailedAnalytics() - was causing campaign-specific data to be overwritten
   // Detailed analytics are now loaded campaign-specifically in handleViewCampaign()
 
@@ -350,12 +364,27 @@ export default function CustomerEmailsPage() {
         }))
         setCampaigns(campaignsWithCustomEmails)
         cacheRef.current.campaigns = campaignsWithCustomEmails
+
+        // Ensure dashboard metrics don't stay on Loading on the Campaigns tab
+        try {
+          if (campaignsWithCustomEmails.length > 0) {
+            await loadCampaignAnalyticsSync(campaignsWithCustomEmails)
+          } else {
+            await loadOverallAnalytics()
+          }
+        } catch (e) {
+          console.error('Dashboard analytics preload failed:', e)
+          setAnalyticsLoading(false)
+        }
       } else {
         setCampaigns([])
+        // Still clear loading for metrics to avoid perpetual Loading state
+        setAnalyticsLoading(false)
       }
     } catch (error) {
       console.error('Error loading campaigns:', error)
       setCampaigns([])
+      setAnalyticsLoading(false)
     } finally {
       setLoading(false)
     }
@@ -2247,6 +2276,13 @@ export default function CustomerEmailsPage() {
       }
     })()
   }, [activeTab])
+
+  // Prefetch templates on demand so the New Campaign modal is never empty on first open
+  useEffect(() => {
+    if (showNewCampaign) {
+      ensureTemplatesLoaded()
+    }
+  }, [showNewCampaign])
 
   if (loading) {
     return (

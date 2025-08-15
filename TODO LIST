@@ -3,3 +3,6 @@
 Last Updated: 2025-08-15 (Golden State `ae7f9fd`)
 
 1) Track clicks on hardcoded footer social icons (Facebook/Instagram/YouTube) in emails so they appear in analytics like other links and videos. Must be safe and cause zero regressions.
+2) Fix dashboard metrics stuck on “Loading…” by ensuring analytics fetch runs on the Campaigns tab and always clears loading safely.
+3) Ensure New Campaign modal always shows templates on first open by prefetching templates before rendering the dropdown.
+4) Stabilize campaign status after send by using the server’s saved status and preventing stale refreshes from reverting to draft.

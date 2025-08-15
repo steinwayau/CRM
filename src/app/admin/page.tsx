@@ -1,15 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 export default function AdminDashboard() {
-  const [stats] = useState({
-    totalEnquiries: 245,
-    newEnquiries: 23,
-    activeStaff: 8,
+  const [stats, setStats] = useState({
+    totalEnquiries: 0,
+    newEnquiries: 0,
+    activeStaff: 0,
     systemHealth: 'Good'
   })
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const [totalRes, weekRes, staffRes] = await Promise.all([
+          fetch('/api/admin/overview/enquiries-total', { cache: 'no-store' }).catch(() => null as any),
+          fetch('/api/admin/overview/enquiries-new-week', { cache: 'no-store' }).catch(() => null as any),
+          fetch('/api/admin/overview/staff-active', { cache: 'no-store' }).catch(() => null as any)
+        ])
+        const totalJson = totalRes && totalRes.ok ? await totalRes.json() : { total: stats.totalEnquiries }
+        const weekJson = weekRes && weekRes.ok ? await weekRes.json() : { count: stats.newEnquiries }
+        const staffJson = staffRes && staffRes.ok ? await staffRes.json() : { count: stats.activeStaff }
+        if (!cancelled) {
+          setStats({
+            totalEnquiries: Number(totalJson.total) || 0,
+            newEnquiries: Number(weekJson.count) || 0,
+            activeStaff: Number(staffJson.count) || 0,
+            systemHealth: 'Good'
+          })
+        }
+      } catch {
+        // keep safe defaults
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   const adminSections = [
     {

@@ -2,7 +2,7 @@
 
 ## CURRENT STABLE VERSION
 
-- Commit: `87acab3` (main)
+- Commit: `726d9b4` (main)
 - Deployment: https://crm.steinway.com.au
 - Status: ✅ Production live and verified
 - Date: Updated after deployment
@@ -25,7 +25,7 @@ If needed, revert to this exact state:
 
 ```bash
 # From repo root
-git checkout 8cd5197
+git checkout 726d9b4
 npx vercel --prod
 ```
 

@@ -460,15 +460,25 @@ export default function CustomerEmailsPage() {
   }
 
   // Helper function to update campaigns (now using database)
-  const updateCampaigns = async (newCampaigns: Campaign[]) => {
-    setCampaigns(newCampaigns)
+  const updateCampaigns = async (newCampaigns: Campaign[] | ((prev: Campaign[]) => Campaign[])) => {
+    let nextList: Campaign[] = []
+    if (typeof newCampaigns === 'function') {
+      setCampaigns(prev => {
+        const computed = (newCampaigns as (prev: Campaign[]) => Campaign[])(prev)
+        nextList = computed
+        return computed
+      })
+    } else {
+      nextList = newCampaigns
+      setCampaigns(newCampaigns)
+    }
     // Update cache for faster subsequent views
-    cacheRef.current.campaigns = newCampaigns
+    cacheRef.current.campaigns = nextList
     
     // ANALYTICS FIX: Also persist campaign updates to database
     // This ensures sent campaigns with sentCount are saved permanently
     try {
-      for (const campaign of newCampaigns) {
+      for (const campaign of nextList) {
         // Only update campaigns that have been sent (have sentCount > 0 or status 'sent')
         if (campaign.status === 'sent' || campaign.sentCount > 0) {
           console.log(`📊 Persisting sent campaign to database: ${campaign.name} (sentCount: ${campaign.sentCount})`)
@@ -733,10 +743,8 @@ export default function CustomerEmailsPage() {
       }
 
       // Update campaign status to sending
-      updateCampaigns(campaigns.map(c => 
-        c.id === campaignId 
-          ? { ...c, status: 'sending' as const }
-          : c
+      await updateCampaigns(prev => prev.map(c =>
+        c.id === campaignId ? { ...c, status: 'sending' as const } : c
       ))
 
       // Prepare recipient data based on campaign type
@@ -790,31 +798,40 @@ export default function CustomerEmailsPage() {
         // Use the server's updated campaign directly for immediate UI update
         if (result.campaign) {
           // Update with server's authoritative campaign data
-          await updateCampaigns(campaigns.map(c => 
-            c.id === campaignId 
+          await updateCampaigns(prev => prev.map(c =>
+            c.id === campaignId
               ? {
                   ...result.campaign,
-                  openRate: 0,  // Will be updated by tracking
-                  clickRate: 0  // Will be updated by tracking
+                  openRate: 0,
+                  clickRate: 0
                 }
               : c
           ))
         } else {
           // Fallback to optimistic update if server doesn't return campaign
-          await updateCampaigns(campaigns.map(c => 
-            c.id === campaignId 
-              ? { 
-                  ...c, 
-                  status: 'sent' as const, 
+          await updateCampaigns(prev => prev.map(c =>
+            c.id === campaignId
+              ? {
+                  ...c,
+                  status: 'sent' as const,
                   sentCount: result.results.successCount,
                   recipientCount: result.results.totalRecipients,
                   sentAt: new Date().toISOString(),
-                  openRate: 0,  // Will be updated by tracking
-                  clickRate: 0  // Will be updated by tracking
+                  openRate: 0,
+                  clickRate: 0
                 }
               : c
           ))
         }
+
+        // Immediate light refresh to reinforce authoritative server state
+        try {
+          const latestNow = await fetch('/api/admin/campaigns', { cache: 'no-store' })
+          if (latestNow.ok) {
+            const listNow = await latestNow.json()
+            setCampaigns(prev => mergeCampaignListsNoDowngrade(prev, listNow))
+          }
+        } catch (_) {}
 
         // Delayed refetch as safety net (2 seconds later) to ensure consistency
         setTimeout(async () => {
@@ -837,10 +854,10 @@ export default function CustomerEmailsPage() {
               const analytics = await analyticsResponse.json()
               const coercedOpenRate = typeof analytics.openRate === 'number' ? analytics.openRate : Number(analytics.openRate) || 0
               const coercedClickRate = typeof analytics.clickRate === 'number' ? analytics.clickRate : Number(analytics.clickRate) || 0
-              updateCampaigns(campaigns.map(c => 
-                c.id === campaignId 
-                  ? { 
-                      ...c, 
+              await updateCampaigns(prev => prev.map(c =>
+                c.id === campaignId
+                  ? {
+                      ...c,
                       openRate: coercedOpenRate || c.openRate,
                       clickRate: coercedClickRate || c.clickRate
                     }
@@ -858,10 +875,8 @@ export default function CustomerEmailsPage() {
         alert(`Campaign sent successfully!\n\nSent to: ${result.results.successCount} recipients\nFailed: ${result.results.failureCount} recipients\n\n${result.message}`)
       } else {
         // Handle API error
-        updateCampaigns(campaigns.map(c => 
-          c.id === campaignId 
-            ? { ...c, status: 'draft' as const }
-            : c
+        await updateCampaigns(prev => prev.map(c =>
+          c.id === campaignId ? { ...c, status: 'draft' as const } : c
         ))
         
         alert(`Failed to send campaign: ${result.error || 'Unknown error'}`)
@@ -871,10 +886,8 @@ export default function CustomerEmailsPage() {
       console.error('Error sending campaign:', error)
       
       // Reset campaign status on error
-      updateCampaigns(campaigns.map(c => 
-        c.id === campaignId 
-          ? { ...c, status: 'draft' as const }
-          : c
+      await updateCampaigns(prev => prev.map(c =>
+        c.id === campaignId ? { ...c, status: 'draft' as const } : c
       ))
       
       alert(`Failed to send campaign: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -999,15 +1012,14 @@ export default function CustomerEmailsPage() {
 
       if (response.ok && result.success) {
         // Update campaign with actual results
-        setCampaigns(campaigns.map(c => 
-          c.id === viewingCampaign.id 
-            ? { 
-                ...c, 
-                status: 'sent' as const, 
+        setCampaigns(prev => prev.map(c =>
+          c.id === viewingCampaign.id
+            ? {
+                ...c,
+                status: 'sent' as const,
                 sentCount: result.results.successCount,
                 recipientCount: result.results.totalRecipients,
                 sentAt: new Date().toISOString(),
-                // Real performance data will be added when tracking is implemented
                 openRate: undefined,
                 clickRate: undefined
               }
@@ -1017,10 +1029,8 @@ export default function CustomerEmailsPage() {
         alert(`Campaign sent successfully!\n\nSent to: ${result.results.successCount} recipients\nFailed: ${result.results.failureCount} recipients\n\n${result.message}`)
       } else {
         // Handle API error
-        setCampaigns(campaigns.map(c => 
-          c.id === viewingCampaign.id 
-            ? { ...c, status: 'draft' as const }
-            : c
+        setCampaigns(prev => prev.map(c =>
+          c.id === viewingCampaign.id ? { ...c, status: 'draft' as const } : c
         ))
         
         alert(`Failed to send campaign: ${result.error || 'Unknown error'}`)
@@ -1030,10 +1040,8 @@ export default function CustomerEmailsPage() {
       console.error('Error sending campaign:', error)
       
       // Reset campaign status on error
-      setCampaigns(campaigns.map(c => 
-        c.id === viewingCampaign?.id 
-          ? { ...c, status: 'draft' as const }
-          : c
+      setCampaigns(prev => prev.map(c =>
+        c.id === viewingCampaign?.id ? { ...c, status: 'draft' as const } : c
       ))
       
       alert(`Failed to send campaign: ${error instanceof Error ? error.message : 'Unknown error'}`)

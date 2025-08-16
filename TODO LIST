@@ -3,4 +3,4 @@
 Last Updated: 2025-08-16 (Golden State `726d9b4`)
 
 1) Add bulk delete for campaigns: allow selecting multiple (or all) campaigns and delete selected with a single action (with confirmation).
-2) Fix Create Campaign modal on smaller screens: ensure the modal body scrolls and the “Create Campaign” button is always reachable (sticky footer or internal scroll).
+2) Show live recipient count in the New Campaign filter panel (inside “Customer Filters”) as filters are adjusted, so the user can see how many recipients will be targeted before applying.

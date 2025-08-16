@@ -181,6 +181,10 @@ export default function CustomerEmailsPage() {
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([])
   const [deletingSelected, setDeletingSelected] = useState(false)
 
+  // Previous campaigns selection (bulk permanent delete)
+  const [selectedPrevCampaignIds, setSelectedPrevCampaignIds] = useState<string[]>([])
+  const [deletingPrevSelected, setDeletingPrevSelected] = useState(false)
+
   const computeDateRange = () => {
     const now = new Date()
     let from: Date | null = null
@@ -2086,7 +2090,35 @@ export default function CustomerEmailsPage() {
       <div className="bg-white p-6 rounded-lg shadow border">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Previous Campaigns ({prevTotal})</h3>
-          <button onClick={loadPreviousCampaigns} className="px-3 py-2 bg-gray-100 border rounded">Refresh</button>
+          <div className="flex items-center gap-2">
+            {selectedPrevCampaignIds.length > 0 && (
+              <button
+                onClick={async () => {
+                  if (!confirm(`Permanently delete ${selectedPrevCampaignIds.length} selected campaign${selectedPrevCampaignIds.length>1?'s':''}? This cannot be undone.`)) return
+                  try {
+                    setDeletingPrevSelected(true)
+                    for (const id of selectedPrevCampaignIds) {
+                      try {
+                        await fetch(`/api/admin/campaigns?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+                      } catch (e) {
+                        console.error('Failed to delete previous campaign', id, e)
+                      }
+                    }
+                    setSelectedPrevCampaignIds([])
+                    await loadPreviousCampaigns()
+                    await refreshCampaignsLight()
+                  } finally {
+                    setDeletingPrevSelected(false)
+                  }
+                }}
+                disabled={deletingPrevSelected}
+                className={`px-3 py-2 text-white rounded ${deletingPrevSelected ? 'bg-red-300' : 'bg-red-600 hover:bg-red-700'}`}
+              >
+                {deletingPrevSelected ? 'Deleting…' : `Delete selected permanently (${selectedPrevCampaignIds.length})`}
+              </button>
+            )}
+            <button onClick={loadPreviousCampaigns} className="px-3 py-2 bg-gray-100 border rounded">Refresh</button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
@@ -2146,6 +2178,20 @@ export default function CustomerEmailsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-3 py-2 text-left">
+                  {(() => {
+                    const visibleIds = previousCampaigns.map((c:any)=>c.id)
+                    const allSelected = visibleIds.length>0 && visibleIds.every((id:string)=>selectedPrevCampaignIds.includes(id))
+                    return (
+                      <input
+                        type="checkbox"
+                        aria-label="Select all previous campaigns"
+                        checked={allSelected}
+                        onChange={(e)=> setSelectedPrevCampaignIds(e.target.checked ? visibleIds : [])}
+                      />
+                    )
+                  })()}
+                </th>
                 <th className="px-3 py-2 text-left text-gray-600">Name</th>
                 <th className="px-3 py-2 text-left text-gray-600">Subject</th>
                 <th className="px-3 py-2 text-left text-gray-600">Status</th>
@@ -2162,6 +2208,16 @@ export default function CustomerEmailsPage() {
                   const full = campaigns.find(x => x.id === c.id) || c
                   await handleViewCampaign(full)
                 }}>
+                  <td className="px-3 py-2" onClick={(e)=>e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${c.name}`}
+                      checked={selectedPrevCampaignIds.includes(c.id)}
+                      onChange={(e)=>{
+                        setSelectedPrevCampaignIds(prev => e.target.checked ? Array.from(new Set([...prev, c.id])) : prev.filter(id => id !== c.id))
+                      }}
+                    />
+                  </td>
                   <td className="px-3 py-2">{c.name}</td>
                   <td className="px-3 py-2">{c.subject}</td>
                   <td className="px-3 py-2">{c.status}</td>
@@ -2179,6 +2235,8 @@ export default function CustomerEmailsPage() {
                       if (resp.ok) {
                         removeCampaignLocally(c.id)
                         await refreshCampaignsLight()
+                        setSelectedPrevCampaignIds(prev => prev.filter(id => id !== c.id))
+                        await loadPreviousCampaigns()
                       } else {
                         alert('Failed to delete campaign')
                       }
@@ -2327,7 +2385,16 @@ export default function CustomerEmailsPage() {
               eventSource: enquiry.eventSource || '',
               customerRating: enquiry.customerRating || '',
               status: enquiry.status || 'New',
-              doNotEmail: enquiry.doNotEmail || false,
+              doNotEmail: (() => {
+                const v = enquiry.doNotEmail
+                if (typeof v === 'boolean') return v
+                if (typeof v === 'number') return v === 1
+                if (typeof v === 'string') {
+                  const s = v.trim().toLowerCase()
+                  return s === 'true' || s === '1' || s === 'yes'
+                }
+                return false
+              })(),
               createdAt: enquiry.createdAt || new Date().toISOString()
             }))
             setCustomers(transformedCustomers)

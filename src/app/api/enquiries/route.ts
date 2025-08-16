@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
       salesManagerExplanation: enquiry.salesManagerExplanation,
       followUpNotes: enquiry.followUpNotes,
       followUpInfo: enquiry.followUpInfo,
-      doNotEmail: enquiry.doNotEmail,
+      // Database field mapped as `doNotEmail` actually stores subscription (newsletter) semantics.
+      // Expose a true "do not email" flag to the UI by inverting once here.
+      doNotEmail: !enquiry.doNotEmail,
       hasFollowUp: !!(enquiry.bestTimeToFollowUp || enquiry.followUpInfo),
       createdAt: enquiry.createdAt,
       created_at: enquiry.createdAt,

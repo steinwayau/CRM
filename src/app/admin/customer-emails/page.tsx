@@ -74,7 +74,7 @@ interface Campaign {
   sentCount: number
   openRate?: number
   clickRate?: number
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'archived'
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'archived' | 'deleted'
   recipientType: 'all' | 'filtered' | 'selected' | 'custom'
   customEmails?: string
   textContent?: string // Temporary storage for custom emails
@@ -176,6 +176,10 @@ export default function CustomerEmailsPage() {
 
   // Simple in-memory cache to speed up tab switches (session-lifetime)
   const cacheRef = useRef<{ campaigns?: Campaign[]; templates?: EmailTemplate[]; cachedAt?: number }>({})
+
+  // Campaign selection (bulk actions)
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([])
+  const [deletingSelected, setDeletingSelected] = useState(false)
 
   const computeDateRange = () => {
     const now = new Date()
@@ -1214,7 +1218,7 @@ export default function CustomerEmailsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Emails Sent</p>
               <p className="text-3xl font-bold text-gray-900">
-                                 {campaigns.filter(c => c.status !== 'archived').reduce((sum, c) => sum + (c.status === 'sent' ? c.sentCount : 0), 0)}
+                                 {campaigns.filter(c => c.status !== 'archived' && c.status !== 'deleted').reduce((sum, c) => sum + (c.status === 'sent' ? c.sentCount : 0), 0)}
               </p>
             </div>
           </div>
@@ -1234,7 +1238,7 @@ export default function CustomerEmailsPage() {
                 {analyticsLoading ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
-                  const active = campaigns.filter(c => c.status !== 'archived')
+                  const active = campaigns.filter(c => c.status !== 'archived' && c.status !== 'deleted')
                   if (active.length === 0) return '0'
                   const ordered = [...active].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
                   const latest = ordered[ordered.length - 1]
@@ -1261,7 +1265,7 @@ export default function CustomerEmailsPage() {
                 {analyticsLoading ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : (() => {
-                  const active = campaigns.filter(c => c.status !== 'archived')
+                  const active = campaigns.filter(c => c.status !== 'archived' && c.status !== 'deleted')
                   if (active.length === 0) return '0'
                   const ordered = [...active].sort((a, b) => (a.sentAt || a.createdAt).localeCompare(b.sentAt || b.createdAt))
                   const latest = ordered[ordered.length - 1]
@@ -1284,6 +1288,24 @@ export default function CustomerEmailsPage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3">
+                  {(() => {
+                    const visible = campaigns.filter(c => c.status !== 'archived' && c.status !== 'deleted')
+                    const visibleIds = visible.map(c => c.id)
+                    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedCampaignIds.includes(id))
+                    return (
+                      <input
+                        type="checkbox"
+                        aria-label="Select all"
+                        checked={allSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedCampaignIds(visibleIds)
+                          else setSelectedCampaignIds([])
+                        }}
+                      />
+                    )
+                  })()}
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Template</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th>
@@ -1293,8 +1315,22 @@ export default function CustomerEmailsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {campaigns.filter(c => c.status !== 'archived').map((campaign) => (
+              {campaigns.filter(c => c.status !== 'archived' && c.status !== 'deleted').map((campaign) => (
                 <tr key={campaign.id}>
+                  <td className="px-4 py-4">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${campaign.name}`}
+                      checked={selectedCampaignIds.includes(campaign.id)}
+                      onChange={(e) => {
+                        setSelectedCampaignIds(prev =>
+                          e.target.checked
+                            ? Array.from(new Set([...prev, campaign.id]))
+                            : prev.filter(id => id !== campaign.id)
+                        )
+                      }}
+                    />
+                  </td>
                   <td className="px-6 py-4">
                     <div>
                       <p className="font-medium text-gray-900">{campaign.name}</p>
@@ -1357,10 +1393,10 @@ export default function CustomerEmailsPage() {
       {/* New Campaign Modal */}
       {showNewCampaign && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Create New Campaign</h3>
+          <div className="bg-white rounded-lg max-w-md w-full mx-4 max-h-[85vh] flex flex-col">
+            <h3 className="text-lg font-semibold mb-4 p-6 pb-0">Create New Campaign</h3>
             
-            <div className="space-y-4">
+            <div className="space-y-4 p-6 pt-4 flex-1 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name</label>
                 <input
@@ -1454,7 +1490,7 @@ export default function CustomerEmailsPage() {
                   <div className="mt-1 text-xs text-gray-500">
                     {(() => {
                       const emailList = campaignForm.customEmails
-                        .split(/[,\n\r]+/)
+                        .split(/[,,\n\r]+/)
                         .map(email => email.trim())
                         .filter(email => email && /\S+@\S+\.\S+/.test(email))
                       return `${emailList.length} valid email${emailList.length !== 1 ? 's' : ''} detected`
@@ -1485,7 +1521,7 @@ export default function CustomerEmailsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end space-x-3 p-6 pt-4 border-t">
               <button
                 onClick={() => setShowNewCampaign(false)}
                 className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
@@ -2315,6 +2351,28 @@ export default function CustomerEmailsPage() {
       ensureTemplatesLoaded()
     }
   }, [showNewCampaign])
+
+  // Bulk delete selected campaigns (soft delete via existing API)
+  const handleDeleteSelectedCampaigns = async () => {
+    if (selectedCampaignIds.length === 0) return
+    const confirmMsg = `Delete ${selectedCampaignIds.length} selected campaign${selectedCampaignIds.length > 1 ? 's' : ''}?\n\nThis will remove them from the list (soft delete).`
+    if (!confirm(confirmMsg)) return
+    try {
+      setDeletingSelected(true)
+      for (const id of selectedCampaignIds) {
+        try {
+          await fetch(`/api/admin/campaigns?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+        } catch (e) {
+          console.error('Failed to delete campaign', id, e)
+        }
+      }
+      // Reflect deletions locally without waiting for a refetch
+      setCampaigns(prev => prev.map(c => selectedCampaignIds.includes(c.id) ? { ...c, status: 'deleted' } : c))
+      setSelectedCampaignIds([])
+    } finally {
+      setDeletingSelected(false)
+    }
+  }
 
   if (loading) {
     return (

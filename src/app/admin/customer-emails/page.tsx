@@ -2099,12 +2099,14 @@ export default function CustomerEmailsPage() {
                     setDeletingPrevSelected(true)
                     for (const id of selectedPrevCampaignIds) {
                       try {
-                        await fetch(`/api/admin/campaigns?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+                        await fetch(`/api/admin/campaigns?id=${encodeURIComponent(id)}&hard=true`, { method: 'DELETE' })
                       } catch (e) {
                         console.error('Failed to delete previous campaign', id, e)
                       }
                     }
                     setSelectedPrevCampaignIds([])
+                    // Reset to first page after deletions for a clean refresh
+                    setPrevPage(1)
                     await loadPreviousCampaigns()
                     await refreshCampaignsLight()
                   } finally {
@@ -2231,11 +2233,12 @@ export default function CustomerEmailsPage() {
                     }}>View</button>
                     <button className="px-2 py-1 text-sm text-red-600 hover:underline" onClick={async ()=>{
                       if (!confirm('Permanently delete this campaign? This cannot be undone.')) return
-                      const resp = await fetch(`/api/admin/campaigns?id=${c.id}`, { method: 'DELETE' })
+                      const resp = await fetch(`/api/admin/campaigns?id=${c.id}&hard=true`, { method: 'DELETE' })
                       if (resp.ok) {
                         removeCampaignLocally(c.id)
                         await refreshCampaignsLight()
                         setSelectedPrevCampaignIds(prev => prev.filter(id => id !== c.id))
+                        setPrevPage(1)
                         await loadPreviousCampaigns()
                       } else {
                         alert('Failed to delete campaign')

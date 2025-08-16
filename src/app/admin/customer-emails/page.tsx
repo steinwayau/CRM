@@ -2383,8 +2383,13 @@ export default function CustomerEmailsPage() {
               state: enquiry.state || '',
               suburb: enquiry.suburb || '',
               nationality: enquiry.nationality || '',
-              productInterest: enquiry.pianoModel ? [enquiry.pianoModel] : [],
-              source: enquiry.enquirySource || '',
+              // Map interests from API string (e.g., "Steinway, Boston") to an array
+              productInterest: (enquiry.productInterest || '')
+                .split(',')
+                .map((s: string) => s.trim())
+                .filter((s: string) => !!s),
+              // Map "hear about us" source correctly
+              source: enquiry.source || '',
               eventSource: enquiry.eventSource || '',
               customerRating: enquiry.customerRating || '',
               status: enquiry.status || 'New',
